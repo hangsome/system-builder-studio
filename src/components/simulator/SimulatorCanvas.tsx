@@ -3,15 +3,47 @@ import { useSimulatorStore } from '@/store/simulatorStore';
 import { componentDefinitions } from '@/data/componentDefinitions';
 import { ComponentDefinition, PlacedComponent, Pin } from '@/types/simulator';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronRight, Zap } from 'lucide-react';
+import { ChevronDown, ChevronRight, Zap, CheckCircle2, XCircle } from 'lucide-react';
 
 const GRID_SIZE = 20;
+
+// 连接成功音效
+const playConnectionSound = (success: boolean) => {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    if (success) {
+      // 成功音效 - 上升音调
+      oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
+      oscillator.frequency.setValueAtTime(660, audioContext.currentTime + 0.1);
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+    } else {
+      // 失败音效 - 下降音调
+      oscillator.frequency.setValueAtTime(330, audioContext.currentTime);
+      oscillator.frequency.setValueAtTime(220, audioContext.currentTime + 0.1);
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+    }
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.2);
+  } catch (e) {
+    // 忽略音频错误
+  }
+};
 
 export function SimulatorCanvas() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedComponent, setDraggedComponent] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [showConnectionFeedback, setShowConnectionFeedback] = useState(false);
   
   const {
     zoom,
@@ -23,6 +55,7 @@ export function SimulatorCanvas() {
     isDrawingConnection,
     connectionStart,
     tempConnectionEnd,
+    lastConnectionResult,
     addComponent,
     updateComponentPosition,
     selectComponent,
@@ -30,9 +63,23 @@ export function SimulatorCanvas() {
     updateTempConnection,
     completeConnection,
     cancelConnection,
+    clearConnectionResult,
     setZoom,
     setPan,
   } = useSimulatorStore();
+  
+  // 监听连接结果并显示反馈
+  useEffect(() => {
+    if (lastConnectionResult) {
+      playConnectionSound(lastConnectionResult.success);
+      setShowConnectionFeedback(true);
+      const timer = setTimeout(() => {
+        setShowConnectionFeedback(false);
+        clearConnectionResult();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [lastConnectionResult, clearConnectionResult]);
 
   // 处理拖放到画布
   const handleDrop = useCallback(
@@ -372,6 +419,32 @@ export function SimulatorCanvas() {
 
       {/* 供电说明浮窗 - 可折叠 */}
       <PowerGuidePanel />
+      
+      {/* 连接成功/失败反馈 */}
+      {showConnectionFeedback && lastConnectionResult && (
+        <div 
+          className={cn(
+            "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
+            "flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl z-50",
+            "animate-scale-in",
+            lastConnectionResult.success 
+              ? "bg-green-500 text-white" 
+              : "bg-red-500 text-white"
+          )}
+        >
+          {lastConnectionResult.success ? (
+            <CheckCircle2 className="w-8 h-8" />
+          ) : (
+            <XCircle className="w-8 h-8" />
+          )}
+          <div>
+            <p className="font-bold text-lg">{lastConnectionResult.message}</p>
+            {lastConnectionResult.success && (
+              <p className="text-sm opacity-90">连线已建立</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 缩放控制 */}
       <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-card border border-border rounded-lg p-2 shadow-sm">

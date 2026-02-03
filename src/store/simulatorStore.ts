@@ -45,6 +45,9 @@ interface SimulatorStore {
   // 日志
   logs: LogEntry[];
   
+  // 连接反馈
+  lastConnectionResult: { success: boolean; message: string; type: string } | null;
+  
   // Actions
   setZoom: (zoom: number) => void;
   setPan: (pan: { x: number; y: number }) => void;
@@ -75,6 +78,7 @@ interface SimulatorStore {
   
   addLog: (log: Omit<LogEntry, 'timestamp'>) => void;
   clearLogs: () => void;
+  clearConnectionResult: () => void;
   
   resetSimulator: () => void;
   loadScenario: (scenario: {
@@ -208,6 +212,7 @@ const initialState = {
     logs: [],
   },
   logs: [],
+  lastConnectionResult: null,
 };
 
 export const useSimulatorStore = create<SimulatorStore>()(
@@ -266,24 +271,31 @@ export const useSimulatorStore = create<SimulatorStore>()(
             isDrawingConnection: false,
             connectionStart: null,
             tempConnectionEnd: null,
+            lastConnectionResult: { 
+              success: false, 
+              message: exists ? '连接已存在' : '不能连接到同一组件',
+              type: 'error'
+            },
           });
           return;
         }
         
         // 根据引脚类型判断连接类型
-        const fromComponent = state.placedComponents.find(c => c.instanceId === fromComponentId);
-        const toComponent = state.placedComponents.find(c => c.instanceId === toComponentId);
-        
-        // 动态导入引脚定义以判断类型
         let connectionType: 'power' | 'ground' | 'data' | 'serial' = 'data';
+        let connectionLabel = '';
         
         // 简单判断逻辑
         if (fromPinId.includes('vcc') || fromPinId.includes('3v') || toPinId.includes('vcc') || toPinId.includes('3v')) {
           connectionType = 'power';
+          connectionLabel = '电源(VCC/3V)';
         } else if (fromPinId.includes('gnd') || toPinId.includes('gnd')) {
           connectionType = 'ground';
+          connectionLabel = '接地(GND)';
         } else if (fromPinId.includes('tx') || fromPinId.includes('rx') || toPinId.includes('tx') || toPinId.includes('rx')) {
           connectionType = 'serial';
+          connectionLabel = '串口(TX/RX)';
+        } else {
+          connectionLabel = '数据';
         }
         
         const newConnection: Connection = {
@@ -301,6 +313,11 @@ export const useSimulatorStore = create<SimulatorStore>()(
           isDrawingConnection: false,
           connectionStart: null,
           tempConnectionEnd: null,
+          lastConnectionResult: {
+            success: true,
+            message: `${connectionLabel}连接成功`,
+            type: connectionType,
+          },
         }));
       },
       
@@ -334,6 +351,7 @@ export const useSimulatorStore = create<SimulatorStore>()(
         logs: [...state.logs, { ...log, timestamp: new Date() }].slice(-100),
       })),
       clearLogs: () => set({ logs: [] }),
+      clearConnectionResult: () => set({ lastConnectionResult: null }),
       
       resetSimulator: () => set({
         ...initialState,
