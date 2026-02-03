@@ -305,13 +305,40 @@ export const useSimulatorStore = create<SimulatorStore>()(
         set({ placedComponents: newComponents });
       },
       
-      removeComponent: (instanceId) => set((state) => ({
-        placedComponents: state.placedComponents.filter((c) => c.instanceId !== instanceId),
-        connections: state.connections.filter(
+      removeComponent: (instanceId) => {
+        const state = get();
+        const componentToRemove = state.placedComponents.find(c => c.instanceId === instanceId);
+        
+        if (!componentToRemove) return;
+        
+        const removedConnections = state.connections.filter(
+          (conn) => conn.fromComponent === instanceId || conn.toComponent === instanceId
+        );
+        const remainingConnections = state.connections.filter(
           (conn) => conn.fromComponent !== instanceId && conn.toComponent !== instanceId
-        ),
-        selectedComponentId: state.selectedComponentId === instanceId ? null : state.selectedComponentId,
-      })),
+        );
+        
+        // 生成移除提示
+        let message = '';
+        if (componentToRemove.definitionId === 'microbit') {
+          message = 'micro:bit 已移除，扩展板连接已断开';
+        } else if (componentToRemove.definitionId === 'expansion-board') {
+          message = '扩展板已移除，所有连接已断开';
+        } else if (removedConnections.length > 0) {
+          message = `组件已移除，${removedConnections.length} 条连线已自动断开`;
+        }
+        
+        set({
+          placedComponents: state.placedComponents.filter((c) => c.instanceId !== instanceId),
+          connections: remainingConnections,
+          selectedComponentId: state.selectedComponentId === instanceId ? null : state.selectedComponentId,
+          lastConnectionResult: message ? {
+            success: true,
+            message,
+            type: 'data',
+          } : null,
+        });
+      },
       
       updateComponentPosition: (instanceId, position) => set((state) => ({
         placedComponents: state.placedComponents.map((c) =>
