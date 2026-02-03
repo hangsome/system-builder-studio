@@ -224,9 +224,86 @@ export const useSimulatorStore = create<SimulatorStore>()(
       setPan: (pan) => set({ pan }),
       toggleGrid: () => set((state) => ({ gridEnabled: !state.gridEnabled })),
       
-      addComponent: (component) => set((state) => ({
-        placedComponents: [...state.placedComponents, component],
-      })),
+      addComponent: (component) => {
+        const state = get();
+        const newComponents = [...state.placedComponents, component];
+        
+        // 检查是否需要自动连接 micro:bit 和扩展板
+        const microbit = newComponents.find(c => c.definitionId === 'microbit');
+        const expansionBoard = newComponents.find(c => c.definitionId === 'expansion-board');
+        
+        if (microbit && expansionBoard) {
+          // 检查是否已存在自动连接
+          const autoConnectionExists = state.connections.some(
+            c => (c.fromComponent === microbit.instanceId && c.toComponent === expansionBoard.instanceId) ||
+                 (c.fromComponent === expansionBoard.instanceId && c.toComponent === microbit.instanceId)
+          );
+          
+          if (!autoConnectionExists) {
+            // 创建 micro:bit 到扩展板的自动连接
+            const autoConnections: Connection[] = [
+              {
+                id: `auto-conn-p0-${Date.now()}`,
+                fromComponent: microbit.instanceId,
+                fromPin: 'p0',
+                toComponent: expansionBoard.instanceId,
+                toPin: 'slot-p0',
+                type: 'data',
+                valid: true,
+              },
+              {
+                id: `auto-conn-p1-${Date.now() + 1}`,
+                fromComponent: microbit.instanceId,
+                fromPin: 'p1',
+                toComponent: expansionBoard.instanceId,
+                toPin: 'slot-p1',
+                type: 'data',
+                valid: true,
+              },
+              {
+                id: `auto-conn-p2-${Date.now() + 2}`,
+                fromComponent: microbit.instanceId,
+                fromPin: 'p2',
+                toComponent: expansionBoard.instanceId,
+                toPin: 'slot-p2',
+                type: 'data',
+                valid: true,
+              },
+              {
+                id: `auto-conn-3v-${Date.now() + 3}`,
+                fromComponent: microbit.instanceId,
+                fromPin: '3v',
+                toComponent: expansionBoard.instanceId,
+                toPin: 'slot-3v',
+                type: 'power',
+                valid: true,
+              },
+              {
+                id: `auto-conn-gnd-${Date.now() + 4}`,
+                fromComponent: microbit.instanceId,
+                fromPin: 'gnd',
+                toComponent: expansionBoard.instanceId,
+                toPin: 'slot-gnd',
+                type: 'ground',
+                valid: true,
+              },
+            ];
+            
+            set({
+              placedComponents: newComponents,
+              connections: [...state.connections, ...autoConnections],
+              lastConnectionResult: {
+                success: true,
+                message: 'micro:bit 已自动插入扩展板',
+                type: 'power',
+              },
+            });
+            return;
+          }
+        }
+        
+        set({ placedComponents: newComponents });
+      },
       
       removeComponent: (instanceId) => set((state) => ({
         placedComponents: state.placedComponents.filter((c) => c.instanceId !== instanceId),
