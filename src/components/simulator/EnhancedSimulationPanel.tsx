@@ -80,9 +80,24 @@ export function EnhancedSimulationPanel() {
   });
 
   // 获取电源状态
-  const powerStatus = useMemo(() => {
+  const { powerStatus, obloqPowered, obloqConnected } = useMemo(() => {
     const validation = validateSystem(placedComponents, connections);
-    return validation.powerStatus;
+    
+    // 检查OBLOQ是否有电源
+    const obloq = placedComponents.find(c => c.definitionId === 'obloq');
+    const obloqHasPower = obloq ? validation.powerStatus.get(obloq.instanceId) : false;
+    
+    // 检查OBLOQ是否有串口连接（TX/RX连到扩展板）
+    const obloqHasSerial = obloq ? connections.some(c => 
+      (c.fromComponent === obloq.instanceId || c.toComponent === obloq.instanceId) &&
+      (c.type === 'serial')
+    ) : false;
+    
+    return {
+      powerStatus: validation.powerStatus,
+      obloqPowered: obloqHasPower,
+      obloqConnected: obloqHasPower && obloqHasSerial,
+    };
   }, [placedComponents, connections]);
 
   // 检查系统状态
@@ -102,20 +117,28 @@ export function EnhancedSimulationPanel() {
     }
   }, [sensorComponents]);
 
-  // 模拟网络连接
+  // 模拟网络连接 - 需要OBLOQ有电源和串口连接
   useEffect(() => {
-    if (isRunning && codeBurned) {
+    if (isRunning && codeBurned && obloqConnected) {
       // 模拟WiFi连接过程
       addLog({ type: 'info', message: '正在连接WiFi...', source: 'OBLOQ' });
       const timer = setTimeout(() => {
         setNetworkConnected(true);
         addLog({ type: 'info', message: `已连接到 ${routerConfig.ssid}`, source: 'OBLOQ' });
-      }, 1000);
+        addLog({ type: 'info', message: `IP地址: 192.168.1.${Math.floor(Math.random() * 100) + 100}`, source: 'OBLOQ' });
+      }, 1500);
       return () => clearTimeout(timer);
+    } else if (isRunning && codeBurned && !obloqConnected) {
+      if (!obloqPowered) {
+        addLog({ type: 'warning', message: 'OBLOQ模块未供电，无法连接WiFi', source: 'System' });
+      } else {
+        addLog({ type: 'warning', message: 'OBLOQ模块串口未连接(需要TX/RX交叉连接)', source: 'System' });
+      }
+      setNetworkConnected(false);
     } else {
       setNetworkConnected(false);
     }
-  }, [isRunning, codeBurned, routerConfig.ssid]);
+  }, [isRunning, codeBurned, obloqConnected, obloqPowered, routerConfig.ssid, addLog]);
 
   // 主仿真循环
   useEffect(() => {
