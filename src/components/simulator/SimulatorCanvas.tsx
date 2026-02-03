@@ -210,8 +210,7 @@ export function SimulatorCanvas() {
   return (
     <div
       ref={canvasRef}
-      className="relative flex-1 bg-muted/30"
-      style={{ overflow: 'hidden' }}
+      className="relative w-full h-full bg-muted/30 overflow-hidden"
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onClick={handleCanvasClick}
@@ -397,6 +396,7 @@ function CanvasComponent({
         width: definition.width * zoom,
         height: definition.height * zoom,
         zIndex: isSelected ? 100 : 10,
+        overflow: 'visible', // Allow pins to overflow the component bounds
       }}
       onMouseDown={handleComponentClick}
       onClick={handleComponentClick}
@@ -436,13 +436,17 @@ function CanvasComponent({
             width: 16 * zoom,
             height: 16 * zoom,
           }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+          }}
           onClick={(e) => {
             e.stopPropagation();
+            e.preventDefault();
             onPinClick(e, component.instanceId, pin.id);
           }}
           title={pin.name}
         >
-          <span className="font-bold text-white" style={{ fontSize: 6 * zoom }}>{pin.name.charAt(0)}</span>
+          <span className="font-bold text-white pointer-events-none" style={{ fontSize: 6 * zoom }}>{pin.name.charAt(0)}</span>
         </div>
       ))}
     </div>
