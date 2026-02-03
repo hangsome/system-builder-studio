@@ -270,13 +270,29 @@ export const useSimulatorStore = create<SimulatorStore>()(
           return;
         }
         
+        // 根据引脚类型判断连接类型
+        const fromComponent = state.placedComponents.find(c => c.instanceId === fromComponentId);
+        const toComponent = state.placedComponents.find(c => c.instanceId === toComponentId);
+        
+        // 动态导入引脚定义以判断类型
+        let connectionType: 'power' | 'ground' | 'data' | 'serial' = 'data';
+        
+        // 简单判断逻辑
+        if (fromPinId.includes('vcc') || fromPinId.includes('3v') || toPinId.includes('vcc') || toPinId.includes('3v')) {
+          connectionType = 'power';
+        } else if (fromPinId.includes('gnd') || toPinId.includes('gnd')) {
+          connectionType = 'ground';
+        } else if (fromPinId.includes('tx') || fromPinId.includes('rx') || toPinId.includes('tx') || toPinId.includes('rx')) {
+          connectionType = 'serial';
+        }
+        
         const newConnection: Connection = {
           id: `conn-${Date.now()}`,
           fromComponent: fromComponentId,
           fromPin: fromPinId,
           toComponent: toComponentId,
           toPin: toPinId,
-          type: 'data', // 可以根据引脚类型自动判断
+          type: connectionType,
           valid: true,
         };
         
