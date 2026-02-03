@@ -148,18 +148,22 @@ export function SimulatorCanvas() {
     [selectComponent, zoom, pan]
   );
 
-  // 画布平移 - 鼠标按下
+  // 画布平移 - 鼠标按下（左键在空白处拖拽）
   const handleCanvasMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      // 中键或按住空格时拖拽画布
-      if (e.button === 1 || (e.button === 0 && e.altKey)) {
+      // 检查是否点击在画布空白处（不是组件上）
+      const target = e.target as HTMLElement;
+      const isCanvasBackground = target === canvasRef.current || target.classList.contains('canvas-grid');
+      
+      // 左键在空白处拖拽画布
+      if (e.button === 0 && isCanvasBackground && !isDrawingConnection) {
         e.preventDefault();
         setIsPanning(true);
         setPanStart({ x: e.clientX, y: e.clientY });
         setInitialPan({ x: pan.x, y: pan.y });
       }
     },
-    [pan]
+    [pan, isDrawingConnection]
   );
 
   const handleMouseMove = useCallback(
