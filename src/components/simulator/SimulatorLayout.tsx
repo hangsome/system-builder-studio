@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { useSimulatorStore } from '@/store/simulatorStore';
@@ -42,11 +42,48 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
+const PANEL_STATE_KEY = 'simulator-panel-state';
+
+interface PanelState {
+  leftCollapsed: boolean;
+  rightCollapsed: boolean;
+  bottomCollapsed: boolean;
+}
+
+function loadPanelState(): PanelState {
+  try {
+    const saved = localStorage.getItem(PANEL_STATE_KEY);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Failed to load panel state:', e);
+  }
+  return { leftCollapsed: false, rightCollapsed: false, bottomCollapsed: false };
+}
+
+function savePanelState(state: PanelState) {
+  try {
+    localStorage.setItem(PANEL_STATE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.error('Failed to save panel state:', e);
+  }
+}
+
 export function SimulatorLayout() {
   const [activeTab, setActiveTab] = useState('hardware');
-  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
-  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
-  const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(false);
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(() => loadPanelState().leftCollapsed);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => loadPanelState().rightCollapsed);
+  const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(() => loadPanelState().bottomCollapsed);
+
+  // 持久化面板状态
+  useEffect(() => {
+    savePanelState({
+      leftCollapsed: leftPanelCollapsed,
+      rightCollapsed: rightPanelCollapsed,
+      bottomCollapsed: bottomPanelCollapsed,
+    });
+  }, [leftPanelCollapsed, rightPanelCollapsed, bottomPanelCollapsed]);
   
   const {
     isRunning,
