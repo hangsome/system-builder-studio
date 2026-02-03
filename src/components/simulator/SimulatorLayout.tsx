@@ -14,8 +14,6 @@ import {
   Square,
   Save,
   RotateCcw,
-  Download,
-  Settings,
   Layers,
   Code,
   Database,
@@ -25,9 +23,10 @@ import {
 import { ComponentLibrary } from './ComponentLibrary';
 import { SimulatorCanvas } from './SimulatorCanvas';
 import { PropertyPanel } from './PropertyPanel';
-import { CodeEditor } from './CodeEditor';
-import { DatabasePanel } from './DatabasePanel';
-import { SimulationPanel } from './SimulationPanel';
+import { EnhancedCodeEditor } from './EnhancedCodeEditor';
+import { EnhancedDatabasePanel } from './EnhancedDatabasePanel';
+import { EnhancedSimulationPanel } from './EnhancedSimulationPanel';
+import { ConnectionValidationPanel } from './ConnectionValidationPanel';
 import { scenarios, loadScenario } from '@/data/scenarios';
 
 export function SimulatorLayout() {
@@ -159,19 +158,19 @@ export function SimulatorLayout() {
               </TabsList>
 
               <TabsContent value="hardware" className="flex-1 m-0 overflow-hidden">
-                <HardwarePanel />
+                <ConnectionValidationPanel />
               </TabsContent>
               
               <TabsContent value="code" className="flex-1 m-0 overflow-hidden">
-                <CodeEditor />
+                <EnhancedCodeEditor />
               </TabsContent>
               
               <TabsContent value="database" className="flex-1 m-0 overflow-hidden">
-                <DatabasePanel />
+                <EnhancedDatabasePanel />
               </TabsContent>
               
               <TabsContent value="simulation" className="flex-1 m-0 overflow-hidden">
-                <SimulationPanel />
+                <EnhancedSimulationPanel />
               </TabsContent>
             </Tabs>
           </div>
@@ -180,72 +179,6 @@ export function SimulatorLayout() {
         {/* 右侧属性面板 */}
         <div className="w-64 flex-shrink-0">
           <PropertyPanel />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function HardwarePanel() {
-  const { connections, placedComponents } = useSimulatorStore();
-
-  return (
-    <div className="p-4 h-full overflow-y-auto">
-      <h3 className="font-medium text-sm mb-3">连接状态</h3>
-      
-      {connections.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          暂无连接。点击组件引脚开始连线。
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {connections.map((conn) => (
-            <div
-              key={conn.id}
-              className="flex items-center gap-2 text-sm p-2 rounded bg-muted/50"
-            >
-              <span
-                className={`w-2 h-2 rounded-full ${conn.valid ? 'bg-green-500' : 'bg-red-500'}`}
-              />
-              <span>
-                {conn.fromComponent.split('-')[0]}.{conn.fromPin}
-              </span>
-              <span className="text-muted-foreground">→</span>
-              <span>
-                {conn.toComponent.split('-')[0]}.{conn.toPin}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-      
-      <div className="mt-4">
-        <h4 className="font-medium text-sm mb-2">引脚颜色说明</h4>
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500" />
-            <span>电源 (VCC/3V)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-gray-800" />
-            <span>接地 (GND)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-blue-500" />
-            <span>数字信号</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-yellow-500" />
-            <span>模拟信号</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-500" />
-            <span>串口 TX</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-400" />
-            <span>串口 RX</span>
-          </div>
         </div>
       </div>
     </div>
