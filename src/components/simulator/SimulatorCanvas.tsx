@@ -71,26 +71,15 @@ export function SimulatorCanvas() {
     e.dataTransfer.dropEffect = 'copy';
   }, []);
 
-  // 处理组件拖拽 - 点击切换拖拽状态
+  // 处理组件拖拽 - 标准 mousedown/mouseup 模式
   const handleComponentMouseDown = useCallback(
     (e: React.MouseEvent, instanceId: string, component: PlacedComponent) => {
       e.stopPropagation();
-      
-      // 如果正在拖拽同一个组件，点击则停止拖拽
-      if (isDragging && draggedComponent === instanceId) {
-        setIsDragging(false);
-        setDraggedComponent(null);
-        return;
-      }
-      
-      // 如果正在拖拽其他组件，先停止
-      if (isDragging) {
-        setIsDragging(false);
-        setDraggedComponent(null);
-      }
+      e.preventDefault();
       
       selectComponent(instanceId);
       
+      // 仅左键触发拖拽
       if (e.button === 0) {
         const rect = canvasRef.current?.getBoundingClientRect();
         if (!rect) return;
@@ -103,7 +92,7 @@ export function SimulatorCanvas() {
         });
       }
     },
-    [selectComponent, zoom, pan, isDragging, draggedComponent]
+    [selectComponent, zoom, pan]
   );
 
   const handleMouseMove = useCallback(
@@ -154,17 +143,10 @@ export function SimulatorCanvas() {
     [isDrawingConnection, connectionStart, completeConnection, startConnection]
   );
 
-  // 点击画布空白处：停止拖拽、取消连线、取消选择
+  // 点击画布空白处：取消连线、取消选择
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('canvas-grid')) {
-        // 如果正在拖拽，点击空白处停止拖拽
-        if (isDragging) {
-          setIsDragging(false);
-          setDraggedComponent(null);
-          return;
-        }
-        
         if (isDrawingConnection) {
           cancelConnection();
         } else {
@@ -172,7 +154,7 @@ export function SimulatorCanvas() {
         }
       }
     },
-    [isDrawingConnection, cancelConnection, selectComponent, isDragging]
+    [isDrawingConnection, cancelConnection, selectComponent]
   );
 
   // 滚轮缩放
@@ -399,11 +381,6 @@ function CanvasComponent({
   zoom,
   pan,
 }: CanvasComponentProps) {
-  const handleComponentClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onMouseDown(e);
-  };
-
   return (
     <div
       className={cn(
@@ -417,10 +394,9 @@ function CanvasComponent({
         width: definition.width * zoom,
         height: definition.height * zoom,
         zIndex: isSelected ? 100 : 10,
-        overflow: 'visible', // Allow pins to overflow the component bounds
+        overflow: 'visible',
       }}
-      onMouseDown={handleComponentClick}
-      onClick={handleComponentClick}
+      onMouseDown={onMouseDown}
     >
       {/* 组件名称 */}
       <div 
