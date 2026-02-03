@@ -332,15 +332,18 @@ export function SimulatorCanvas() {
         />
       )}
 
-      {/* SVG 连线层 - z-20 确保在组件之上 */}
+      {/* SVG 连线层 - z-20 确保在组件之上，使用 viewBox 支持负坐标 */}
       <svg
-        className="absolute inset-0 pointer-events-none z-20"
+        className="absolute pointer-events-none z-20"
         style={{
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-          transformOrigin: '0 0',
-          width: '5000px',
-          height: '5000px',
+          left: pan.x - 5000,
+          top: pan.y - 5000,
+          width: '10000px',
+          height: '10000px',
+          transform: `scale(${zoom})`,
+          transformOrigin: '5000px 5000px',
         }}
+        viewBox="-5000 -5000 10000 10000"
       >
         {/* SVG Filters for glow effect */}
         <defs>
