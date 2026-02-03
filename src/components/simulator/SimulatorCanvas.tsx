@@ -317,10 +317,10 @@ export function SimulatorCanvas() {
       onMouseLeave={handleMouseUp}
       onWheel={handleWheel}
     >
-      {/* 网格背景 */}
+      {/* 网格背景 - z-0 */}
       {gridEnabled && (
         <div
-          className="canvas-grid absolute inset-0 pointer-events-none"
+          className="canvas-grid absolute inset-0 pointer-events-none z-0"
           style={{
             backgroundImage: `
               linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px),
@@ -332,14 +332,14 @@ export function SimulatorCanvas() {
         />
       )}
 
-      {/* SVG 连线层 */}
+      {/* SVG 连线层 - z-20 确保在组件之上 */}
       <svg
-        className="absolute inset-0 pointer-events-none"
+        className="absolute inset-0 pointer-events-none z-20"
         style={{
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
           transformOrigin: '0 0',
-          width: '2000px',
-          height: '2000px',
+          width: '5000px',
+          height: '5000px',
         }}
       >
         {/* SVG Filters for glow effect */}
