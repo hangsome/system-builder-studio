@@ -379,6 +379,11 @@ function CanvasComponent({
   zoom,
   pan,
 }: CanvasComponentProps) {
+  const handleComponentClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onMouseDown(e);
+  };
+
   return (
     <div
       className={cn(
@@ -393,24 +398,33 @@ function CanvasComponent({
         height: definition.height * zoom,
         zIndex: isSelected ? 100 : 10,
       }}
-      onMouseDown={onMouseDown}
+      onMouseDown={handleComponentClick}
+      onClick={handleComponentClick}
     >
       {/* 组件名称 */}
-      <div className="absolute -top-6 left-0 right-0 text-center">
-        <span className="text-xs font-medium text-foreground bg-card px-2 py-0.5 rounded border border-border">
+      <div 
+        className="absolute left-0 right-0 text-center pointer-events-none"
+        style={{ top: -24 * zoom }}
+      >
+        <span 
+          className="font-medium text-foreground bg-card px-2 py-0.5 rounded border border-border"
+          style={{ fontSize: 12 * zoom }}
+        >
           {definition.name}
         </span>
       </div>
 
       {/* 组件可视化内容 */}
-      <ComponentVisual type={definition.type} state={component.state} />
+      <div className="w-full h-full overflow-hidden rounded-md pointer-events-none">
+        <ComponentVisual type={definition.type} state={component.state} />
+      </div>
 
       {/* 引脚 */}
       {definition.pins.map((pin) => (
         <div
           key={pin.id}
           className={cn(
-            "absolute rounded-full border-2 cursor-pointer transition-all",
+            "absolute rounded-full border-2 cursor-pointer transition-all z-20",
             "flex items-center justify-center",
             "-translate-x-1/2 -translate-y-1/2",
             getPinColor(pin.type),
@@ -422,7 +436,10 @@ function CanvasComponent({
             width: 16 * zoom,
             height: 16 * zoom,
           }}
-          onClick={(e) => onPinClick(e, component.instanceId, pin.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onPinClick(e, component.instanceId, pin.id);
+          }}
           title={pin.name}
         >
           <span className="font-bold text-white" style={{ fontSize: 6 * zoom }}>{pin.name.charAt(0)}</span>
