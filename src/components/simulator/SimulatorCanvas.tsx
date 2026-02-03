@@ -245,29 +245,65 @@ export function SimulatorCanvas() {
           transformOrigin: '0 0',
         }}
       >
-        {/* 已完成的连线 */}
+        {/* 已完成的连线 - 增强可视化 */}
         {connections.map((connection) => {
           const points = getConnectionPoints(connection);
           if (!points) return null;
           
+          const color = getConnectionColor(connection.type);
+          const midX = (points.from.x + points.to.x) / 2;
+          const midY = (points.from.y + points.to.y) / 2;
+          
           return (
             <g key={connection.id}>
+              {/* 连线阴影/光晕效果 */}
               <line
                 x1={points.from.x}
                 y1={points.from.y}
                 x2={points.to.x}
                 y2={points.to.y}
-                stroke={getConnectionColor(connection.type)}
-                strokeWidth={3}
+                stroke={color}
+                strokeWidth={8}
+                strokeLinecap="round"
+                opacity={0.3}
+              />
+              {/* 主连线 */}
+              <line
+                x1={points.from.x}
+                y1={points.from.y}
+                x2={points.to.x}
+                y2={points.to.y}
+                stroke={color}
+                strokeWidth={4}
                 strokeLinecap="round"
               />
-              {/* 数据流动画 */}
-              <circle
-                r={4}
-                fill={getConnectionColor(connection.type)}
+              {/* 连线端点圆圈 */}
+              <circle cx={points.from.x} cy={points.from.y} r={6} fill={color} stroke="#fff" strokeWidth={2} />
+              <circle cx={points.to.x} cy={points.to.y} r={6} fill={color} stroke="#fff" strokeWidth={2} />
+              {/* 连线类型标签 */}
+              <rect
+                x={midX - 20}
+                y={midY - 10}
+                width={40}
+                height={20}
+                rx={4}
+                fill="#1f2937"
+                opacity={0.9}
+              />
+              <text
+                x={midX}
+                y={midY + 4}
+                textAnchor="middle"
+                fill="#fff"
+                fontSize={10}
+                fontWeight="bold"
               >
+                {connection.type === 'power' ? 'VCC' : connection.type === 'ground' ? 'GND' : connection.type === 'serial' ? 'TX/RX' : 'DATA'}
+              </text>
+              {/* 数据流动画 */}
+              <circle r={5} fill="#fff">
                 <animateMotion
-                  dur="2s"
+                  dur="1.5s"
                   repeatCount="indefinite"
                   path={`M${points.from.x},${points.from.y} L${points.to.x},${points.to.y}`}
                 />
@@ -332,6 +368,20 @@ export function SimulatorCanvas() {
           </div>
         </div>
       )}
+
+      {/* 供电说明浮窗 */}
+      <div className="absolute top-4 left-4 bg-card border border-border rounded-lg p-3 shadow-lg max-w-xs text-sm">
+        <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-red-500"></span>
+          供电连接说明
+        </h4>
+        <ul className="space-y-1 text-muted-foreground text-xs">
+          <li>• <b>micro:bit</b>: 连接 <span className="text-purple-500 font-medium">USB</span> 引脚到 PC服务器</li>
+          <li>• <b>扩展板</b>: 将 micro:bit 的 <span className="text-red-500 font-medium">3V</span>/<span className="text-gray-500 font-medium">GND</span> 连到扩展板插槽</li>
+          <li>• <b>传感器</b>: 连接 <span className="text-red-500 font-medium">VCC</span> 到扩展板 3V，<span className="text-gray-500 font-medium">GND</span> 到扩展板 GND</li>
+          <li>• <b>OBLOQ</b>: 连接 <span className="text-red-500 font-medium">VCC</span>/<span className="text-gray-500 font-medium">GND</span> 并将 <span className="text-green-500 font-medium">TX</span>/<span className="text-green-400 font-medium">RX</span> 交叉连到扩展板</li>
+        </ul>
+      </div>
 
       {/* 缩放控制 */}
       <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-card border border-border rounded-lg p-2 shadow-sm">
@@ -416,34 +466,58 @@ function CanvasComponent({
         <ComponentVisual type={definition.type} state={component.state} />
       </div>
 
-      {/* 引脚 */}
+      {/* 引脚 - 增强显示 */}
       {definition.pins.map((pin) => (
         <div
           key={pin.id}
-          className={cn(
-            "absolute rounded-full border-2 cursor-pointer transition-all z-20",
-            "flex items-center justify-center",
-            "-translate-x-1/2 -translate-y-1/2",
-            getPinColor(pin.type),
-            isDrawingConnection && "animate-pulse hover:scale-125"
-          )}
+          className="absolute z-20"
           style={{
             left: pin.position.x * zoom,
             top: pin.position.y * zoom,
-            width: 16 * zoom,
-            height: 16 * zoom,
           }}
-          onMouseDown={(e) => {
-            e.stopPropagation();
-          }}
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            onPinClick(e, component.instanceId, pin.id);
-          }}
-          title={pin.name}
         >
-          <span className="font-bold text-white pointer-events-none" style={{ fontSize: 6 * zoom }}>{pin.name.charAt(0)}</span>
+          {/* 引脚圆点 */}
+          <div
+            className={cn(
+              "rounded-full border-2 cursor-pointer transition-all",
+              "flex items-center justify-center",
+              "-translate-x-1/2 -translate-y-1/2",
+              getPinColor(pin.type),
+              isDrawingConnection && "animate-pulse hover:scale-150 hover:shadow-lg"
+            )}
+            style={{
+              width: 18 * zoom,
+              height: 18 * zoom,
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onPinClick(e, component.instanceId, pin.id);
+            }}
+            title={`${pin.name} (${pin.type})`}
+          />
+          {/* 引脚名称标签 - 始终显示 */}
+          <div
+            className="absolute pointer-events-none whitespace-nowrap"
+            style={{
+              left: '50%',
+              top: pin.position.y < definition.height / 2 ? -22 * zoom : 12 * zoom,
+              transform: 'translateX(-50%)',
+            }}
+          >
+            <span
+              className="px-1 py-0.5 rounded text-xs font-bold bg-card border border-border shadow-sm"
+              style={{ 
+                fontSize: Math.max(9, 10 * zoom),
+                color: getPinLabelColor(pin.type),
+              }}
+            >
+              {pin.name}
+            </span>
+          </div>
         </div>
       ))}
     </div>
@@ -453,21 +527,46 @@ function CanvasComponent({
 function getPinColor(type: string) {
   switch (type) {
     case 'power':
-      return 'bg-red-500 border-red-700';
+      return 'bg-red-500 border-red-700 shadow-red-500/50 shadow-md';
     case 'ground':
-      return 'bg-gray-800 border-gray-900';
+      return 'bg-gray-800 border-gray-900 shadow-gray-800/50 shadow-md';
     case 'serial_tx':
-      return 'bg-green-500 border-green-700';
+      return 'bg-green-500 border-green-700 shadow-green-500/50 shadow-md';
     case 'serial_rx':
-      return 'bg-green-400 border-green-600';
+      return 'bg-green-400 border-green-600 shadow-green-400/50 shadow-md';
     case 'usb':
-      return 'bg-purple-500 border-purple-700';
+      return 'bg-purple-500 border-purple-700 shadow-purple-500/50 shadow-md';
     case 'analog':
-      return 'bg-yellow-500 border-yellow-700';
+      return 'bg-yellow-500 border-yellow-700 shadow-yellow-500/50 shadow-md';
     case 'digital':
-      return 'bg-blue-500 border-blue-700';
+      return 'bg-blue-500 border-blue-700 shadow-blue-500/50 shadow-md';
+    case 'data':
+      return 'bg-cyan-500 border-cyan-700 shadow-cyan-500/50 shadow-md';
     default:
-      return 'bg-blue-400 border-blue-600';
+      return 'bg-blue-400 border-blue-600 shadow-blue-400/50 shadow-md';
+  }
+}
+
+function getPinLabelColor(type: string) {
+  switch (type) {
+    case 'power':
+      return '#ef4444';
+    case 'ground':
+      return '#374151';
+    case 'serial_tx':
+      return '#22c55e';
+    case 'serial_rx':
+      return '#4ade80';
+    case 'usb':
+      return '#a855f7';
+    case 'analog':
+      return '#eab308';
+    case 'digital':
+      return '#3b82f6';
+    case 'data':
+      return '#06b6d4';
+    default:
+      return '#60a5fa';
   }
 }
 
