@@ -78,11 +78,14 @@ export function SimulatorCanvas() {
       selectComponent(instanceId);
       
       if (e.button === 0) {
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        
         setIsDragging(true);
         setDraggedComponent(instanceId);
         setDragOffset({
-          x: e.clientX - component.position.x * zoom - pan.x,
-          y: e.clientY - component.position.y * zoom - pan.y,
+          x: e.clientX - rect.left - (component.position.x * zoom + pan.x),
+          y: e.clientY - rect.top - (component.position.y * zoom + pan.y),
         });
       }
     },
@@ -92,8 +95,14 @@ export function SimulatorCanvas() {
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
       if (isDragging && draggedComponent) {
-        const x = (e.clientX - dragOffset.x - pan.x) / zoom;
-        const y = (e.clientY - dragOffset.y - pan.y) / zoom;
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        
+        const canvasX = e.clientX - rect.left;
+        const canvasY = e.clientY - rect.top;
+        
+        const x = (canvasX - dragOffset.x - pan.x) / zoom;
+        const y = (canvasY - dragOffset.y - pan.y) / zoom;
         
         const snappedX = gridEnabled ? Math.round(x / GRID_SIZE) * GRID_SIZE : x;
         const snappedY = gridEnabled ? Math.round(y / GRID_SIZE) * GRID_SIZE : y;
@@ -201,7 +210,8 @@ export function SimulatorCanvas() {
   return (
     <div
       ref={canvasRef}
-      className="relative flex-1 overflow-hidden bg-muted/30"
+      className="relative flex-1 bg-muted/30"
+      style={{ overflow: 'hidden' }}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onClick={handleCanvasClick}
@@ -291,31 +301,25 @@ export function SimulatorCanvas() {
         })()}
       </svg>
 
-      {/* 组件层 */}
-      <div
-        className="absolute"
-        style={{
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-          transformOrigin: '0 0',
-        }}
-      >
-        {placedComponents.map((component) => {
-          const definition = componentDefinitions.find((d) => d.id === component.definitionId);
-          if (!definition) return null;
+      {/* 组件层 - 直接渲染组件 */}
+      {placedComponents.map((component) => {
+        const definition = componentDefinitions.find((d) => d.id === component.definitionId);
+        if (!definition) return null;
 
-          return (
-            <CanvasComponent
-              key={component.instanceId}
-              component={component}
-              definition={definition}
-              isSelected={selectedComponentId === component.instanceId}
-              onMouseDown={(e) => handleComponentMouseDown(e, component.instanceId, component)}
-              onPinClick={handlePinClick}
-              isDrawingConnection={isDrawingConnection}
-            />
-          );
-        })}
-      </div>
+        return (
+          <CanvasComponent
+            key={component.instanceId}
+            component={component}
+            definition={definition}
+            isSelected={selectedComponentId === component.instanceId}
+            onMouseDown={(e) => handleComponentMouseDown(e, component.instanceId, component)}
+            onPinClick={handlePinClick}
+            isDrawingConnection={isDrawingConnection}
+            zoom={zoom}
+            pan={pan}
+          />
+        );
+      })}
 
       {/* 空状态提示 */}
       {placedComponents.length === 0 && (
@@ -361,6 +365,8 @@ interface CanvasComponentProps {
   onMouseDown: (e: React.MouseEvent) => void;
   onPinClick: (e: React.MouseEvent, componentId: string, pinId: string) => void;
   isDrawingConnection: boolean;
+  zoom: number;
+  pan: { x: number; y: number };
 }
 
 function CanvasComponent({
@@ -370,6 +376,8 @@ function CanvasComponent({
   onMouseDown,
   onPinClick,
   isDrawingConnection,
+  zoom,
+  pan,
 }: CanvasComponentProps) {
   return (
     <div
@@ -379,10 +387,11 @@ function CanvasComponent({
         isSelected ? "border-primary shadow-lg ring-2 ring-primary/20" : "border-border hover:border-muted-foreground"
       )}
       style={{
-        left: component.position.x,
-        top: component.position.y,
-        width: definition.width,
-        height: definition.height,
+        left: component.position.x * zoom + pan.x,
+        top: component.position.y * zoom + pan.y,
+        width: definition.width * zoom,
+        height: definition.height * zoom,
+        zIndex: isSelected ? 100 : 10,
       }}
       onMouseDown={onMouseDown}
     >
@@ -401,20 +410,22 @@ function CanvasComponent({
         <div
           key={pin.id}
           className={cn(
-            "absolute w-4 h-4 rounded-full border-2 cursor-pointer transition-all",
+            "absolute rounded-full border-2 cursor-pointer transition-all",
             "flex items-center justify-center",
             "-translate-x-1/2 -translate-y-1/2",
             getPinColor(pin.type),
             isDrawingConnection && "animate-pulse hover:scale-125"
           )}
           style={{
-            left: pin.position.x,
-            top: pin.position.y,
+            left: pin.position.x * zoom,
+            top: pin.position.y * zoom,
+            width: 16 * zoom,
+            height: 16 * zoom,
           }}
           onClick={(e) => onPinClick(e, component.instanceId, pin.id)}
           title={pin.name}
         >
-          <span className="text-[6px] font-bold text-white">{pin.name.charAt(0)}</span>
+          <span className="font-bold text-white" style={{ fontSize: 6 * zoom }}>{pin.name.charAt(0)}</span>
         </div>
       ))}
     </div>
