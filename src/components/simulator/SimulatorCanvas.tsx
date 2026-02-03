@@ -45,6 +45,11 @@ export function SimulatorCanvas() {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [showConnectionFeedback, setShowConnectionFeedback] = useState(false);
   
+  // 画布拖拽平移状态
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [initialPan, setInitialPan] = useState({ x: 0, y: 0 });
+  
   const {
     zoom,
     pan,
@@ -143,8 +148,33 @@ export function SimulatorCanvas() {
     [selectComponent, zoom, pan]
   );
 
+  // 画布平移 - 鼠标按下
+  const handleCanvasMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      // 中键或按住空格时拖拽画布
+      if (e.button === 1 || (e.button === 0 && e.altKey)) {
+        e.preventDefault();
+        setIsPanning(true);
+        setPanStart({ x: e.clientX, y: e.clientY });
+        setInitialPan({ x: pan.x, y: pan.y });
+      }
+    },
+    [pan]
+  );
+
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
+      // 画布平移
+      if (isPanning) {
+        const deltaX = e.clientX - panStart.x;
+        const deltaY = e.clientY - panStart.y;
+        setPan({
+          x: initialPan.x + deltaX,
+          y: initialPan.y + deltaY,
+        });
+        return;
+      }
+      
       if (isDragging && draggedComponent) {
         const rect = canvasRef.current?.getBoundingClientRect();
         if (!rect) return;
@@ -169,12 +199,13 @@ export function SimulatorCanvas() {
         });
       }
     },
-    [isDragging, draggedComponent, dragOffset, pan, zoom, gridEnabled, updateComponentPosition, isDrawingConnection, updateTempConnection]
+    [isPanning, panStart, initialPan, setPan, isDragging, draggedComponent, dragOffset, pan, zoom, gridEnabled, updateComponentPosition, isDrawingConnection, updateTempConnection]
   );
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
     setDraggedComponent(null);
+    setIsPanning(false);
   }, []);
 
   // 引脚点击处理
@@ -205,16 +236,24 @@ export function SimulatorCanvas() {
     [isDrawingConnection, cancelConnection, selectComponent]
   );
 
-  // 滚轮缩放
+  // 滚轮缩放和平移
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
+        // Ctrl + 滚轮 = 缩放
         e.preventDefault();
         const delta = e.deltaY > 0 ? -0.1 : 0.1;
         setZoom(zoom + delta);
+      } else {
+        // 普通滚轮 = 平移画布（支持上下左右）
+        e.preventDefault();
+        setPan({
+          x: pan.x - e.deltaX,
+          y: pan.y - e.deltaY,
+        });
       }
     },
-    [zoom, setZoom]
+    [zoom, setZoom, pan, setPan]
   );
 
   // 获取引脚的绝对位置
@@ -261,10 +300,14 @@ export function SimulatorCanvas() {
   return (
     <div
       ref={canvasRef}
-      className="relative w-full h-full bg-muted/30 overflow-hidden"
+      className={cn(
+        "relative w-full h-full bg-muted/30 overflow-hidden",
+        isPanning && "cursor-grabbing"
+      )}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onClick={handleCanvasClick}
+      onMouseDown={handleCanvasMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
