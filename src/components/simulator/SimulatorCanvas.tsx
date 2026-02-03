@@ -293,7 +293,7 @@ export function SimulatorCanvas() {
           transformOrigin: '0 0',
         }}
       >
-        {/* 已完成的连线 - 增强可视化 */}
+        {/* 已完成的连线 - 超增强可视化 */}
         {connections.map((connection) => {
           const points = getConnectionPoints(connection);
           if (!points) return null;
@@ -302,56 +302,91 @@ export function SimulatorCanvas() {
           const midX = (points.from.x + points.to.x) / 2;
           const midY = (points.from.y + points.to.y) / 2;
           
+          // 计算连线角度用于标签旋转
+          const angle = Math.atan2(points.to.y - points.from.y, points.to.x - points.from.x) * 180 / Math.PI;
+          const shouldRotate = Math.abs(angle) > 45 && Math.abs(angle) < 135;
+          
           return (
             <g key={connection.id}>
-              {/* 连线阴影/光晕效果 */}
+              {/* 外层光晕效果 - 更宽更亮 */}
               <line
                 x1={points.from.x}
                 y1={points.from.y}
                 x2={points.to.x}
                 y2={points.to.y}
                 stroke={color}
-                strokeWidth={8}
+                strokeWidth={16}
+                strokeLinecap="round"
+                opacity={0.2}
+                filter="blur(2px)"
+              />
+              {/* 中层阴影 */}
+              <line
+                x1={points.from.x}
+                y1={points.from.y}
+                x2={points.to.x}
+                y2={points.to.y}
+                stroke={color}
+                strokeWidth={10}
+                strokeLinecap="round"
+                opacity={0.4}
+              />
+              {/* 主连线 - 更粗 */}
+              <line
+                x1={points.from.x}
+                y1={points.from.y}
+                x2={points.to.x}
+                y2={points.to.y}
+                stroke={color}
+                strokeWidth={6}
+                strokeLinecap="round"
+              />
+              {/* 连线高光 */}
+              <line
+                x1={points.from.x}
+                y1={points.from.y}
+                x2={points.to.x}
+                y2={points.to.y}
+                stroke="#fff"
+                strokeWidth={2}
                 strokeLinecap="round"
                 opacity={0.3}
               />
-              {/* 主连线 */}
-              <line
-                x1={points.from.x}
-                y1={points.from.y}
-                x2={points.to.x}
-                y2={points.to.y}
-                stroke={color}
-                strokeWidth={4}
-                strokeLinecap="round"
-              />
-              {/* 连线端点圆圈 */}
-              <circle cx={points.from.x} cy={points.from.y} r={6} fill={color} stroke="#fff" strokeWidth={2} />
-              <circle cx={points.to.x} cy={points.to.y} r={6} fill={color} stroke="#fff" strokeWidth={2} />
-              {/* 连线类型标签 */}
+              {/* 连线端点圆圈 - 更大 */}
+              <circle cx={points.from.x} cy={points.from.y} r={8} fill={color} stroke="#fff" strokeWidth={3} />
+              <circle cx={points.to.x} cy={points.to.y} r={8} fill={color} stroke="#fff" strokeWidth={3} />
+              {/* 连线类型标签 - 更大更清晰 */}
               <rect
-                x={midX - 20}
-                y={midY - 10}
-                width={40}
-                height={20}
-                rx={4}
+                x={midX - 28}
+                y={midY - 12}
+                width={56}
+                height={24}
+                rx={6}
                 fill="#1f2937"
-                opacity={0.9}
+                stroke={color}
+                strokeWidth={2}
               />
               <text
                 x={midX}
-                y={midY + 4}
+                y={midY + 5}
                 textAnchor="middle"
                 fill="#fff"
-                fontSize={10}
+                fontSize={12}
                 fontWeight="bold"
               >
-                {connection.type === 'power' ? 'VCC' : connection.type === 'ground' ? 'GND' : connection.type === 'serial' ? 'TX/RX' : 'DATA'}
+                {connection.type === 'power' ? '🔴 VCC' : connection.type === 'ground' ? '⚫ GND' : connection.type === 'serial' ? '🟢 串口' : '🔵 数据'}
               </text>
-              {/* 数据流动画 */}
-              <circle r={5} fill="#fff">
+              {/* 数据流动画 - 更大更明显 */}
+              <circle r={6} fill="#fff" opacity={0.9}>
                 <animateMotion
-                  dur="1.5s"
+                  dur="1.2s"
+                  repeatCount="indefinite"
+                  path={`M${points.from.x},${points.from.y} L${points.to.x},${points.to.y}`}
+                />
+              </circle>
+              <circle r={4} fill={color}>
+                <animateMotion
+                  dur="1.2s"
                   repeatCount="indefinite"
                   path={`M${points.from.x},${points.from.y} L${points.to.x},${points.to.y}`}
                 />

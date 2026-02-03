@@ -1,66 +1,88 @@
 import { Scenario } from '@/types/simulator';
 
-// 教室温度监测系统场景
+// 教室温度监测系统场景 - 完整连线版
 export const classroomTemperatureScenario: Scenario = {
   id: 'classroom-temperature',
   name: '教室温度监测系统',
-  description: '使用温湿度传感器监测教室温度，数据通过WiFi发送到服务器存储',
+  description: '使用温湿度传感器监测教室温度，数据通过WiFi发送到服务器存储（已完成所有连线）',
   components: [
     {
       instanceId: 'microbit-1',
       definitionId: 'microbit',
-      position: { x: 100, y: 100 },
-      state: { powered: false, active: false },
+      position: { x: 80, y: 60 },
+      state: { powered: true, active: false },
     },
     {
       instanceId: 'expansion-1',
       definitionId: 'expansion-board',
-      position: { x: 300, y: 80 },
-      state: { powered: false, active: false },
+      position: { x: 280, y: 40 },
+      state: { powered: true, active: false },
     },
     {
       instanceId: 'temp-sensor-1',
       definitionId: 'temp-humidity-sensor',
-      position: { x: 100, y: 280 },
-      state: { powered: false, active: false, value: 25 },
+      position: { x: 80, y: 260 },
+      state: { powered: true, active: false, value: 25 },
     },
     {
       instanceId: 'obloq-1',
       definitionId: 'obloq',
-      position: { x: 320, y: 280 },
-      state: { powered: false, active: false },
+      position: { x: 280, y: 280 },
+      state: { powered: true, active: false },
     },
     {
       instanceId: 'router-1',
       definitionId: 'router',
-      position: { x: 500, y: 150 },
+      position: { x: 480, y: 140 },
       state: { powered: true, active: true },
     },
     {
       instanceId: 'server-1',
       definitionId: 'pc-server',
-      position: { x: 650, y: 120 },
+      position: { x: 620, y: 100 },
       state: { powered: true, active: true },
     },
     {
       instanceId: 'database-1',
       definitionId: 'database',
-      position: { x: 650, y: 250 },
+      position: { x: 620, y: 220 },
       state: { powered: true, active: true },
     },
   ],
   connections: [
+    // micro:bit USB连接PC服务器
     {
-      id: 'conn-1',
-      fromComponent: 'temp-sensor-1',
-      fromPin: 'data',
-      toComponent: 'expansion-1',
-      toPin: 'p0',
+      id: 'conn-usb',
+      fromComponent: 'microbit-1',
+      fromPin: 'usb',
+      toComponent: 'server-1',
+      toPin: 'usb',
       type: 'data',
       valid: true,
     },
+    // micro:bit 3V连接扩展板
     {
-      id: 'conn-2',
+      id: 'conn-mb-3v',
+      fromComponent: 'microbit-1',
+      fromPin: '3v',
+      toComponent: 'expansion-1',
+      toPin: 'slot-3v',
+      type: 'power',
+      valid: true,
+    },
+    // micro:bit GND连接扩展板
+    {
+      id: 'conn-mb-gnd',
+      fromComponent: 'microbit-1',
+      fromPin: 'gnd',
+      toComponent: 'expansion-1',
+      toPin: 'slot-gnd',
+      type: 'ground',
+      valid: true,
+    },
+    // 温湿度传感器 VCC
+    {
+      id: 'conn-temp-vcc',
       fromComponent: 'temp-sensor-1',
       fromPin: 'vcc',
       toComponent: 'expansion-1',
@@ -68,8 +90,9 @@ export const classroomTemperatureScenario: Scenario = {
       type: 'power',
       valid: true,
     },
+    // 温湿度传感器 GND
     {
-      id: 'conn-3',
+      id: 'conn-temp-gnd',
       fromComponent: 'temp-sensor-1',
       fromPin: 'gnd',
       toComponent: 'expansion-1',
@@ -77,8 +100,39 @@ export const classroomTemperatureScenario: Scenario = {
       type: 'ground',
       valid: true,
     },
+    // 温湿度传感器 DATA
     {
-      id: 'conn-4',
+      id: 'conn-temp-data',
+      fromComponent: 'temp-sensor-1',
+      fromPin: 'data',
+      toComponent: 'expansion-1',
+      toPin: 'p0',
+      type: 'data',
+      valid: true,
+    },
+    // OBLOQ VCC - 关键电源连接
+    {
+      id: 'conn-obloq-vcc',
+      fromComponent: 'obloq-1',
+      fromPin: 'vcc',
+      toComponent: 'expansion-1',
+      toPin: '3v-out2',
+      type: 'power',
+      valid: true,
+    },
+    // OBLOQ GND - 关键接地连接
+    {
+      id: 'conn-obloq-gnd',
+      fromComponent: 'obloq-1',
+      fromPin: 'gnd',
+      toComponent: 'expansion-1',
+      toPin: 'gnd-out2',
+      type: 'ground',
+      valid: true,
+    },
+    // OBLOQ TX -> 扩展板 RX (串口交叉)
+    {
+      id: 'conn-obloq-tx',
       fromComponent: 'obloq-1',
       fromPin: 'tx',
       toComponent: 'expansion-1',
@@ -86,13 +140,34 @@ export const classroomTemperatureScenario: Scenario = {
       type: 'serial',
       valid: true,
     },
+    // OBLOQ RX -> 扩展板 TX (串口交叉)
     {
-      id: 'conn-5',
+      id: 'conn-obloq-rx',
       fromComponent: 'obloq-1',
       fromPin: 'rx',
       toComponent: 'expansion-1',
       toPin: 'tx',
       type: 'serial',
+      valid: true,
+    },
+    // 路由器连接服务器
+    {
+      id: 'conn-router-server',
+      fromComponent: 'router-1',
+      fromPin: 'lan',
+      toComponent: 'server-1',
+      toPin: 'network',
+      type: 'data',
+      valid: true,
+    },
+    // 服务器连接数据库
+    {
+      id: 'conn-server-db',
+      fromComponent: 'server-1',
+      fromPin: 'network',
+      toComponent: 'database-1',
+      toPin: 'connection',
+      type: 'data',
       valid: true,
     },
   ],
@@ -222,46 +297,138 @@ if __name__ == '__main__':
   },
 };
 
-// 智能灌溉系统场景
+// 智能灌溉系统场景 - 完整连线版
 export const smartIrrigationScenario: Scenario = {
   id: 'smart-irrigation',
   name: '智能灌溉系统',
-  description: '通过土壤湿度传感器检测土壤状态，自动控制继电器进行灌溉',
+  description: '通过土壤湿度传感器检测土壤状态，自动控制继电器进行灌溉（已完成所有连线）',
   components: [
     {
       instanceId: 'microbit-1',
       definitionId: 'microbit',
-      position: { x: 100, y: 100 },
-      state: { powered: false, active: false },
+      position: { x: 80, y: 60 },
+      state: { powered: true, active: false },
     },
     {
       instanceId: 'expansion-1',
       definitionId: 'expansion-board',
-      position: { x: 300, y: 80 },
-      state: { powered: false, active: false },
+      position: { x: 280, y: 40 },
+      state: { powered: true, active: false },
     },
     {
       instanceId: 'temp-sensor-1',
       definitionId: 'temp-humidity-sensor',
-      position: { x: 100, y: 280 },
-      state: { powered: false, active: false, value: 40 },
+      position: { x: 80, y: 280 },
+      state: { powered: true, active: false, value: 40 },
     },
     {
       instanceId: 'relay-1',
       definitionId: 'relay',
       position: { x: 200, y: 280 },
-      state: { powered: false, active: false },
+      state: { powered: true, active: false },
+    },
+    {
+      instanceId: 'server-1',
+      definitionId: 'pc-server',
+      position: { x: 480, y: 100 },
+      state: { powered: true, active: true },
     },
   ],
-  connections: [],
+  connections: [
+    // micro:bit USB连接PC
+    {
+      id: 'conn-usb',
+      fromComponent: 'microbit-1',
+      fromPin: 'usb',
+      toComponent: 'server-1',
+      toPin: 'usb',
+      type: 'data',
+      valid: true,
+    },
+    // micro:bit 连接扩展板
+    {
+      id: 'conn-mb-3v',
+      fromComponent: 'microbit-1',
+      fromPin: '3v',
+      toComponent: 'expansion-1',
+      toPin: 'slot-3v',
+      type: 'power',
+      valid: true,
+    },
+    {
+      id: 'conn-mb-gnd',
+      fromComponent: 'microbit-1',
+      fromPin: 'gnd',
+      toComponent: 'expansion-1',
+      toPin: 'slot-gnd',
+      type: 'ground',
+      valid: true,
+    },
+    // 温湿度传感器连接
+    {
+      id: 'conn-temp-vcc',
+      fromComponent: 'temp-sensor-1',
+      fromPin: 'vcc',
+      toComponent: 'expansion-1',
+      toPin: '3v-out1',
+      type: 'power',
+      valid: true,
+    },
+    {
+      id: 'conn-temp-gnd',
+      fromComponent: 'temp-sensor-1',
+      fromPin: 'gnd',
+      toComponent: 'expansion-1',
+      toPin: 'gnd-out1',
+      type: 'ground',
+      valid: true,
+    },
+    {
+      id: 'conn-temp-data',
+      fromComponent: 'temp-sensor-1',
+      fromPin: 'data',
+      toComponent: 'expansion-1',
+      toPin: 'p0',
+      type: 'data',
+      valid: true,
+    },
+    // 继电器连接
+    {
+      id: 'conn-relay-vcc',
+      fromComponent: 'relay-1',
+      fromPin: 'vcc',
+      toComponent: 'expansion-1',
+      toPin: '3v-out2',
+      type: 'power',
+      valid: true,
+    },
+    {
+      id: 'conn-relay-gnd',
+      fromComponent: 'relay-1',
+      fromPin: 'gnd',
+      toComponent: 'expansion-1',
+      toPin: 'gnd-out2',
+      type: 'ground',
+      valid: true,
+    },
+    {
+      id: 'conn-relay-in',
+      fromComponent: 'relay-1',
+      fromPin: 'in',
+      toComponent: 'expansion-1',
+      toPin: 'p3',
+      type: 'data',
+      valid: true,
+    },
+  ],
   microbitCode: `# 智能灌溉系统
 from microbit import *
 
-# 湿度阈值
+# 湿度阈值（低于此值开始灌溉）
 THRESHOLD = 30
 
 while True:
-    # 读取土壤湿度
+    # 读取土壤湿度（模拟值0-100%）
     humidity = pin0.read_analog() / 10
     
     # 显示湿度值
@@ -269,13 +436,13 @@ while True:
     
     # 判断是否需要灌溉
     if humidity < THRESHOLD:
-        # 开启继电器（灌溉）
-        pin1.write_digital(1)
-        display.show(Image.ARROW_S)
+        # 土壤干燥，开启继电器进行灌溉
+        pin3.write_digital(1)
+        display.show(Image.ARROW_S)  # 显示向下箭头表示灌溉中
     else:
-        # 关闭继电器
-        pin1.write_digital(0)
-        display.show(Image.HAPPY)
+        # 土壤湿润，关闭继电器
+        pin3.write_digital(0)
+        display.show(Image.HAPPY)  # 显示笑脸表示正常
     
     sleep(2000)
 `,
