@@ -3,6 +3,7 @@ import { useSimulatorStore } from '@/store/simulatorStore';
 import { componentDefinitions } from '@/data/componentDefinitions';
 import { ComponentDefinition, PlacedComponent, Pin } from '@/types/simulator';
 import { cn } from '@/lib/utils';
+import { ChevronDown, ChevronRight, Zap } from 'lucide-react';
 
 const GRID_SIZE = 20;
 
@@ -369,19 +370,8 @@ export function SimulatorCanvas() {
         </div>
       )}
 
-      {/* 供电说明浮窗 */}
-      <div className="absolute top-4 left-4 bg-card border border-border rounded-lg p-3 shadow-lg max-w-xs text-sm">
-        <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-red-500"></span>
-          供电连接说明
-        </h4>
-        <ul className="space-y-1 text-muted-foreground text-xs">
-          <li>• <b>micro:bit</b>: 连接 <span className="text-purple-500 font-medium">USB</span> 引脚到 PC服务器</li>
-          <li>• <b>扩展板</b>: 将 micro:bit 的 <span className="text-red-500 font-medium">3V</span>/<span className="text-gray-500 font-medium">GND</span> 连到扩展板插槽</li>
-          <li>• <b>传感器</b>: 连接 <span className="text-red-500 font-medium">VCC</span> 到扩展板 3V，<span className="text-gray-500 font-medium">GND</span> 到扩展板 GND</li>
-          <li>• <b>OBLOQ</b>: 连接 <span className="text-red-500 font-medium">VCC</span>/<span className="text-gray-500 font-medium">GND</span> 并将 <span className="text-green-500 font-medium">TX</span>/<span className="text-green-400 font-medium">RX</span> 交叉连到扩展板</li>
-        </ul>
-      </div>
+      {/* 供电说明浮窗 - 可折叠 */}
+      <PowerGuidePanel />
 
       {/* 缩放控制 */}
       <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-card border border-border rounded-lg p-2 shadow-sm">
@@ -695,4 +685,56 @@ function ComponentVisual({ type, state }: { type: string; state?: PlacedComponen
         </div>
       );
   }
+}
+
+// 可折叠的供电说明面板
+function PowerGuidePanel() {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="absolute top-4 left-4 bg-card border border-border rounded-lg shadow-lg max-w-xs text-sm z-50">
+      {/* 标题栏 - 可点击折叠 */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Zap className="w-4 h-4 text-red-500" />
+          <span className="font-semibold text-foreground">供电连接说明</span>
+        </div>
+        {isExpanded ? (
+          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        )}
+      </button>
+      
+      {/* 可折叠内容 */}
+      {isExpanded && (
+        <div className="px-3 pb-3 border-t border-border">
+          <ul className="space-y-2 text-muted-foreground text-xs mt-2">
+            <li className="flex items-start gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-1.5 flex-shrink-0"></span>
+              <span><b className="text-foreground">micro:bit</b>: 连接 <span className="text-purple-500 font-medium">USB</span> 引脚到 PC服务器</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 flex-shrink-0"></span>
+              <span><b className="text-foreground">扩展板</b>: 将 micro:bit 的 <span className="text-red-500 font-medium">3V</span>/<span className="text-gray-500 font-medium">GND</span> 连到扩展板插槽</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 mt-1.5 flex-shrink-0"></span>
+              <span><b className="text-foreground">传感器</b>: 连接 <span className="text-red-500 font-medium">VCC</span> 到扩展板 3V，<span className="text-gray-500 font-medium">GND</span> 到扩展板 GND</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5 flex-shrink-0"></span>
+              <span><b className="text-foreground">OBLOQ</b>: 连接 <span className="text-red-500 font-medium">VCC</span>/<span className="text-gray-500 font-medium">GND</span> 并将 <span className="text-green-500 font-medium">TX→RX</span>，<span className="text-green-400 font-medium">RX→TX</span> 交叉连接</span>
+            </li>
+          </ul>
+          <div className="mt-3 p-2 bg-muted/50 rounded text-xs text-muted-foreground">
+            💡 <b>串口交叉</b>: OBLOQ的TX连扩展板RX，OBLOQ的RX连扩展板TX
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
