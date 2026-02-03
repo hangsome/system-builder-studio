@@ -163,7 +163,7 @@ export function validateSystem(
   // 标记主板为已供电
   powerSources.forEach(c => powerStatus.set(c.instanceId, true));
 
-  // 检查传感器/执行器是否有电源和接地连接
+  // 检查传感器/执行器/网络设备是否有电源和接地连接
   placedComponents.forEach(component => {
     const def = componentDefinitions.find(d => d.id === component.definitionId);
     if (!def || def.category === 'mainboard' || def.category === 'server') return;
@@ -172,13 +172,28 @@ export function validateSystem(
       c => c.fromComponent === component.instanceId || c.toComponent === component.instanceId
     );
 
-    // 检查VCC连接
+    // 检查VCC连接 - 确保是当前组件的power引脚被连接
     const hasPowerPin = def.pins.some(p => p.type === 'power');
     if (hasPowerPin) {
       const hasPowerConnection = componentConnections.some(conn => {
-        const fromPin = getPinDefinition(conn.fromComponent, conn.fromPin, placedComponents);
-        const toPin = getPinDefinition(conn.toComponent, conn.toPin, placedComponents);
-        return fromPin?.type === 'power' || toPin?.type === 'power';
+        // 确定当前组件在连接中的角色
+        const isFrom = conn.fromComponent === component.instanceId;
+        const componentPinId = isFrom ? conn.fromPin : conn.toPin;
+        const otherPinId = isFrom ? conn.toPin : conn.fromPin;
+        const otherComponentId = isFrom ? conn.toComponent : conn.fromComponent;
+        
+        // 检查当前组件的引脚是否是power类型
+        const componentPin = def.pins.find(p => p.id === componentPinId);
+        if (componentPin?.type === 'power') {
+          // 检查另一端是否也是power类型（扩展板的3V等）
+          const otherComponent = placedComponents.find(c => c.instanceId === otherComponentId);
+          if (otherComponent) {
+            const otherDef = componentDefinitions.find(d => d.id === otherComponent.definitionId);
+            const otherPin = otherDef?.pins.find(p => p.id === otherPinId);
+            return otherPin?.type === 'power';
+          }
+        }
+        return false;
       });
       
       if (!hasPowerConnection) {
@@ -188,13 +203,28 @@ export function validateSystem(
       }
     }
 
-    // 检查GND连接
+    // 检查GND连接 - 确保是当前组件的ground引脚被连接
     const hasGroundPin = def.pins.some(p => p.type === 'ground');
     if (hasGroundPin) {
       const hasGroundConnection = componentConnections.some(conn => {
-        const fromPin = getPinDefinition(conn.fromComponent, conn.fromPin, placedComponents);
-        const toPin = getPinDefinition(conn.toComponent, conn.toPin, placedComponents);
-        return fromPin?.type === 'ground' || toPin?.type === 'ground';
+        // 确定当前组件在连接中的角色
+        const isFrom = conn.fromComponent === component.instanceId;
+        const componentPinId = isFrom ? conn.fromPin : conn.toPin;
+        const otherPinId = isFrom ? conn.toPin : conn.fromPin;
+        const otherComponentId = isFrom ? conn.toComponent : conn.fromComponent;
+        
+        // 检查当前组件的引脚是否是ground类型
+        const componentPin = def.pins.find(p => p.id === componentPinId);
+        if (componentPin?.type === 'ground') {
+          // 检查另一端是否也是ground类型
+          const otherComponent = placedComponents.find(c => c.instanceId === otherComponentId);
+          if (otherComponent) {
+            const otherDef = componentDefinitions.find(d => d.id === otherComponent.definitionId);
+            const otherPin = otherDef?.pins.find(p => p.id === otherPinId);
+            return otherPin?.type === 'ground';
+          }
+        }
+        return false;
       });
       
       if (!hasGroundConnection) {
