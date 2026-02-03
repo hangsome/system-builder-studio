@@ -1,5 +1,5 @@
 // 增强的仿真运行面板 - 阶段五功能
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { componentDefinitions } from '@/data/componentDefinitions';
 import { 
@@ -9,6 +9,7 @@ import {
   canRunSimulation,
   createDataFlowLog
 } from '@/lib/simulationEngine';
+import { validateSystem } from '@/lib/connectionValidator';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
@@ -72,6 +73,12 @@ export function EnhancedSimulationPanel() {
     return def?.category === 'sensor';
   });
 
+  // 获取电源状态
+  const powerStatus = useMemo(() => {
+    const validation = validateSystem(placedComponents, connections);
+    return validation.powerStatus;
+  }, [placedComponents, connections]);
+
   // 检查系统状态
   const systemCheck = canRunSimulation(placedComponents, connections, codeBurned, serverConfig.running);
 
@@ -112,12 +119,16 @@ export function EnhancedSimulationPanel() {
       return;
     }
 
-    // 传感器波动
+    // 传感器波动 - 只对有电源的传感器生效
     if (autoFluctuation) {
       simulationRef.current = setInterval(() => {
         setSensorValues(prev => {
           const newValues = { ...prev };
           sensorComponents.forEach(sensor => {
+            // 检查传感器是否有电源
+            const isPowered = powerStatus.get(sensor.instanceId);
+            if (!isPowered) return; // 未供电的传感器不产生波动
+            
             const currentValue = prev[sensor.instanceId];
             if (currentValue !== undefined) {
               newValues[sensor.instanceId] = generateSensorFluctuation(currentValue, sensor.definitionId);
@@ -128,10 +139,22 @@ export function EnhancedSimulationPanel() {
       }, 2000 / simulationSpeed);
     }
 
-    // 数据发送循环
+    // 数据发送循环 - 只对有电源的传感器生效
     if (codeBurned && serverConfig.running && networkConnected) {
       dataFlowRef.current = setInterval(() => {
         sensorComponents.forEach(sensor => {
+          // 检查传感器是否有电源
+          const isPowered = powerStatus.get(sensor.instanceId);
+          if (!isPowered) {
+            const def = componentDefinitions.find(d => d.id === sensor.definitionId);
+            addLog({
+              type: 'warning',
+              message: `${def?.name} 未供电，无法读取数据`,
+              source: 'micro:bit',
+            });
+            return; // 未供电的传感器不发送数据
+          }
+          
           const value = sensorValues[sensor.instanceId];
           const def = componentDefinitions.find(d => d.id === sensor.definitionId);
           
@@ -181,7 +204,7 @@ export function EnhancedSimulationPanel() {
       if (simulationRef.current) clearInterval(simulationRef.current);
       if (dataFlowRef.current) clearInterval(dataFlowRef.current);
     };
-  }, [isRunning, simulationSpeed, autoFluctuation, codeBurned, serverConfig.running, networkConnected, sensorComponents, sensorValues, database]);
+  }, [isRunning, simulationSpeed, autoFluctuation, codeBurned, serverConfig.running, networkConnected, sensorComponents, sensorValues, database, powerStatus, addLog, updateDatabase]);
 
   // 传感器值变化处理
   const handleSensorValueChange = useCallback((instanceId: string, value: number) => {
@@ -242,17 +265,32 @@ export function EnhancedSimulationPanel() {
                 };
                 const value = sensorValues[sensor.instanceId] ?? config.defaultValue;
                 const Icon = getSensorIcon(sensor.definitionId);
+                const isPowered = powerStatus.get(sensor.instanceId);
                 
                 return (
-                  <div key={sensor.instanceId} className="space-y-1">
+                  <div key={sensor.instanceId} className={cn(
+                    "space-y-1 p-2 rounded border",
+                    isPowered 
+                      ? "border-border bg-background" 
+                      : "border-destructive/50 bg-destructive/10"
+                  )}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1">
-                        <Icon className="h-3 w-3 text-muted-foreground" />
+                        <Icon className={cn(
+                          "h-3 w-3",
+                          isPowered ? "text-muted-foreground" : "text-destructive"
+                        )} />
                         <Label className="text-[10px]">{def?.name}</Label>
                       </div>
-                      <span className="text-xs font-mono font-medium">
-                        {value.toFixed(config.decimals)} {config.unit}
-                      </span>
+                      {isPowered ? (
+                        <span className="text-xs font-mono font-medium">
+                          {value.toFixed(config.decimals)} {config.unit}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-destructive font-medium">
+                          未供电
+                        </span>
+                      )}
                     </div>
                     <Slider
                       value={[value]}
@@ -260,7 +298,7 @@ export function EnhancedSimulationPanel() {
                       max={config.max}
                       step={config.decimals > 0 ? 0.1 : 1}
                       onValueChange={([v]) => handleSensorValueChange(sensor.instanceId, v)}
-                      disabled={!isRunning}
+                      disabled={!isRunning || !isPowered}
                       className="h-4"
                     />
                     <div className="flex justify-between text-[9px] text-muted-foreground">
