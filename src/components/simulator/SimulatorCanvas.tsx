@@ -291,20 +291,35 @@ export function SimulatorCanvas() {
         style={{
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
           transformOrigin: '0 0',
+          width: '2000px',
+          height: '2000px',
         }}
       >
+        {/* SVG Filters for glow effect */}
+        <defs>
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
         {/* 已完成的连线 - 超增强可视化 */}
         {connections.map((connection) => {
           const points = getConnectionPoints(connection);
-          if (!points) return null;
+          if (!points) {
+            console.warn('无法获取连线端点:', connection.id, connection.fromComponent, connection.fromPin, '->', connection.toComponent, connection.toPin);
+            return null;
+          }
           
           const color = getConnectionColor(connection.type);
           const midX = (points.from.x + points.to.x) / 2;
           const midY = (points.from.y + points.to.y) / 2;
           
-          // 计算连线角度用于标签旋转
-          const angle = Math.atan2(points.to.y - points.from.y, points.to.x - points.from.x) * 180 / Math.PI;
-          const shouldRotate = Math.abs(angle) > 45 && Math.abs(angle) < 135;
+          // 计算连线长度用于动画时长
+          const length = Math.sqrt(Math.pow(points.to.x - points.from.x, 2) + Math.pow(points.to.y - points.from.y, 2));
+          const animDuration = Math.max(0.8, Math.min(2, length / 150));
           
           return (
             <g key={connection.id}>
@@ -315,10 +330,10 @@ export function SimulatorCanvas() {
                 x2={points.to.x}
                 y2={points.to.y}
                 stroke={color}
-                strokeWidth={16}
+                strokeWidth={20}
                 strokeLinecap="round"
-                opacity={0.2}
-                filter="blur(2px)"
+                opacity={0.15}
+                filter="url(#glow)"
               />
               {/* 中层阴影 */}
               <line
@@ -327,9 +342,9 @@ export function SimulatorCanvas() {
                 x2={points.to.x}
                 y2={points.to.y}
                 stroke={color}
-                strokeWidth={10}
+                strokeWidth={12}
                 strokeLinecap="round"
-                opacity={0.4}
+                opacity={0.3}
               />
               {/* 主连线 - 更粗 */}
               <line
@@ -338,7 +353,7 @@ export function SimulatorCanvas() {
                 x2={points.to.x}
                 y2={points.to.y}
                 stroke={color}
-                strokeWidth={6}
+                strokeWidth={5}
                 strokeLinecap="round"
               />
               {/* 连线高光 */}
@@ -347,22 +362,22 @@ export function SimulatorCanvas() {
                 y1={points.from.y}
                 x2={points.to.x}
                 y2={points.to.y}
-                stroke="#fff"
-                strokeWidth={2}
+                stroke="#ffffff"
+                strokeWidth={1.5}
                 strokeLinecap="round"
-                opacity={0.3}
+                opacity={0.5}
               />
-              {/* 连线端点圆圈 - 更大 */}
-              <circle cx={points.from.x} cy={points.from.y} r={8} fill={color} stroke="#fff" strokeWidth={3} />
-              <circle cx={points.to.x} cy={points.to.y} r={8} fill={color} stroke="#fff" strokeWidth={3} />
+              {/* 连线端点圆圈 - 更大更醒目 */}
+              <circle cx={points.from.x} cy={points.from.y} r={10} fill={color} stroke="#fff" strokeWidth={3} />
+              <circle cx={points.to.x} cy={points.to.y} r={10} fill={color} stroke="#fff" strokeWidth={3} />
               {/* 连线类型标签 - 更大更清晰 */}
               <rect
-                x={midX - 28}
-                y={midY - 12}
-                width={56}
-                height={24}
-                rx={6}
-                fill="#1f2937"
+                x={midX - 32}
+                y={midY - 14}
+                width={64}
+                height={28}
+                rx={8}
+                fill="rgba(15, 23, 42, 0.95)"
                 stroke={color}
                 strokeWidth={2}
               />
@@ -371,22 +386,24 @@ export function SimulatorCanvas() {
                 y={midY + 5}
                 textAnchor="middle"
                 fill="#fff"
-                fontSize={12}
+                fontSize={11}
                 fontWeight="bold"
               >
-                {connection.type === 'power' ? '🔴 VCC' : connection.type === 'ground' ? '⚫ GND' : connection.type === 'serial' ? '🟢 串口' : '🔵 数据'}
+                {connection.type === 'power' ? '🔴 VCC' : 
+                 connection.type === 'ground' ? '⚫ GND' : 
+                 connection.type === 'serial' ? '🟢 串口' : '🔵 数据'}
               </text>
-              {/* 数据流动画 - 更大更明显 */}
-              <circle r={6} fill="#fff" opacity={0.9}>
+              {/* 数据流动画 - 双层动画效果 */}
+              <circle r={7} fill="#ffffff" opacity={0.9}>
                 <animateMotion
-                  dur="1.2s"
+                  dur={`${animDuration}s`}
                   repeatCount="indefinite"
                   path={`M${points.from.x},${points.from.y} L${points.to.x},${points.to.y}`}
                 />
               </circle>
               <circle r={4} fill={color}>
                 <animateMotion
-                  dur="1.2s"
+                  dur={`${animDuration}s`}
                   repeatCount="indefinite"
                   path={`M${points.from.x},${points.from.y} L${points.to.x},${points.to.y}`}
                 />
