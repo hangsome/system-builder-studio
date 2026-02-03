@@ -71,10 +71,24 @@ export function SimulatorCanvas() {
     e.dataTransfer.dropEffect = 'copy';
   }, []);
 
-  // 处理组件拖拽
+  // 处理组件拖拽 - 点击切换拖拽状态
   const handleComponentMouseDown = useCallback(
     (e: React.MouseEvent, instanceId: string, component: PlacedComponent) => {
       e.stopPropagation();
+      
+      // 如果正在拖拽同一个组件，点击则停止拖拽
+      if (isDragging && draggedComponent === instanceId) {
+        setIsDragging(false);
+        setDraggedComponent(null);
+        return;
+      }
+      
+      // 如果正在拖拽其他组件，先停止
+      if (isDragging) {
+        setIsDragging(false);
+        setDraggedComponent(null);
+      }
+      
       selectComponent(instanceId);
       
       if (e.button === 0) {
@@ -89,7 +103,7 @@ export function SimulatorCanvas() {
         });
       }
     },
-    [selectComponent, zoom, pan]
+    [selectComponent, zoom, pan, isDragging, draggedComponent]
   );
 
   const handleMouseMove = useCallback(
@@ -140,10 +154,17 @@ export function SimulatorCanvas() {
     [isDrawingConnection, connectionStart, completeConnection, startConnection]
   );
 
-  // 取消连线
+  // 点击画布空白处：停止拖拽、取消连线、取消选择
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('canvas-grid')) {
+        // 如果正在拖拽，点击空白处停止拖拽
+        if (isDragging) {
+          setIsDragging(false);
+          setDraggedComponent(null);
+          return;
+        }
+        
         if (isDrawingConnection) {
           cancelConnection();
         } else {
@@ -151,7 +172,7 @@ export function SimulatorCanvas() {
         }
       }
     },
-    [isDrawingConnection, cancelConnection, selectComponent]
+    [isDrawingConnection, cancelConnection, selectComponent, isDragging]
   );
 
   // 滚轮缩放
