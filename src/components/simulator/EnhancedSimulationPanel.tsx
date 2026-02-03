@@ -66,6 +66,12 @@ export function EnhancedSimulationPanel() {
   const [networkConnected, setNetworkConnected] = useState(false);
   const simulationRef = useRef<NodeJS.Timeout | null>(null);
   const dataFlowRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 使用 ref 来存储最新的 sensorValues，避免 closure 问题
+  const sensorValuesRef = useRef<Record<string, number>>({});
+  useEffect(() => {
+    sensorValuesRef.current = sensorValues;
+  }, [sensorValues]);
 
   // 获取画布上的传感器组件
   const sensorComponents = placedComponents.filter((c) => {
@@ -155,7 +161,8 @@ export function EnhancedSimulationPanel() {
             return; // 未供电的传感器不发送数据
           }
           
-          const value = sensorValues[sensor.instanceId];
+          // 使用 ref 获取最新的传感器值
+          const value = sensorValuesRef.current[sensor.instanceId];
           const def = componentDefinitions.find(d => d.id === sensor.definitionId);
           
           // 记录传感器读取
@@ -204,7 +211,7 @@ export function EnhancedSimulationPanel() {
       if (simulationRef.current) clearInterval(simulationRef.current);
       if (dataFlowRef.current) clearInterval(dataFlowRef.current);
     };
-  }, [isRunning, simulationSpeed, autoFluctuation, codeBurned, serverConfig.running, networkConnected, sensorComponents, sensorValues, database, powerStatus, addLog, updateDatabase]);
+  }, [isRunning, simulationSpeed, autoFluctuation, codeBurned, serverConfig.running, networkConnected, sensorComponents, database, powerStatus, addLog, updateDatabase, serverConfig]);
 
   // 传感器值变化处理
   const handleSensorValueChange = useCallback((instanceId: string, value: number) => {
