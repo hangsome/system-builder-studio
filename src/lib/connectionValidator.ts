@@ -4,7 +4,7 @@ import { componentDefinitions } from '@/data/componentDefinitions';
 
 export interface ValidationResult {
   valid: boolean;
-  type: 'power' | 'ground' | 'data' | 'serial';
+  type: 'power' | 'ground' | 'data' | 'serial' | 'wireless';
   errors: string[];
   warnings: string[];
 }
@@ -70,7 +70,7 @@ export function validateConnection(
   }
 
   // 确定连接类型并验证
-  const connectionType = determineConnectionType(fromPin.type, toPin.type);
+  const connectionType = determineConnectionType(fromPin.type, toPin.type, fromPinId, toPinId);
   result.type = connectionType;
 
   // 电源连接规则
@@ -130,11 +130,23 @@ export function validateConnection(
     }
   }
 
+  // WIFI无线连接规则 - OBLOQ的WIFI引脚连接到路由器的WIFI引脚
+  if (fromPin.id === 'wifi' || toPin.id === 'wifi') {
+    if (fromPin.id === 'wifi' && toPin.id === 'wifi') {
+      result.valid = true;
+      result.type = 'wireless';
+    } else {
+      result.warnings.push('WIFI引脚应连接到另一个WIFI引脚');
+    }
+  }
+
   return result;
 }
 
 // 确定连接类型
-function determineConnectionType(fromType: string, toType: string): 'power' | 'ground' | 'data' | 'serial' {
+function determineConnectionType(fromType: string, toType: string, fromId?: string, toId?: string): 'power' | 'ground' | 'data' | 'serial' | 'wireless' {
+  // WIFI引脚之间的连接是无线类型
+  if (fromId === 'wifi' && toId === 'wifi') return 'wireless';
   if (fromType === 'power' || toType === 'power') return 'power';
   if (fromType === 'ground' || toType === 'ground') return 'ground';
   if (fromType === 'serial_tx' || fromType === 'serial_rx' ||
@@ -262,11 +274,12 @@ export function validateSystem(
 }
 
 // 获取连接的颜色
-export function getConnectionColor(type: 'power' | 'ground' | 'data' | 'serial'): string {
+export function getConnectionColor(type: 'power' | 'ground' | 'data' | 'serial' | 'wireless'): string {
   switch (type) {
     case 'power': return '#ef4444'; // 红色
     case 'ground': return '#1f2937'; // 黑色
     case 'serial': return '#22c55e'; // 绿色
+    case 'wireless': return '#8b5cf6'; // 紫色 - 无线连接
     default: return '#3b82f6'; // 蓝色
   }
 }
