@@ -200,10 +200,12 @@ export const obloqModule: ComponentDefinition = {
   width: 90,
   height: 70,
   pins: [
-    { id: 'vcc', name: 'VCC', type: 'power', position: { x: 20, y: 70 } },
-    { id: 'gnd', name: 'GND', type: 'ground', position: { x: 40, y: 70 } },
+    { id: 'vcc', name: 'VCC', type: 'power', position: { x: 15, y: 70 } },
+    { id: 'gnd', name: 'GND', type: 'ground', position: { x: 35, y: 70 } },
     { id: 'tx', name: 'TX', type: 'serial_tx', position: { x: 55, y: 70 } },
-    { id: 'rx', name: 'RX', type: 'serial_rx', position: { x: 70, y: 70 } },
+    { id: 'rx', name: 'RX', type: 'serial_rx', position: { x: 75, y: 70 } },
+    // WiFi 信号引脚 - 表示无线连接到路由器
+    { id: 'wifi', name: 'WIFI', type: 'data', position: { x: 45, y: 0 } },
   ],
 };
 
@@ -215,10 +217,12 @@ export const router: ComponentDefinition = {
   name: '无线路由器',
   description: 'WiFi无线路由器',
   width: 100,
-  height: 60,
+  height: 70,
   pins: [
-    { id: 'wan', name: 'WAN', type: 'data', position: { x: 25, y: 60 } },
-    { id: 'lan', name: 'LAN', type: 'data', position: { x: 75, y: 60 } },
+    // WiFi 信号引脚 - 接收无线设备连接
+    { id: 'wifi', name: 'WIFI', type: 'data', position: { x: 50, y: 0 } },
+    { id: 'wan', name: 'WAN', type: 'data', position: { x: 25, y: 70 } },
+    { id: 'lan', name: 'LAN', type: 'data', position: { x: 75, y: 70 } },
   ],
 };
 
@@ -229,11 +233,13 @@ export const pcServer: ComponentDefinition = {
   category: 'server',
   name: 'PC服务器',
   description: '运行Flask服务器的电脑',
-  width: 100,
+  width: 110,
   height: 90,
   pins: [
-    { id: 'usb', name: 'USB', type: 'usb', position: { x: 30, y: 90 } },
-    { id: 'network', name: 'NET', type: 'data', position: { x: 70, y: 90 } },
+    { id: 'usb', name: 'USB', type: 'usb', position: { x: 25, y: 90 } },
+    { id: 'network', name: 'NET', type: 'data', position: { x: 55, y: 90 } },
+    // 数据库连接引脚
+    { id: 'db', name: 'DB', type: 'data', position: { x: 85, y: 90 } },
   ],
 };
 
@@ -243,11 +249,12 @@ export const database: ComponentDefinition = {
   type: 'database',
   category: 'server',
   name: 'SQLite数据库',
-  description: 'SQLite本地数据库',
+  description: 'SQLite本地数据库（运行于PC服务器内）',
   width: 70,
   height: 70,
   pins: [
-    { id: 'connection', name: 'CONN', type: 'data', position: { x: 35, y: 70 } },
+    // 与PC服务器的DB引脚连接
+    { id: 'connection', name: 'CONN', type: 'data', position: { x: 35, y: 0 } },
   ],
 };
 
