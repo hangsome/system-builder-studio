@@ -44,7 +44,7 @@ export interface Connection {
   fromPin: string;
   toComponent: string;
   toPin: string;
-  type: 'power' | 'ground' | 'data' | 'serial';
+  type: 'power' | 'ground' | 'data' | 'serial' | 'wireless';
   valid: boolean;
 }
 

@@ -297,9 +297,13 @@ export function SimulatorCanvas() {
       case 'power': return '#ef4444';
       case 'ground': return '#1f2937';
       case 'serial': return '#22c55e';
+      case 'wireless': return '#8b5cf6'; // 紫色 - 无线连接
       default: return '#3b82f6';
     }
   };
+  
+  // 判断是否为无线连接
+  const isWirelessConnection = (type: string) => type === 'wireless';
 
   return (
     <div
@@ -366,10 +370,14 @@ export function SimulatorCanvas() {
           const color = getConnectionColor(connection.type);
           const midX = (points.from.x + points.to.x) / 2;
           const midY = (points.from.y + points.to.y) / 2;
+          const isWireless = isWirelessConnection(connection.type);
           
           // 计算连线长度用于动画时长
           const length = Math.sqrt(Math.pow(points.to.x - points.from.x, 2) + Math.pow(points.to.y - points.from.y, 2));
           const animDuration = Math.max(0.8, Math.min(2, length / 150));
+          
+          // 无线连接使用虚线样式
+          const strokeDasharray = isWireless ? "12,8" : undefined;
           
           return (
             <g key={connection.id}>
@@ -384,6 +392,7 @@ export function SimulatorCanvas() {
                 strokeLinecap="round"
                 opacity={0.15}
                 filter="url(#glow)"
+                strokeDasharray={isWireless ? "20,15" : undefined}
               />
               {/* 中层阴影 */}
               <line
@@ -395,8 +404,9 @@ export function SimulatorCanvas() {
                 strokeWidth={12}
                 strokeLinecap="round"
                 opacity={0.3}
+                strokeDasharray={isWireless ? "15,10" : undefined}
               />
-              {/* 主连线 - 更粗 */}
+              {/* 主连线 - 更粗，无线连接用虚线 */}
               <line
                 x1={points.from.x}
                 y1={points.from.y}
@@ -405,6 +415,7 @@ export function SimulatorCanvas() {
                 stroke={color}
                 strokeWidth={5}
                 strokeLinecap="round"
+                strokeDasharray={strokeDasharray}
               />
               {/* 连线高光 */}
               <line
@@ -416,10 +427,26 @@ export function SimulatorCanvas() {
                 strokeWidth={1.5}
                 strokeLinecap="round"
                 opacity={0.5}
+                strokeDasharray={strokeDasharray}
               />
-              {/* 连线端点圆圈 - 更大更醒目 */}
-              <circle cx={points.from.x} cy={points.from.y} r={10} fill={color} stroke="#fff" strokeWidth={3} />
-              <circle cx={points.to.x} cy={points.to.y} r={10} fill={color} stroke="#fff" strokeWidth={3} />
+              {/* 连线端点圆圈 - 无线连接用wifi信号图标样式 */}
+              {isWireless ? (
+                <>
+                  {/* 无线信号图标 - 起点 */}
+                  <circle cx={points.from.x} cy={points.from.y} r={12} fill={color} stroke="#fff" strokeWidth={2} opacity={0.3} />
+                  <circle cx={points.from.x} cy={points.from.y} r={8} fill={color} stroke="#fff" strokeWidth={2} opacity={0.5} />
+                  <circle cx={points.from.x} cy={points.from.y} r={5} fill={color} stroke="#fff" strokeWidth={2} />
+                  {/* 无线信号图标 - 终点 */}
+                  <circle cx={points.to.x} cy={points.to.y} r={12} fill={color} stroke="#fff" strokeWidth={2} opacity={0.3} />
+                  <circle cx={points.to.x} cy={points.to.y} r={8} fill={color} stroke="#fff" strokeWidth={2} opacity={0.5} />
+                  <circle cx={points.to.x} cy={points.to.y} r={5} fill={color} stroke="#fff" strokeWidth={2} />
+                </>
+              ) : (
+                <>
+                  <circle cx={points.from.x} cy={points.from.y} r={10} fill={color} stroke="#fff" strokeWidth={3} />
+                  <circle cx={points.to.x} cy={points.to.y} r={10} fill={color} stroke="#fff" strokeWidth={3} />
+                </>
+              )}
               {/* 连线类型标签 - 更大更清晰 */}
               <rect
                 x={midX - 32}
@@ -430,6 +457,7 @@ export function SimulatorCanvas() {
                 fill="rgba(15, 23, 42, 0.95)"
                 stroke={color}
                 strokeWidth={2}
+                strokeDasharray={isWireless ? "8,4" : undefined}
               />
               <text
                 x={midX}
@@ -441,23 +469,41 @@ export function SimulatorCanvas() {
               >
                 {connection.type === 'power' ? '🔴 VCC' : 
                  connection.type === 'ground' ? '⚫ GND' : 
-                 connection.type === 'serial' ? '🟢 串口' : '🔵 数据'}
+                 connection.type === 'serial' ? '🟢 串口' : 
+                 connection.type === 'wireless' ? '📶 无线' : '🔵 数据'}
               </text>
-              {/* 数据流动画 - 双层动画效果 */}
-              <circle r={7} fill="#ffffff" opacity={0.9}>
-                <animateMotion
-                  dur={`${animDuration}s`}
-                  repeatCount="indefinite"
-                  path={`M${points.from.x},${points.from.y} L${points.to.x},${points.to.y}`}
-                />
-              </circle>
-              <circle r={4} fill={color}>
-                <animateMotion
-                  dur={`${animDuration}s`}
-                  repeatCount="indefinite"
-                  path={`M${points.from.x},${points.from.y} L${points.to.x},${points.to.y}`}
-                />
-              </circle>
+              {/* 数据流动画 - 双层动画效果，无线连接用波浪扩散效果 */}
+              {isWireless ? (
+                <>
+                  {/* 无线信号波动画 */}
+                  <circle r={6} fill={color} opacity={0.8}>
+                    <animateMotion
+                      dur={`${animDuration * 0.8}s`}
+                      repeatCount="indefinite"
+                      path={`M${points.from.x},${points.from.y} L${points.to.x},${points.to.y}`}
+                    />
+                    <animate attributeName="r" values="4;8;4" dur="0.5s" repeatCount="indefinite" />
+                    <animate attributeName="opacity" values="0.9;0.4;0.9" dur="0.5s" repeatCount="indefinite" />
+                  </circle>
+                </>
+              ) : (
+                <>
+                  <circle r={7} fill="#ffffff" opacity={0.9}>
+                    <animateMotion
+                      dur={`${animDuration}s`}
+                      repeatCount="indefinite"
+                      path={`M${points.from.x},${points.from.y} L${points.to.x},${points.to.y}`}
+                    />
+                  </circle>
+                  <circle r={4} fill={color}>
+                    <animateMotion
+                      dur={`${animDuration}s`}
+                      repeatCount="indefinite"
+                      path={`M${points.from.x},${points.from.y} L${points.to.x},${points.to.y}`}
+                    />
+                  </circle>
+                </>
+              )}
             </g>
           );
         })}
