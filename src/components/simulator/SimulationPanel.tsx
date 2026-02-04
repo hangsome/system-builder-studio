@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { componentDefinitions } from '@/data/componentDefinitions';
 import { Button } from '@/components/ui/button';
@@ -8,8 +8,6 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
-  Play, 
-  Pause, 
   RotateCcw, 
   Gauge, 
   Activity,
@@ -18,15 +16,14 @@ import {
   AlertCircle,
   CheckCircle2
 } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 
 export function SimulationPanel() {
   const {
     isRunning,
-    setRunning,
     simulationSpeed,
     setSimulationSpeed,
     placedComponents,
-    connections,
     routerConfig,
     serverConfig,
     updateRouterConfig,
@@ -37,15 +34,34 @@ export function SimulationPanel() {
     database,
     updateDatabase,
     codeBurned,
-  } = useSimulatorStore();
+  } = useSimulatorStore(
+    useShallow((state) => ({
+      isRunning: state.isRunning,
+      simulationSpeed: state.simulationSpeed,
+      setSimulationSpeed: state.setSimulationSpeed,
+      placedComponents: state.placedComponents,
+      routerConfig: state.routerConfig,
+      serverConfig: state.serverConfig,
+      updateRouterConfig: state.updateRouterConfig,
+      updateServerConfig: state.updateServerConfig,
+      logs: state.logs,
+      addLog: state.addLog,
+      clearLogs: state.clearLogs,
+      database: state.database,
+      updateDatabase: state.updateDatabase,
+      codeBurned: state.codeBurned,
+    }))
+  );
 
   const [sensorValues, setSensorValues] = useState<Record<string, number>>({});
 
   // 获取画布上的传感器组件
-  const sensorComponents = placedComponents.filter((c) => {
-    const def = componentDefinitions.find((d) => d.id === c.definitionId);
-    return def?.category === 'sensor';
-  });
+  const sensorComponents = useMemo(() => {
+    return placedComponents.filter((c) => {
+      const def = componentDefinitions.find((d) => d.id === c.definitionId);
+      return def?.category === 'sensor';
+    });
+  }, [placedComponents]);
 
   // 模拟运行效果
   useEffect(() => {
@@ -84,7 +100,17 @@ export function SimulationPanel() {
     }, 3000 / simulationSpeed);
 
     return () => clearInterval(interval);
-  }, [isRunning, codeBurned, serverConfig.running, sensorComponents, sensorValues, simulationSpeed]);
+  }, [
+    isRunning,
+    codeBurned,
+    serverConfig.running,
+    sensorComponents,
+    sensorValues,
+    simulationSpeed,
+    addLog,
+    database,
+    updateDatabase,
+  ]);
 
   // 检查系统状态
   const checkSystemStatus = () => {

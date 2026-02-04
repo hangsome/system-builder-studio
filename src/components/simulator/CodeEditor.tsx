@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useSimulatorStore } from '@/store/simulatorStore';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Download, Play, Puzzle, FileCode } from 'lucide-react';

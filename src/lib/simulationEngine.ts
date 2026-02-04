@@ -1,6 +1,5 @@
 // 仿真引擎 - 阶段五核心功能
 import { PlacedComponent, Connection, DatabaseState, ServerConfig, LogEntry } from '@/types/simulator';
-import { componentDefinitions } from '@/data/componentDefinitions';
 import { validateSystem } from './connectionValidator';
 
 export interface SimulationState {

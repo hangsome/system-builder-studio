@@ -1,7 +1,6 @@
 // 增强的代码编辑器 - 阶段三功能
 import { useState, useCallback } from 'react';
 import { useSimulatorStore } from '@/store/simulatorStore';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -15,7 +14,7 @@ import {
   Trash2,
   RotateCcw
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, createId } from '@/lib/utils';
 
 // 积木块类型定义
 interface CodeBlock {
@@ -242,7 +241,7 @@ export function EnhancedCodeEditor() {
   // 添加积木到程序
   const addBlock = useCallback((block: CodeBlock) => {
     const instance: BlockInstance = {
-      id: `${block.id}-${Date.now()}`,
+      id: createId(),
       blockId: block.id,
       inputs: {},
     };

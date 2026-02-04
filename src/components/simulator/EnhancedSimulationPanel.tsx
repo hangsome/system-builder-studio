@@ -6,8 +6,7 @@ import {
   sensorConfigs, 
   generateSensorFluctuation, 
   simulateFlaskRoute,
-  canRunSimulation,
-  createDataFlowLog
+  canRunSimulation
 } from '@/lib/simulationEngine';
 import { validateSystem } from '@/lib/connectionValidator';
 import { Button } from '@/components/ui/button';
@@ -17,14 +16,11 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Progress } from '@/components/ui/progress';
 import { 
   Play, 
-  Pause, 
   Square,
   RotateCcw, 
   Gauge, 
-  Activity,
   Wifi,
   WifiOff,
   Server,
@@ -32,13 +28,13 @@ import {
   AlertCircle,
   CheckCircle2,
   Radio,
-  Zap,
   ThermometerSun,
   Sun,
   Volume2,
   Eye
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useShallow } from 'zustand/react/shallow';
 
 export function EnhancedSimulationPanel() {
   const {
@@ -58,8 +54,26 @@ export function EnhancedSimulationPanel() {
     database,
     updateDatabase,
     codeBurned,
-    microbitCode,
-  } = useSimulatorStore();
+  } = useSimulatorStore(
+    useShallow((state) => ({
+      isRunning: state.isRunning,
+      setRunning: state.setRunning,
+      simulationSpeed: state.simulationSpeed,
+      setSimulationSpeed: state.setSimulationSpeed,
+      placedComponents: state.placedComponents,
+      connections: state.connections,
+      routerConfig: state.routerConfig,
+      serverConfig: state.serverConfig,
+      updateRouterConfig: state.updateRouterConfig,
+      updateServerConfig: state.updateServerConfig,
+      logs: state.logs,
+      addLog: state.addLog,
+      clearLogs: state.clearLogs,
+      database: state.database,
+      updateDatabase: state.updateDatabase,
+      codeBurned: state.codeBurned,
+    }))
+  );
 
   const [sensorValues, setSensorValues] = useState<Record<string, number>>({});
   const [autoFluctuation, setAutoFluctuation] = useState(true);
@@ -74,10 +88,12 @@ export function EnhancedSimulationPanel() {
   }, [sensorValues]);
 
   // 获取画布上的传感器组件
-  const sensorComponents = placedComponents.filter((c) => {
-    const def = componentDefinitions.find((d) => d.id === c.definitionId);
-    return def?.category === 'sensor';
-  });
+  const sensorComponents = useMemo(() => {
+    return placedComponents.filter((c) => {
+      const def = componentDefinitions.find((d) => d.id === c.definitionId);
+      return def?.category === 'sensor';
+    });
+  }, [placedComponents]);
 
   // 获取电源状态
   const { powerStatus, obloqPowered, obloqConnected } = useMemo(() => {
@@ -106,14 +122,15 @@ export function EnhancedSimulationPanel() {
   // 初始化传感器值
   useEffect(() => {
     const newValues: Record<string, number> = {};
-    sensorComponents.forEach(sensor => {
-      if (sensorValues[sensor.instanceId] === undefined) {
+    const currentValues = sensorValuesRef.current;
+    sensorComponents.forEach((sensor) => {
+      if (currentValues[sensor.instanceId] === undefined) {
         const config = sensorConfigs[sensor.definitionId];
         newValues[sensor.instanceId] = config?.defaultValue ?? 25;
       }
     });
     if (Object.keys(newValues).length > 0) {
-      setSensorValues(prev => ({ ...prev, ...newValues }));
+      setSensorValues((prev) => ({ ...prev, ...newValues }));
     }
   }, [sensorComponents]);
 
@@ -515,7 +532,7 @@ export function EnhancedSimulationPanel() {
             <div className="p-2 space-y-0.5">
               {logs.length === 0 ? (
                 <p className="text-[10px] text-muted-foreground text-center py-4">
-                  点击"运行"开始仿真
+                  点击&quot;运行&quot;开始仿真
                 </p>
               ) : (
                 logs.slice().reverse().map((log, i) => (

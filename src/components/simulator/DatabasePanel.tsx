@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Table,
   TableBody,
@@ -11,14 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Plus, Play, Trash2 } from 'lucide-react';
+import { Plus, Play } from 'lucide-react';
 
 export function DatabasePanel() {
   const { database, updateDatabase } = useSimulatorStore();
@@ -39,7 +31,7 @@ export function DatabasePanel() {
       } else {
         setQueryResult('仅支持 SELECT 查询');
       }
-    } catch (error) {
+    } catch {
       setQueryResult('查询错误');
     }
   };

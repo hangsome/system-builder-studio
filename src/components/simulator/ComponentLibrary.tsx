@@ -11,7 +11,7 @@ import {
   ChevronDown,
   ChevronRight
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, createId } from '@/lib/utils';
 
 const categoryIcons: Record<string, React.ReactNode> = {
   mainboard: <Cpu className="h-4 w-4" />,
@@ -50,7 +50,7 @@ export function ComponentLibrary({ onDragStart }: ComponentLibraryProps) {
 
   const handleDoubleClick = (definition: ComponentDefinition) => {
     const newComponent = {
-      instanceId: `${definition.id}-${Date.now()}`,
+      instanceId: createId(),
       definitionId: definition.id,
       position: { x: 200 + Math.random() * 100, y: 150 + Math.random() * 100 },
       state: {

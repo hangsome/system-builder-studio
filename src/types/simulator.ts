@@ -106,7 +106,7 @@ export interface ServerConfig {
 }
 
 export interface LogEntry {
-  timestamp: Date;
+  timestamp: number;
   type: 'info' | 'warning' | 'error' | 'data';
   message: string;
   source: string;

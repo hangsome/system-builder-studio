@@ -8,6 +8,7 @@ import {
   ServerConfig,
   LogEntry 
 } from '@/types/simulator';
+import { createId } from '@/lib/utils';
 
 interface SimulatorStore {
   // 画布状态
@@ -243,7 +244,7 @@ export const useSimulatorStore = create<SimulatorStore>()(
             // 创建 micro:bit 到扩展板的自动连接
             const autoConnections: Connection[] = [
               {
-                id: `auto-conn-p0-${Date.now()}`,
+                id: createId(),
                 fromComponent: microbit.instanceId,
                 fromPin: 'p0',
                 toComponent: expansionBoard.instanceId,
@@ -252,7 +253,7 @@ export const useSimulatorStore = create<SimulatorStore>()(
                 valid: true,
               },
               {
-                id: `auto-conn-p1-${Date.now() + 1}`,
+                id: createId(),
                 fromComponent: microbit.instanceId,
                 fromPin: 'p1',
                 toComponent: expansionBoard.instanceId,
@@ -261,7 +262,7 @@ export const useSimulatorStore = create<SimulatorStore>()(
                 valid: true,
               },
               {
-                id: `auto-conn-p2-${Date.now() + 2}`,
+                id: createId(),
                 fromComponent: microbit.instanceId,
                 fromPin: 'p2',
                 toComponent: expansionBoard.instanceId,
@@ -270,7 +271,7 @@ export const useSimulatorStore = create<SimulatorStore>()(
                 valid: true,
               },
               {
-                id: `auto-conn-3v-${Date.now() + 3}`,
+                id: createId(),
                 fromComponent: microbit.instanceId,
                 fromPin: '3v',
                 toComponent: expansionBoard.instanceId,
@@ -279,7 +280,7 @@ export const useSimulatorStore = create<SimulatorStore>()(
                 valid: true,
               },
               {
-                id: `auto-conn-gnd-${Date.now() + 4}`,
+                id: createId(),
                 fromComponent: microbit.instanceId,
                 fromPin: 'gnd',
                 toComponent: expansionBoard.instanceId,
@@ -403,7 +404,7 @@ export const useSimulatorStore = create<SimulatorStore>()(
         }
         
         const newConnection: Connection = {
-          id: `conn-${Date.now()}`,
+          id: createId(),
           fromComponent: fromComponentId,
           fromPin: fromPinId,
           toComponent: toComponentId,
@@ -452,7 +453,7 @@ export const useSimulatorStore = create<SimulatorStore>()(
       })),
       
       addLog: (log) => set((state) => ({
-        logs: [...state.logs, { ...log, timestamp: new Date() }].slice(-100),
+        logs: [...state.logs, { ...log, timestamp: Date.now() }].slice(-100),
       })),
       clearLogs: () => set({ logs: [] }),
       clearConnectionResult: () => set({ lastConnectionResult: null }),
@@ -478,13 +479,27 @@ export const useSimulatorStore = create<SimulatorStore>()(
     }),
     {
       name: 'simulator-storage',
+      version: 2,
+      migrate: (persistedState, version) => {
+        const state = persistedState as Partial<SimulatorStore>;
+        if (version < 2 && state?.routerConfig) {
+          return {
+            ...state,
+            routerConfig: {
+              ...state.routerConfig,
+              password: '',
+            },
+          } as SimulatorStore;
+        }
+        return state as SimulatorStore;
+      },
       partialize: (state) => ({
         placedComponents: state.placedComponents,
         connections: state.connections,
         microbitCode: state.microbitCode,
         flaskCode: state.flaskCode,
         database: state.database,
-        routerConfig: state.routerConfig,
+        routerConfig: { ...state.routerConfig, password: '' },
         serverConfig: state.serverConfig,
       }),
     }

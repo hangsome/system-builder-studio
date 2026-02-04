@@ -35,7 +35,6 @@ import {
   Plus, 
   Play, 
   Trash2, 
-  Edit2, 
   Table as TableIcon,
   Database,
   Key,
@@ -205,20 +204,6 @@ export function EnhancedDatabasePanel() {
     
     setNewColumn({ name: '', type: 'TEXT', primaryKey: false });
     setIsAddColumnOpen(false);
-  };
-
-  // 删除表
-  const handleDeleteTable = () => {
-    if (!currentTable) return;
-    
-    updateDatabase({
-      tables: database.tables.filter(t => t.name !== selectedTable),
-      records: Object.fromEntries(
-        Object.entries(database.records).filter(([key]) => key !== selectedTable)
-      ),
-    });
-    
-    setSelectedTable(database.tables.find(t => t.name !== selectedTable)?.name || '');
   };
 
   // 导出数据
@@ -422,7 +407,7 @@ export function EnhancedDatabasePanel() {
                       colSpan={currentTable.columns.length + 1}
                       className="text-center text-muted-foreground text-xs py-8"
                     >
-                      暂无数据 - 点击"添加"或运行仿真
+                      暂无数据 - 点击&quot;添加&quot;或运行仿真
                     </TableCell>
                   </TableRow>
                 ) : (

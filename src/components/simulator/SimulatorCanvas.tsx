@@ -1,16 +1,21 @@
-import { useCallback, useRef, useState, useEffect } from 'react';
+import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { componentDefinitions } from '@/data/componentDefinitions';
 import { ComponentDefinition, PlacedComponent, Pin } from '@/types/simulator';
-import { cn } from '@/lib/utils';
+import { cn, createId } from '@/lib/utils';
 import { ChevronDown, ChevronRight, Zap, CheckCircle2, XCircle } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 
 const GRID_SIZE = 20;
 
 // 连接成功音效
 const playConnectionSound = (success: boolean) => {
   try {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const audioContext = new AudioContextClass();
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
     
@@ -33,7 +38,7 @@ const playConnectionSound = (success: boolean) => {
     
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.2);
-  } catch (e) {
+  } catch {
     // 忽略音频错误
   }
 };
@@ -71,7 +76,46 @@ export function SimulatorCanvas() {
     clearConnectionResult,
     setZoom,
     setPan,
-  } = useSimulatorStore();
+  } = useSimulatorStore(
+    useShallow((state) => ({
+      zoom: state.zoom,
+      pan: state.pan,
+      gridEnabled: state.gridEnabled,
+      placedComponents: state.placedComponents,
+      connections: state.connections,
+      selectedComponentId: state.selectedComponentId,
+      isDrawingConnection: state.isDrawingConnection,
+      connectionStart: state.connectionStart,
+      tempConnectionEnd: state.tempConnectionEnd,
+      lastConnectionResult: state.lastConnectionResult,
+      addComponent: state.addComponent,
+      updateComponentPosition: state.updateComponentPosition,
+      selectComponent: state.selectComponent,
+      startConnection: state.startConnection,
+      updateTempConnection: state.updateTempConnection,
+      completeConnection: state.completeConnection,
+      cancelConnection: state.cancelConnection,
+      clearConnectionResult: state.clearConnectionResult,
+      setZoom: state.setZoom,
+      setPan: state.setPan,
+    }))
+  );
+
+  const definitionById = useMemo(
+    () => new Map(componentDefinitions.map((definition) => [definition.id, definition])),
+    []
+  );
+  const pinsByDefinitionId = useMemo(() => {
+    const map = new Map<string, Map<string, Pin>>();
+    componentDefinitions.forEach((definition) => {
+      map.set(definition.id, new Map(definition.pins.map((pin) => [pin.id, pin])));
+    });
+    return map;
+  }, []);
+  const placedById = useMemo(
+    () => new Map(placedComponents.map((component) => [component.instanceId, component])),
+    [placedComponents]
+  );
   
   // 监听连接结果并显示反馈
   useEffect(() => {
@@ -105,7 +149,7 @@ export function SimulatorCanvas() {
       const snappedY = gridEnabled ? Math.round(y / GRID_SIZE) * GRID_SIZE : y;
 
       const newComponent: PlacedComponent = {
-        instanceId: `${definition.id}-${Date.now()}`,
+        instanceId: createId(),
         definitionId: definition.id,
         position: { x: snappedX, y: snappedY },
         state: {
@@ -270,18 +314,18 @@ export function SimulatorCanvas() {
 
   // 获取连线的引脚位置
   const getConnectionPoints = (connection: typeof connections[0]) => {
-    const fromComponent = placedComponents.find((c) => c.instanceId === connection.fromComponent);
-    const toComponent = placedComponents.find((c) => c.instanceId === connection.toComponent);
+    const fromComponent = placedById.get(connection.fromComponent);
+    const toComponent = placedById.get(connection.toComponent);
     
     if (!fromComponent || !toComponent) return null;
     
-    const fromDef = componentDefinitions.find((d) => d.id === fromComponent.definitionId);
-    const toDef = componentDefinitions.find((d) => d.id === toComponent.definitionId);
+    const fromDef = definitionById.get(fromComponent.definitionId);
+    const toDef = definitionById.get(toComponent.definitionId);
     
     if (!fromDef || !toDef) return null;
     
-    const fromPin = fromDef.pins.find((p) => p.id === connection.fromPin);
-    const toPin = toDef.pins.find((p) => p.id === connection.toPin);
+    const fromPin = pinsByDefinitionId.get(fromDef.id)?.get(connection.fromPin);
+    const toPin = pinsByDefinitionId.get(toDef.id)?.get(connection.toPin);
     
     if (!fromPin || !toPin) return null;
     
@@ -513,10 +557,10 @@ export function SimulatorCanvas() {
           const fromComponent = placedComponents.find((c) => c.instanceId === connectionStart.componentId);
           if (!fromComponent) return null;
           
-          const fromDef = componentDefinitions.find((d) => d.id === fromComponent.definitionId);
+          const fromDef = definitionById.get(fromComponent.definitionId);
           if (!fromDef) return null;
           
-          const fromPin = fromDef.pins.find((p) => p.id === connectionStart.pinId);
+          const fromPin = pinsByDefinitionId.get(fromDef.id)?.get(connectionStart.pinId);
           if (!fromPin) return null;
           
           const fromPos = getPinPosition(fromComponent, fromPin);
@@ -537,7 +581,7 @@ export function SimulatorCanvas() {
 
       {/* 组件层 - 直接渲染组件 */}
       {placedComponents.map((component) => {
-        const definition = componentDefinitions.find((d) => d.id === component.definitionId);
+        const definition = definitionById.get(component.definitionId);
         if (!definition) return null;
 
         return (
