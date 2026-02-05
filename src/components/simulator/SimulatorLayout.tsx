@@ -26,6 +26,7 @@ import {
   Package,
   Settings,
 } from 'lucide-react';
+import { Globe } from 'lucide-react';
 import { ComponentLibrary } from './ComponentLibrary';
 import { SimulatorCanvas } from './SimulatorCanvas';
 import { PropertyPanel } from './PropertyPanel';
@@ -33,6 +34,7 @@ import { EnhancedCodeEditor } from './EnhancedCodeEditor';
 import { EnhancedDatabasePanel } from './EnhancedDatabasePanel';
 import { EnhancedSimulationPanel } from './EnhancedSimulationPanel';
 import { ConnectionValidationPanel } from './ConnectionValidationPanel';
+import { BrowserSimulator } from './BrowserSimulator';
 import { scenarios, loadScenario } from '@/data/scenarios';
 import { cn } from '@/lib/utils';
 import {
@@ -269,6 +271,10 @@ export function SimulatorLayout() {
                       <Activity className="h-4 w-4" />
                       {!bottomPanelCollapsed && "运行仿真"}
                     </TabsTrigger>
+                    <TabsTrigger value="browser" className="gap-1.5">
+                      <Globe className="h-4 w-4" />
+                      {!bottomPanelCollapsed && "浏览器"}
+                    </TabsTrigger>
                   </TabsList>
                   
                   <Button
@@ -305,6 +311,10 @@ export function SimulatorLayout() {
                     
                     <TabsContent value="simulation" className="flex-1 m-0 overflow-hidden">
                       <EnhancedSimulationPanel />
+                    </TabsContent>
+                    
+                    <TabsContent value="browser" className="flex-1 m-0 overflow-hidden p-2">
+                      <BrowserSimulator />
                     </TabsContent>
                   </>
                 )}
