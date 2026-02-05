@@ -228,33 +228,33 @@ export const classroomTemperatureScenario: Scenario = {
       type: 'data',
       valid: true,
     },
-    // 蜂鸣器 VCC
+    // 蜂鸣器 VCC - 连接3V电源
     {
       id: 'conn-buzzer-vcc',
       fromComponent: 'buzzer-1',
       fromPin: 'vcc',
       toComponent: 'expansion-1',
-      toPin: 'p13',
+      toPin: '3v-out3',
       type: 'power',
       valid: true,
     },
-    // 蜂鸣器 GND
+    // 蜂鸣器 GND - 连接接地
     {
       id: 'conn-buzzer-gnd',
       fromComponent: 'buzzer-1',
       fromPin: 'gnd',
       toComponent: 'expansion-1',
-      toPin: 'p14',
+      toPin: 'gnd-out3',
       type: 'ground',
       valid: true,
     },
-    // 蜂鸣器 IO
+    // 蜂鸣器 IO - 连接数字引脚P3
     {
       id: 'conn-buzzer-io',
       fromComponent: 'buzzer-1',
       fromPin: 'io',
       toComponent: 'expansion-1',
-      toPin: 'p15',
+      toPin: 'p3',
       type: 'data',
       valid: true,
     },

@@ -27,7 +27,7 @@ export const expansionBoard: ComponentDefinition = {
   name: '扩展板',
   description: '完整的micro:bit扩展板，提供P0-P20引脚、3V和GND',
   width: 280,
-  height: 180,
+  height: 200,
   pins: [
     // 顶部 - micro:bit 插槽
     { id: 'slot-p0', name: 'P0', type: 'analog', position: { x: 40, y: 10 } },
@@ -50,15 +50,19 @@ export const expansionBoard: ComponentDefinition = {
     { id: 'p15', name: 'P15', type: 'digital', position: { x: 280, y: 80 } },
     { id: 'p16', name: 'P16', type: 'digital', position: { x: 280, y: 100 } },
     
-    // 底部电源引脚
-    { id: '3v-out1', name: '3V', type: 'power', position: { x: 60, y: 180 } },
-    { id: '3v-out2', name: '3V', type: 'power', position: { x: 100, y: 180 } },
-    { id: 'gnd-out1', name: 'GND', type: 'ground', position: { x: 140, y: 180 } },
-    { id: 'gnd-out2', name: 'GND', type: 'ground', position: { x: 180, y: 180 } },
+    // 底部电源引脚（扩展为4组3V和4组GND）
+    { id: '3v-out1', name: '3V', type: 'power', position: { x: 30, y: 200 } },
+    { id: '3v-out2', name: '3V', type: 'power', position: { x: 55, y: 200 } },
+    { id: '3v-out3', name: '3V', type: 'power', position: { x: 80, y: 200 } },
+    { id: '3v-out4', name: '3V', type: 'power', position: { x: 105, y: 200 } },
+    { id: 'gnd-out1', name: 'GND', type: 'ground', position: { x: 140, y: 200 } },
+    { id: 'gnd-out2', name: 'GND', type: 'ground', position: { x: 165, y: 200 } },
+    { id: 'gnd-out3', name: 'GND', type: 'ground', position: { x: 190, y: 200 } },
+    { id: 'gnd-out4', name: 'GND', type: 'ground', position: { x: 215, y: 200 } },
     
     // 串口引脚（用于IoT模块）
-    { id: 'tx', name: 'TX(P1)', type: 'serial_tx', position: { x: 220, y: 180 } },
-    { id: 'rx', name: 'RX(P2)', type: 'serial_rx', position: { x: 250, y: 180 } },
+    { id: 'tx', name: 'TX', type: 'serial_tx', position: { x: 240, y: 200 } },
+    { id: 'rx', name: 'RX', type: 'serial_rx', position: { x: 265, y: 200 } },
   ],
 };
 
