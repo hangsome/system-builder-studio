@@ -1,11 +1,9 @@
 // 增强的仿真运行面板 - 阶段五功能
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { componentDefinitions } from '@/data/componentDefinitions';
 import { 
   sensorConfigs, 
-  generateSensorFluctuation, 
-  simulateFlaskRoute,
   canRunSimulation
 } from '@/lib/simulationEngine';
 import { validateSystem } from '@/lib/connectionValidator';
@@ -51,9 +49,11 @@ export function EnhancedSimulationPanel() {
     logs,
     addLog,
     clearLogs,
-    database,
-    updateDatabase,
     codeBurned,
+    sensorValues,
+    setSensorValue,
+    autoFluctuation,
+    setAutoFluctuation,
   } = useSimulatorStore(
     useShallow((state) => ({
       isRunning: state.isRunning,
@@ -69,23 +69,16 @@ export function EnhancedSimulationPanel() {
       logs: state.logs,
       addLog: state.addLog,
       clearLogs: state.clearLogs,
-      database: state.database,
-      updateDatabase: state.updateDatabase,
       codeBurned: state.codeBurned,
+      sensorValues: state.sensorValues,
+      setSensorValue: state.setSensorValue,
+      autoFluctuation: state.autoFluctuation,
+      setAutoFluctuation: state.setAutoFluctuation,
     }))
   );
 
-  const [sensorValues, setSensorValues] = useState<Record<string, number>>({});
-  const [autoFluctuation, setAutoFluctuation] = useState(true);
   const [networkConnected, setNetworkConnected] = useState(false);
-  const simulationRef = useRef<NodeJS.Timeout | null>(null);
-  const dataFlowRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // 使用 ref 来存储最新的 sensorValues，避免 closure 问题
-  const sensorValuesRef = useRef<Record<string, number>>({});
-  useEffect(() => {
-    sensorValuesRef.current = sensorValues;
-  }, [sensorValues]);
+  // 仿真循环现在由 useSimulationRunner 在后台处理
 
   // 获取画布上的传感器组件
   const sensorComponents = useMemo(() => {
@@ -121,18 +114,13 @@ export function EnhancedSimulationPanel() {
 
   // 初始化传感器值
   useEffect(() => {
-    const newValues: Record<string, number> = {};
-    const currentValues = sensorValuesRef.current;
     sensorComponents.forEach((sensor) => {
-      if (currentValues[sensor.instanceId] === undefined) {
+      if (sensorValues[sensor.instanceId] === undefined) {
         const config = sensorConfigs[sensor.definitionId];
-        newValues[sensor.instanceId] = config?.defaultValue ?? 25;
+        setSensorValue(sensor.instanceId, config?.defaultValue ?? 25);
       }
     });
-    if (Object.keys(newValues).length > 0) {
-      setSensorValues((prev) => ({ ...prev, ...newValues }));
-    }
-  }, [sensorComponents]);
+  }, [sensorComponents, sensorValues, setSensorValue]);
 
   // 模拟网络连接 - 需要OBLOQ有电源和串口连接
   useEffect(() => {
@@ -157,122 +145,12 @@ export function EnhancedSimulationPanel() {
     }
   }, [isRunning, codeBurned, obloqConnected, obloqPowered, routerConfig.ssid, addLog]);
 
-  // 主仿真循环
-  useEffect(() => {
-    if (!isRunning) {
-      if (simulationRef.current) clearInterval(simulationRef.current);
-      if (dataFlowRef.current) clearInterval(dataFlowRef.current);
-      return;
-    }
-
-    // 传感器波动 - 只对有电源的传感器生效
-    if (autoFluctuation) {
-      simulationRef.current = setInterval(() => {
-        setSensorValues(prev => {
-          const newValues = { ...prev };
-          sensorComponents.forEach(sensor => {
-            // 检查传感器是否有电源
-            const isPowered = powerStatus.get(sensor.instanceId);
-            if (!isPowered) return; // 未供电的传感器不产生波动
-            
-            const currentValue = prev[sensor.instanceId];
-            if (currentValue !== undefined) {
-              newValues[sensor.instanceId] = generateSensorFluctuation(currentValue, sensor.definitionId);
-            }
-          });
-          return newValues;
-        });
-      }, 2000 / simulationSpeed);
-    }
-
-    // 数据发送循环 - 只对有电源的传感器生效
-    if (codeBurned && serverConfig.running && networkConnected) {
-      dataFlowRef.current = setInterval(() => {
-        sensorComponents.forEach(sensor => {
-          // 检查传感器是否有电源
-          const isPowered = powerStatus.get(sensor.instanceId);
-          if (!isPowered) {
-            const def = componentDefinitions.find(d => d.id === sensor.definitionId);
-            addLog({
-              type: 'warning',
-              message: `${def?.name} 未供电，无法读取数据`,
-              source: 'micro:bit',
-            });
-            return; // 未供电的传感器不发送数据
-          }
-          
-          // 使用 ref 获取最新的传感器值
-          const value = sensorValuesRef.current[sensor.instanceId];
-          const def = componentDefinitions.find(d => d.id === sensor.definitionId);
-          
-          // 记录传感器读取
-          addLog({
-            type: 'data',
-            message: `读取 ${def?.name}: ${value?.toFixed(1) ?? '?'} ${sensorConfigs[sensor.definitionId]?.unit ?? ''}`,
-            source: 'micro:bit',
-          });
-
-          // 模拟HTTP GET请求（参数附加在URL后）
-          const requestPath = `/upload?temperature=${value?.toFixed(1) ?? 0}`;
-          const fullUrl = `http://${serverConfig.ip}:${serverConfig.port}${requestPath}`;
-          
-          // 记录发送的请求详情
-          addLog({
-            type: 'info',
-            message: `发送请求: GET ${fullUrl}`,
-            source: 'IoT模块',
-          });
-          
-          const result = simulateFlaskRoute(
-            {
-              method: 'GET',
-              path: requestPath,
-              timestamp: new Date(),
-            },
-            serverConfig,
-            database
-          );
-
-          // 记录请求结果
-          if (result.response.status === 200) {
-            const responseBody = result.response.body as { status?: string; id?: number; message?: string };
-            addLog({
-              type: 'info',
-              message: `响应: ${result.response.status} OK - ${responseBody.message || '数据已保存'} (ID: ${responseBody.id})`,
-              source: 'Flask',
-            });
-
-            // 更新数据库
-            if (result.updatedDatabase) {
-              updateDatabase(result.updatedDatabase);
-              addLog({
-                type: 'data',
-                message: `数据库已更新: sensorlog 表新增1条记录`,
-                source: 'SQLite',
-              });
-            }
-          } else {
-            const errorBody = result.response.body as { error?: string; path?: string; method?: string };
-            addLog({
-              type: 'error',
-              message: `请求失败: ${result.response.status} - ${errorBody.error || '未知错误'} (路径: ${errorBody.path}, 方法: ${errorBody.method})`,
-              source: 'Flask',
-            });
-          }
-        });
-      }, 3000 / simulationSpeed);
-    }
-
-    return () => {
-      if (simulationRef.current) clearInterval(simulationRef.current);
-      if (dataFlowRef.current) clearInterval(dataFlowRef.current);
-    };
-  }, [isRunning, simulationSpeed, autoFluctuation, codeBurned, serverConfig.running, networkConnected, sensorComponents, database, powerStatus, addLog, updateDatabase, serverConfig]);
+  // 仿真循环现在由 useSimulationRunner hook 在 SimulatorLayout 中统一处理
 
   // 传感器值变化处理
   const handleSensorValueChange = useCallback((instanceId: string, value: number) => {
-    setSensorValues(prev => ({ ...prev, [instanceId]: value }));
-  }, []);
+    setSensorValue(instanceId, value);
+  }, [setSensorValue]);
 
   // 获取传感器图标
   const getSensorIcon = (type: string) => {

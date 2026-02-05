@@ -60,6 +60,16 @@
      });
    }, [placedComponents]);
  
+  // 初始化传感器值
+  useEffect(() => {
+    sensorComponents.forEach((sensor) => {
+      if (sensorValues[sensor.instanceId] === undefined) {
+        const config = sensorConfigs[sensor.definitionId];
+        setSensorValue(sensor.instanceId, config?.defaultValue ?? 25);
+      }
+    });
+  }, [sensorComponents, sensorValues, setSensorValue]);
+
    // 获取电源状态
    const getPowerStatus = useCallback(() => {
      const validation = validateSystem(placedComponents, connections);
