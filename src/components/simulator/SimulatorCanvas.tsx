@@ -335,15 +335,9 @@ export function SimulatorCanvas() {
     };
   };
 
-  // 获取连线颜色
-  const getConnectionColor = (type: string) => {
-    switch (type) {
-      case 'power': return '#ef4444';
-      case 'ground': return '#1f2937';
-      case 'serial': return '#22c55e';
-      case 'wireless': return '#8b5cf6'; // 紫色 - 无线连接
-      default: return '#3b82f6';
-    }
+  // 获取连线颜色 - 基于有效性（绿色=正确，红色=错误）
+  const getConnectionColorByValidity = (valid: boolean) => {
+    return valid ? '#22c55e' : '#ef4444'; // 绿色表示正确，红色表示错误
   };
   
   // 判断是否为无线连接
@@ -411,7 +405,7 @@ export function SimulatorCanvas() {
             return null;
           }
           
-          const color = getConnectionColor(connection.type);
+          const color = getConnectionColorByValidity(connection.valid);
           const midX = (points.from.x + points.to.x) / 2;
           const midY = (points.from.y + points.to.y) / 2;
           const isWireless = isWirelessConnection(connection.type);
@@ -919,11 +913,19 @@ function ComponentVisual({ type, state }: { type: string; state?: PlacedComponen
         </div>
       );
     
-    case 'pc-server':
+    case 'pc-computer':
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-blue-100 rounded">
+          <span className="text-2xl">🖥️</span>
+          <span className="text-[8px] text-blue-800">PC电脑</span>
+        </div>
+      );
+    
+    case 'web-server':
       return (
         <div className="w-full h-full flex flex-col items-center justify-center bg-gray-800 rounded">
-          <span className="text-2xl">🖥️</span>
-          <span className="text-[8px] text-gray-300">Flask服务器</span>
+          <span className="text-2xl">🌐</span>
+          <span className="text-[8px] text-gray-300">Web服务器</span>
         </div>
       );
     

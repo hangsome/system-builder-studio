@@ -178,7 +178,8 @@ function ComponentIcon({ type }: { type: string }) {
           <Wifi className="h-full w-full" />
         </div>
       );
-    case 'pc-server':
+    case 'pc-computer':
+    case 'web-server':
     case 'database':
     case 'browser':
       return (
