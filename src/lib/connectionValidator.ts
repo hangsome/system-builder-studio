@@ -273,8 +273,17 @@ export function validateSystem(
   return { issues, warnings, powerStatus };
 }
 
-// 获取连接的颜色
-export function getConnectionColor(type: 'power' | 'ground' | 'data' | 'serial' | 'wireless'): string {
+// 获取连接的颜色 - 基于有效性
+export function getConnectionColor(valid: boolean): string {
+  if (valid) {
+    return '#22c55e'; // 绿色 - 正确连接
+  } else {
+    return '#ef4444'; // 红色 - 错误连接
+  }
+}
+
+// 获取连接的颜色（按类型） - 用于引脚颜色说明等
+export function getConnectionColorByType(type: 'power' | 'ground' | 'data' | 'serial' | 'wireless'): string {
   switch (type) {
     case 'power': return '#ef4444'; // 红色
     case 'ground': return '#1f2937'; // 黑色

@@ -230,20 +230,32 @@ export const router: ComponentDefinition = {
   ],
 };
 
-// PC服务器
-export const pcServer: ComponentDefinition = {
-  id: 'pc-server',
-  type: 'pc-server',
+// PC电脑（用于编程烧录）
+export const pcComputer: ComponentDefinition = {
+  id: 'pc-computer',
+  type: 'pc-computer',
   category: 'server',
-  name: 'PC服务器',
-  description: '运行Flask服务器的电脑',
+  name: 'PC电脑',
+  description: '用于编程和烧录micro:bit代码的电脑',
   width: 110,
   height: 90,
   pins: [
-    { id: 'usb', name: 'USB', type: 'usb', position: { x: 25, y: 90 } },
-    { id: 'network', name: 'NET', type: 'data', position: { x: 55, y: 90 } },
-    // 数据库连接引脚
-    { id: 'db', name: 'DB', type: 'data', position: { x: 85, y: 90 } },
+    { id: 'usb', name: 'USB', type: 'usb', position: { x: 55, y: 90 } },
+  ],
+};
+
+// Web服务器（Flask服务器）
+export const webServer: ComponentDefinition = {
+  id: 'web-server',
+  type: 'web-server',
+  category: 'server',
+  name: 'Web服务器',
+  description: '运行Flask服务的Web服务器，IoT模块通过WiFi访问',
+  width: 110,
+  height: 90,
+  pins: [
+    { id: 'network', name: 'NET', type: 'data', position: { x: 35, y: 90 } },
+    { id: 'db', name: 'DB', type: 'data', position: { x: 75, y: 90 } },
   ],
 };
 
@@ -290,7 +302,8 @@ export const componentDefinitions: ComponentDefinition[] = [
   relay,
   iotModule,
   router,
-  pcServer,
+  pcComputer,
+  webServer,
   database,
   browser,
 ];
@@ -301,7 +314,7 @@ export const componentsByCategory = {
   sensor: [tempHumiditySensor, lightSensor, infraredSensor, soundSensor],
   actuator: [ledStrip, buzzer, servo, relay],
   network: [iotModule, router],
-  server: [pcServer, database, browser],
+  server: [pcComputer, webServer, database, browser],
 };
 
 export const categoryNames: Record<string, string> = {

@@ -37,8 +37,14 @@ export const classroomTemperatureScenario: Scenario = {
       state: { powered: true, active: true },
     },
     {
+      instanceId: 'pc-1',
+      definitionId: 'pc-computer',
+      position: { x: 60, y: -120 },
+      state: { powered: true, active: true },
+    },
+    {
       instanceId: 'server-1',
-      definitionId: 'pc-server',
+      definitionId: 'web-server',
       position: { x: 580, y: 160 },
       state: { powered: true, active: true },
     },
@@ -63,6 +69,15 @@ export const classroomTemperatureScenario: Scenario = {
   ],
   connections: [
     // micro:bit 与扩展板全连接
+    {
+      id: 'conn-mb-usb',
+      fromComponent: 'microbit-1',
+      fromPin: 'usb',
+      toComponent: 'pc-1',
+      toPin: 'usb',
+      type: 'data',
+      valid: true,
+    },
     {
       id: 'conn-mb-3v',
       fromComponent: 'microbit-1',
@@ -105,16 +120,6 @@ export const classroomTemperatureScenario: Scenario = {
       fromPin: 'p2',
       toComponent: 'expansion-1',
       toPin: 'slot-p2',
-      type: 'data',
-      valid: true,
-    },
-    // micro:bit USB连接PC服务器
-    {
-      id: 'conn-mb-usb',
-      fromComponent: 'microbit-1',
-      fromPin: 'usb',
-      toComponent: 'server-1',
-      toPin: 'usb',
       type: 'data',
       valid: true,
     },
@@ -479,7 +484,7 @@ export const smartIrrigationScenario: Scenario = {
     },
     {
       instanceId: 'server-1',
-      definitionId: 'pc-server',
+      definitionId: 'pc-computer',
       position: { x: 420, y: 160 },
       state: { powered: true, active: true },
     },
