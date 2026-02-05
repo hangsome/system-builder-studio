@@ -245,28 +245,28 @@ export function validateSystem(
     }
   });
 
-  // 检查OBLOQ模块的TX/RX连接
-  const obloqComponents = placedComponents.filter(c => c.definitionId === 'obloq');
-  obloqComponents.forEach(obloq => {
-    const obloqConnections = connections.filter(
-      c => c.fromComponent === obloq.instanceId || c.toComponent === obloq.instanceId
+  // 检查IoT模块的TX/RX连接
+  const iotComponents = placedComponents.filter(c => c.definitionId === 'iot-module');
+  iotComponents.forEach(iot => {
+    const iotConnections = connections.filter(
+      c => c.fromComponent === iot.instanceId || c.toComponent === iot.instanceId
     );
     
-    const hasTxConnection = obloqConnections.some(conn => {
-      const pin = conn.fromComponent === obloq.instanceId ? conn.fromPin : conn.toPin;
+    const hasTxConnection = iotConnections.some(conn => {
+      const pin = conn.fromComponent === iot.instanceId ? conn.fromPin : conn.toPin;
       return pin === 'tx';
     });
     
-    const hasRxConnection = obloqConnections.some(conn => {
-      const pin = conn.fromComponent === obloq.instanceId ? conn.fromPin : conn.toPin;
+    const hasRxConnection = iotConnections.some(conn => {
+      const pin = conn.fromComponent === iot.instanceId ? conn.fromPin : conn.toPin;
       return pin === 'rx';
     });
 
     if (!hasTxConnection) {
-      issues.push('OBLOQ模块的TX引脚未连接到扩展板的RX');
+      issues.push('IoT模块的TX引脚未连接到扩展板的RX');
     }
     if (!hasRxConnection) {
-      issues.push('OBLOQ模块的RX引脚未连接到扩展板的TX');
+      issues.push('IoT模块的RX引脚未连接到扩展板的TX');
     }
   });
 
