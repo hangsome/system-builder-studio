@@ -1,11 +1,12 @@
 // 增强的数据库面板 - 阶段四功能
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -39,7 +40,8 @@ import {
   Database,
   Key,
   RefreshCw,
-  Download
+  Download,
+  Radio
 } from 'lucide-react';
 
 interface NewColumn {
@@ -49,7 +51,7 @@ interface NewColumn {
 }
 
 export function EnhancedDatabasePanel() {
-  const { database, updateDatabase } = useSimulatorStore();
+  const { database, updateDatabase, isRunning } = useSimulatorStore();
   const [selectedTable, setSelectedTable] = useState(database.tables[0]?.name || '');
   const [sqlQuery, setSqlQuery] = useState('SELECT * FROM sensorlog ORDER BY id DESC LIMIT 10');
   const [queryResult, setQueryResult] = useState<string>('');
@@ -57,9 +59,32 @@ export function EnhancedDatabasePanel() {
   const [isAddColumnOpen, setIsAddColumnOpen] = useState(false);
   const [newTableName, setNewTableName] = useState('');
   const [newColumn, setNewColumn] = useState<NewColumn>({ name: '', type: 'TEXT', primaryKey: false });
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const currentTable = database.tables.find((t) => t.name === selectedTable);
-  const tableData = useMemo(() => database.records[selectedTable] || [], [database.records, selectedTable]);
+  
+  // 使用refreshKey强制刷新，确保实时显示最新数据
+  const tableData = useMemo(() => {
+    // refreshKey用于触发重新计算
+    void refreshKey;
+    return database.records[selectedTable] || [];
+  }, [database.records, selectedTable, refreshKey]);
+
+  // 自动刷新：仿真运行时每秒刷新一次
+  useEffect(() => {
+    if (isRunning && autoRefresh) {
+      const timer = setInterval(() => {
+        setRefreshKey(prev => prev + 1);
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [isRunning, autoRefresh]);
+
+  // 手动刷新
+  const handleRefresh = useCallback(() => {
+    setRefreshKey(prev => prev + 1);
+  }, []);
 
   // 执行SQL查询
   const handleRunQuery = () => {
@@ -368,18 +393,45 @@ export function EnhancedDatabasePanel() {
         <div className="flex items-center justify-between p-2 border-b border-border">
           <h4 className="text-xs font-medium">{selectedTable}</h4>
           <div className="flex gap-1">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="h-6 text-[10px]" 
+              onClick={handleRefresh}
+              title="刷新数据"
+            >
+              <RefreshCw className="h-3 w-3" />
+            </Button>
             <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={handleAddRecord}>
               <Plus className="h-3 w-3 mr-1" />
               添加
             </Button>
-            <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={handleClearTable}>
-              <RefreshCw className="h-3 w-3 mr-1" />
+            <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={handleClearTable} title="清空表数据">
+              <Trash2 className="h-3 w-3 mr-1" />
               清空
             </Button>
             <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={handleExport}>
               <Download className="h-3 w-3 mr-1" />
               导出
             </Button>
+          </div>
+        </div>
+        
+        {/* 自动刷新控制 */}
+        <div className="flex items-center justify-between px-2 py-1 border-b border-border bg-muted/30">
+          <div className="flex items-center gap-2">
+            <Radio className={`h-3 w-3 ${isRunning && autoRefresh ? 'text-green-500 animate-pulse' : 'text-muted-foreground'}`} />
+            <span className="text-[10px] text-muted-foreground">
+              {isRunning ? (autoRefresh ? '实时更新中...' : '已暂停更新') : '等待仿真运行'}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Label className="text-[10px]">自动刷新</Label>
+            <Switch
+              checked={autoRefresh}
+              onCheckedChange={setAutoRefresh}
+              className="scale-75"
+            />
           </div>
         </div>
         
@@ -407,11 +459,11 @@ export function EnhancedDatabasePanel() {
                       colSpan={currentTable.columns.length + 1}
                       className="text-center text-muted-foreground text-xs py-8"
                     >
-                      暂无数据 - 点击&quot;添加&quot;或运行仿真
+                      暂无数据 - 运行仿真后数据将自动显示
                     </TableCell>
                   </TableRow>
                 ) : (
-                  tableData.map((row, index) => (
+                  [...tableData].reverse().map((row, index) => (
                     <TableRow key={index}>
                       {currentTable.columns.map((col) => (
                         <TableCell key={col.name} className="text-[10px] py-1 px-2 font-mono">
@@ -423,7 +475,7 @@ export function EnhancedDatabasePanel() {
                           variant="ghost"
                           size="icon"
                           className="h-5 w-5"
-                          onClick={() => handleDeleteRecord(index)}
+                          onClick={() => handleDeleteRecord(tableData.length - 1 - index)}
                         >
                           <Trash2 className="h-3 w-3 text-destructive" />
                         </Button>
