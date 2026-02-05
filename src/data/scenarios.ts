@@ -259,60 +259,109 @@ export const classroomTemperatureScenario: Scenario = {
       valid: true,
     },
   ],
-  microbitCode: `# 教室温度监测系统
+  microbitCode: `# ============================================
+# 教室温度监测系统 - micro:bit 端代码
+# ============================================
+# 功能：采集教室温度，通过WiFi上传到服务器
+# 硬件：micro:bit + 扩展板 + 温湿度传感器 + IoT模块
+# 通信：HTTP GET 请求（参数附加在URL后）
+# ============================================
+
 from microbit import *
-import obloq
+import obloq  # 导入OBLOQ物联网模块库
 
-# 连接WiFi
-obloq.setup("School_WiFi", "12345678")
+# ========== 配置参数 ==========
+# WiFi连接配置
+WIFI_SSID = "School_WiFi"      # 学校WiFi名称
+WIFI_PASSWORD = "12345678"     # WiFi密码
 
-# 服务器地址
-SERVER_URL = "http://192.168.1.100:5000/upload"
+# 服务器配置
+SERVER_IP = "192.168.1.100"    # Flask服务器IP
+SERVER_PORT = 5000             # 服务器端口
 
-# 主循环
+# 报警阈值
+TEMP_THRESHOLD = 30            # 超过此温度触发蜂鸣器报警
+
+# ========== 初始化 ==========
+# 连接WiFi网络
+obloq.setup(WIFI_SSID, WIFI_PASSWORD)
+
+# ========== 主循环 ==========
 while True:
-    # 读取温度
+    # 1. 读取温度传感器数据
     temp = temperature()
     
-    # 显示在LED点阵
+    # 2. LED点阵显示当前温度
     display.scroll(str(temp))
     
-    # 发送到服务器
-    data = {"temperature": temp, "location": "301教室"}
-    obloq.http_post(SERVER_URL, data)
+    # 3. 温度报警检测
+    if temp > TEMP_THRESHOLD:
+        pin3.write_digital(1)  # 触发蜂鸣器
+    else:
+        pin3.write_digital(0)  # 关闭蜂鸣器
     
-    # 等待5秒
+    # 4. 构建GET请求URL
+    # 格式：/upload?temperature=数值
+    url = "http://" + SERVER_IP + ":" + str(SERVER_PORT)
+    url = url + "/upload?temperature=" + str(temp)
+    
+    # 5. 发送HTTP GET请求上传数据
+    obloq.http_get(url)
+    
+    # 6. 等待5秒后再次采集
     sleep(5000)
 `,
-  flaskCode: `# Flask 服务器 - 教室温度监测
+  flaskCode: `# ============================================
+# Flask 服务器 - 教室温度监测系统
+# ============================================
+# 功能：接收micro:bit上传的温度数据，存入SQLite数据库
+# 接口说明：
+#   GET /upload?temperature=数值  - 接收温度数据
+#   GET /query                    - 查询最近10条记录
+# ============================================
+
 from flask import Flask, request, jsonify
 import sqlite3
 from datetime import datetime
 
 app = Flask(__name__)
 
-# 初始化数据库
+# ========== 数据库初始化函数 ==========
 def init_db():
+    """
+    创建SQLite数据库和表结构
+    表 sensorlog：存储传感器历史数据
+    """
     conn = sqlite3.connect('sensor.db')
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS sensorlog (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sensor_id INTEGER,
-            value REAL,
-            timestamp DATETIME
+            id INTEGER PRIMARY KEY AUTOINCREMENT,  -- 自增主键
+            sensor_id INTEGER,                     -- 传感器ID
+            value REAL,                            -- 传感器数值
+            timestamp DATETIME                     -- 记录时间
         )
     ''')
     conn.commit()
     conn.close()
 
-# 接收温度数据
-@app.route('/upload', methods=['POST'])
+# ========== 数据接收接口 ==========
+# 使用GET方法，参数通过URL传递
+# 请求示例：GET /upload?temperature=25.5
+@app.route('/upload', methods=['GET'])
 def upload_data():
-    data = request.get_json()
-    temperature = data.get('temperature')
-    location = data.get('location', '未知')
+    # 1. 从URL中提取temperature参数
+    # request.args.get() 用于获取GET请求的查询参数
+    temperature = request.args.get('temperature', type=float)
     
+    # 2. 参数校验
+    if temperature is None:
+        return jsonify({
+            "status": "error",
+            "message": "缺少temperature参数"
+        })
+    
+    # 3. 将数据插入数据库
     conn = sqlite3.connect('sensor.db')
     cursor = conn.cursor()
     cursor.execute('''
@@ -322,22 +371,35 @@ def upload_data():
     conn.commit()
     conn.close()
     
-    print(f"收到数据: {location} 温度 {temperature}°C")
-    return jsonify({"status": "success"})
+    # 4. 打印日志并返回成功响应
+    print(f"[数据接收] 温度: {temperature}°C，时间: {datetime.now()}")
+    return jsonify({
+        "status": "success",
+        "temperature": temperature,
+        "message": "数据已保存"
+    })
 
-# 查询最近数据
+# ========== 数据查询接口 ==========
+# 返回最近10条传感器记录
 @app.route('/query', methods=['GET'])
 def query_data():
     conn = sqlite3.connect('sensor.db')
     cursor = conn.cursor()
+    # 按ID倒序排列，获取最新的10条记录
     cursor.execute('SELECT * FROM sensorlog ORDER BY id DESC LIMIT 10')
     rows = cursor.fetchall()
     conn.close()
     return jsonify(rows)
 
+# ========== 服务器启动入口 ==========
 if __name__ == '__main__':
-    init_db()
-    app.run(host='0.0.0.0', port=5000)
+    init_db()  # 先初始化数据库
+    print("="*40)
+    print("教室温度监测服务器已启动")
+    print("数据接收: GET /upload?temperature=数值")
+    print("数据查询: GET /query")
+    print("="*40)
+    app.run(host='0.0.0.0', port=5000, debug=True)
 `,
   database: {
     tables: [
@@ -378,7 +440,7 @@ if __name__ == '__main__':
     port: 5000,
     running: false,
     routes: [
-      { path: '/upload', method: 'POST', handler: 'upload_data' },
+      { path: '/upload', method: 'GET', handler: 'upload_data' },
       { path: '/query', method: 'GET', handler: 'query_data' },
     ],
     logs: [],

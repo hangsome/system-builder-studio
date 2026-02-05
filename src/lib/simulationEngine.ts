@@ -90,7 +90,13 @@ export function simulateFlaskRoute(
     r => r.path === request.path && r.method === request.method
   );
 
-  if (!route) {
+  // 支持带参数的GET请求匹配（如 /upload?temperature=25）
+  const pathWithoutParams = request.path.split('?')[0];
+  const matchedRoute = route || serverConfig.routes.find(
+    r => r.path === pathWithoutParams && r.method === request.method
+  );
+
+  if (!matchedRoute) {
     return {
       response: {
         status: 404,
@@ -101,13 +107,17 @@ export function simulateFlaskRoute(
   }
 
   // 模拟不同路由的处理
-  switch (route.handler) {
+  switch (matchedRoute.handler) {
     case 'upload_data': {
-      // 处理传感器数据上传
-      const data = request.body;
-      if (!data) {
+      // 处理传感器数据上传（GET请求，参数在URL中）
+      // 解析URL参数：/upload?temperature=25.5&location=301
+      const urlParams = new URLSearchParams(request.path.split('?')[1] || '');
+      const temperature = parseFloat(urlParams.get('temperature') || '0');
+      
+      // 如果没有有效的温度数据，返回错误
+      if (isNaN(temperature)) {
         return {
-          response: { status: 400, body: { error: 'No data provided' }, timestamp: new Date() },
+          response: { status: 400, body: { error: 'Invalid temperature parameter' }, timestamp: new Date() },
         };
       }
 
@@ -115,7 +125,7 @@ export function simulateFlaskRoute(
       const newRecord = {
         id: (database.records['sensorlog']?.length || 0) + 1,
         sensor_id: 1,
-        value: data.temperature || data.value || 0,
+        value: temperature,
         timestamp: new Date().toISOString(),
       };
 
@@ -127,8 +137,13 @@ export function simulateFlaskRoute(
         },
       };
 
+      // 返回成功响应，包含插入的记录ID
       return {
-        response: { status: 200, body: { status: 'success', id: newRecord.id }, timestamp: new Date() },
+        response: { 
+          status: 200, 
+          body: { status: 'success', id: newRecord.id, message: `温度 ${temperature}°C 已记录` }, 
+          timestamp: new Date() 
+        },
         updatedDatabase,
       };
     }
