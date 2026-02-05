@@ -1,12 +1,16 @@
  import React, { useState, useEffect, useRef, useCallback } from 'react';
- import { RefreshCw, Globe, Pause, Play } from 'lucide-react';
+import { RefreshCw, Globe, Pause, Play, AlertTriangle } from 'lucide-react';
  import { Button } from '@/components/ui/button';
  import { Input } from '@/components/ui/input';
  import { Badge } from '@/components/ui/badge';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
  import { useSimulatorStore } from '@/store/simulatorStore';
  import { simulateFlaskRoute } from '@/lib/simulationEngine';
  import { useShallow } from 'zustand/react/shallow';
  
+// 温度报警阈值
+const TEMPERATURE_THRESHOLD = 30;
+
  export const BrowserSimulator: React.FC = () => {
    const { serverConfig, database, isRunning } = useSimulatorStore(
      useShallow((state) => ({
@@ -73,6 +77,9 @@
      timestamp: string;
    }>;
    const latestRecord = sensorLogs[sensorLogs.length - 1];
+  
+  // 判断是否温度过高需要报警
+  const isOverheated = latestRecord && latestRecord.value > TEMPERATURE_THRESHOLD;
  
    return (
      <div className="flex flex-col h-full bg-background border rounded-lg overflow-hidden">
@@ -134,13 +141,31 @@
                </span>
              )}
            </div>
+          
+          {/* 温度过高报警提示 */}
+          {isOverheated && (
+            <Alert variant="destructive" className="animate-pulse">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle className="flex items-center gap-2">
+                🔔 蜂鸣器报警中
+              </AlertTitle>
+              <AlertDescription>
+                当前温度 {latestRecord.value.toFixed(1)}°C 超过阈值 {TEMPERATURE_THRESHOLD}°C，蜂鸣器已触发警报！
+              </AlertDescription>
+            </Alert>
+          )}
            
            {/* 当前温度卡片 */}
-           <div className="p-4 bg-muted rounded-lg text-center">
+          <div className={`p-4 rounded-lg text-center ${isOverheated ? 'bg-destructive/10 border border-destructive' : 'bg-muted'}`}>
              <div className="text-sm text-muted-foreground">当前温度</div>
-             <div className="text-4xl font-bold text-primary">
+            <div className={`text-4xl font-bold ${isOverheated ? 'text-destructive' : 'text-primary'}`}>
                {latestRecord ? `${latestRecord.value.toFixed(1)}°C` : '--'}
              </div>
+            {isOverheated && (
+              <div className="text-xs text-destructive mt-1 font-medium">
+                ⚠️ 温度过高！
+              </div>
+            )}
              <div className="text-xs text-muted-foreground mt-1">
                {latestRecord ? `记录于 ${latestRecord.timestamp}` : '暂无数据'}
              </div>
