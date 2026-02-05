@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { useSimulatorStore } from '@/store/simulatorStore';
+import { useLicense } from '@/hooks/useLicense';
+import { useUpgradePrompt } from '@/components/UpgradePrompt';
+import { getLicenseDisplayName } from '@/lib/license';
 import {
   Select,
   SelectContent,
@@ -25,6 +28,7 @@ import {
   PanelRightOpen,
   Package,
   Settings,
+  Lock,
 } from 'lucide-react';
 import { Globe } from 'lucide-react';
 import { ComponentLibrary } from './ComponentLibrary';
@@ -77,6 +81,10 @@ export function SimulatorLayout() {
   // 启动后台仿真运行器
   useSimulationRunner();
   
+  // 许可证状态
+  const { licenseState, featureAccess } = useLicense();
+  const upgradePrompt = useUpgradePrompt();
+  
   const [activeTab, setActiveTab] = useState('hardware');
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(() => loadPanelState().leftCollapsed);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => loadPanelState().rightCollapsed);
@@ -101,6 +109,15 @@ export function SimulatorLayout() {
   } = useSimulatorStore();
 
   const handleScenarioChange = (scenarioId: string) => {
+    // 体验版限制场景
+    if (!featureAccess.canUseAllComponents && scenarioId !== 'blank') {
+      const scenarioIndex = scenarios.findIndex(s => s.id === scenarioId);
+      if (scenarioIndex >= featureAccess.maxScenarios) {
+        upgradePrompt.show('该预设场景');
+        return;
+      }
+    }
+    
     if (scenarioId === 'blank') {
       resetSimulator();
     } else {
@@ -114,16 +131,37 @@ export function SimulatorLayout() {
   const handleRun = () => {
     setRunning(!isRunning);
   };
+  
+  const handleSave = () => {
+    if (!featureAccess.canSave) {
+      upgradePrompt.show('保存功能');
+      return;
+    }
+    // TODO: 实现保存逻辑
+  };
 
   return (
     <TooltipProvider>
       <div className="h-screen flex flex-col bg-background">
+        {/* 升级提示弹窗 */}
+        <upgradePrompt.UpgradePromptComponent />
+        
         {/* 顶部工具栏 */}
         <header className="h-14 border-b border-border flex items-center justify-between px-4 bg-card">
           <div className="flex items-center gap-4">
             <h1 className="text-lg font-semibold text-foreground flex items-center gap-2">
               <span className="text-2xl">📐</span>
               信息系统搭建模拟器
+              {licenseState && (
+                <span className={cn(
+                  "text-xs px-2 py-0.5 rounded-full",
+                  licenseState.licenseType === 'trial' 
+                    ? "bg-muted text-muted-foreground" 
+                    : "bg-primary/10 text-primary"
+                )}>
+                  {getLicenseDisplayName(licenseState.licenseType)}
+                </span>
+              )}
             </h1>
             
             <Select onValueChange={handleScenarioChange}>
@@ -132,9 +170,14 @@ export function SimulatorLayout() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="blank">空白画布</SelectItem>
-                {scenarios.map((scenario) => (
-                  <SelectItem key={scenario.id} value={scenario.id}>
-                    {scenario.name}
+                {scenarios.map((scenario, index) => (
+                  <SelectItem key={scenario.id} value={scenario.id} className="flex items-center">
+                    <span className="flex items-center gap-2">
+                      {scenario.name}
+                      {!featureAccess.canUseAllComponents && index >= featureAccess.maxScenarios && (
+                        <Lock className="h-3 w-3 text-muted-foreground" />
+                      )}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -196,8 +239,9 @@ export function SimulatorLayout() {
             </Button>
             
             <Button variant="outline" size="sm">
-              <Save className="h-4 w-4 mr-1" />
+              <Save className="h-4 w-4 mr-1" onClick={handleSave} />
               保存
+              {!featureAccess.canSave && <Lock className="h-3 w-3 ml-1 text-muted-foreground" />}
             </Button>
             
             <Button variant="outline" size="sm" onClick={resetSimulator}>
