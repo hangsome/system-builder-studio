@@ -54,6 +54,12 @@ export const classroomTemperatureScenario: Scenario = {
       position: { x: 580, y: 420 },
       state: { powered: true, active: true },
     },
+    {
+      instanceId: 'buzzer-1',
+      definitionId: 'buzzer',
+      position: { x: 320, y: 420 },
+      state: { powered: true, active: false },
+    },
   ],
   connections: [
     // micro:bit 与扩展板全连接
@@ -99,6 +105,16 @@ export const classroomTemperatureScenario: Scenario = {
       fromPin: 'p2',
       toComponent: 'expansion-1',
       toPin: 'slot-p2',
+      type: 'data',
+      valid: true,
+    },
+    // micro:bit USB连接PC服务器
+    {
+      id: 'conn-mb-usb',
+      fromComponent: 'microbit-1',
+      fromPin: 'usb',
+      toComponent: 'server-1',
+      toPin: 'usb',
       type: 'data',
       valid: true,
     },
@@ -209,6 +225,36 @@ export const classroomTemperatureScenario: Scenario = {
       fromPin: 'http',
       toComponent: 'router-1',
       toPin: 'lan',
+      type: 'data',
+      valid: true,
+    },
+    // 蜂鸣器 VCC
+    {
+      id: 'conn-buzzer-vcc',
+      fromComponent: 'buzzer-1',
+      fromPin: 'vcc',
+      toComponent: 'expansion-1',
+      toPin: 'p13',
+      type: 'power',
+      valid: true,
+    },
+    // 蜂鸣器 GND
+    {
+      id: 'conn-buzzer-gnd',
+      fromComponent: 'buzzer-1',
+      fromPin: 'gnd',
+      toComponent: 'expansion-1',
+      toPin: 'p14',
+      type: 'ground',
+      valid: true,
+    },
+    // 蜂鸣器 IO
+    {
+      id: 'conn-buzzer-io',
+      fromComponent: 'buzzer-1',
+      fromPin: 'io',
+      toComponent: 'expansion-1',
+      toPin: 'p15',
       type: 'data',
       valid: true,
     },
