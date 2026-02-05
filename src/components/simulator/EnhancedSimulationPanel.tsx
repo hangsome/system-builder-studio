@@ -212,12 +212,12 @@ export function EnhancedSimulationPanel() {
             source: 'micro:bit',
           });
 
-          // 模拟HTTP请求
+          // 模拟HTTP GET请求（参数附加在URL后）
+          const requestPath = `/upload?temperature=${value?.toFixed(1) ?? 0}`;
           const result = simulateFlaskRoute(
             {
-              method: 'POST',
-              path: '/upload',
-              body: { temperature: value, sensor_id: 1 },
+              method: 'GET',
+              path: requestPath,
               timestamp: new Date(),
             },
             serverConfig,
@@ -228,7 +228,7 @@ export function EnhancedSimulationPanel() {
           if (result.response.status === 200) {
             addLog({
               type: 'info',
-              message: `POST /upload -> ${result.response.status}`,
+              message: `GET ${requestPath} -> ${result.response.status}`,
               source: 'Flask',
             });
 

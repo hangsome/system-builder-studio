@@ -93,62 +93,126 @@ interface SimulatorStore {
   }) => void;
 }
 
-const defaultMicrobitCode = `# micro:bit Python 代码
+const defaultMicrobitCode = `# ============================================
+# micro:bit Python 代码 - 传感器数据上传示例
+# ============================================
+# 功能：读取温度传感器数据，通过WiFi发送到服务器
+# 通信方式：HTTP GET 请求（参数附加在URL后）
+# ============================================
+
 from microbit import *
-import obloq
+import obloq  # 导入OBLOQ物联网模块库
 
-# 连接WiFi
-obloq.setup("WiFi名称", "密码")
+# ========== 网络配置 ==========
+# WiFi连接参数（需与路由器设置一致）
+WIFI_SSID = "School_WiFi"      # WiFi名称
+WIFI_PASSWORD = "12345678"     # WiFi密码
 
-# 主循环
+# 服务器配置（Flask服务器地址）
+SERVER_IP = "192.168.1.100"    # 服务器IP地址
+SERVER_PORT = 5000             # 服务器端口号
+
+# ========== 初始化连接 ==========
+# 调用setup函数连接到WiFi网络
+obloq.setup(WIFI_SSID, WIFI_PASSWORD)
+
+# ========== 主循环 ==========
 while True:
-    # 读取传感器数据
+    # 1. 读取温度传感器数据
     temp = temperature()
     
-    # 发送数据到服务器
-    obloq.http_post("http://192.168.1.100:5000/upload", 
-                    {"temperature": temp})
-    
-    # 显示数据
+    # 2. 在LED点阵上显示当前温度
     display.scroll(str(temp))
+    
+    # 3. 构建GET请求URL（参数附加在URL后面）
+    # 格式：http://服务器IP:端口/upload?temperature=数值
+    url = "http://" + SERVER_IP + ":" + str(SERVER_PORT)
+    url = url + "/upload?temperature=" + str(temp)
+    
+    # 4. 发送HTTP GET请求到服务器
+    # 服务器收到请求后会将数据存入数据库
+    obloq.http_get(url)
+    
+    # 5. 等待5秒后再次采集（避免频繁请求）
     sleep(5000)
 `;
 
-const defaultFlaskCode = `# Flask 服务器代码
+const defaultFlaskCode = `# ============================================
+# Flask 服务器代码 - 传感器数据接收与存储
+# ============================================
+# 功能：接收来自micro:bit的传感器数据，存入SQLite数据库
+# 接口：GET /upload?temperature=数值 - 接收温度数据
+#       GET /query - 查询最近10条记录
+# ============================================
+
 from flask import Flask, request, jsonify
 import sqlite3
+from datetime import datetime
 
 app = Flask(__name__)
 
-# 接收传感器数据
-@app.route('/upload', methods=['POST'])
+# ========== 数据库初始化 ==========
+def init_db():
+    """创建数据库和表结构"""
+    conn = sqlite3.connect('sensor.db')
+    cursor = conn.cursor()
+    # 创建传感器日志表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS sensorlog (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sensor_id INTEGER,
+            value REAL,
+            timestamp DATETIME
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+# ========== 接收传感器数据接口 ==========
+# 使用GET方法，参数通过URL传递
+# 示例请求：GET /upload?temperature=25.5
+@app.route('/upload', methods=['GET'])
 def upload_data():
-    data = request.get_json()
-    temperature = data.get('temperature')
+    # 1. 从URL参数中获取温度值
+    # request.args 用于获取GET请求的参数
+    temperature = request.args.get('temperature', type=float)
     
-    # 存入数据库
+    # 2. 参数校验
+    if temperature is None:
+        return jsonify({"status": "error", "message": "缺少temperature参数"})
+    
+    # 3. 连接数据库并插入数据
     conn = sqlite3.connect('sensor.db')
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO sensorlog (sensor_id, value, timestamp)
-        VALUES (1, ?, datetime('now'))
-    ''', (temperature,))
+        VALUES (1, ?, ?)
+    ''', (temperature, datetime.now()))
     conn.commit()
     conn.close()
     
-    return jsonify({"status": "success"})
+    # 4. 返回成功响应
+    print(f"[数据接收] 温度: {temperature}°C")
+    return jsonify({"status": "success", "temperature": temperature})
 
-# 查询数据
+# ========== 查询数据接口 ==========
+# 返回最近10条传感器记录
 @app.route('/query', methods=['GET'])
 def query_data():
     conn = sqlite3.connect('sensor.db')
     cursor = conn.cursor()
+    # 按ID倒序查询最近10条
     cursor.execute('SELECT * FROM sensorlog ORDER BY id DESC LIMIT 10')
     rows = cursor.fetchall()
     conn.close()
     return jsonify(rows)
 
+# ========== 启动服务器 ==========
 if __name__ == '__main__':
+    init_db()  # 初始化数据库
+    print("Flask服务器启动中...")
+    print("数据接收接口: GET /upload?temperature=数值")
+    print("数据查询接口: GET /query")
     app.run(host='0.0.0.0', port=5000)
 `;
 
@@ -207,7 +271,7 @@ const initialState = {
     port: 5000,
     running: false,
     routes: [
-      { path: '/upload', method: 'POST', handler: 'upload_data' },
+        { path: '/upload', method: 'GET', handler: 'upload_data' },
       { path: '/query', method: 'GET', handler: 'query_data' },
     ],
     logs: [],
