@@ -191,12 +191,12 @@ export const relay: ComponentDefinition = {
 };
 
 // WiFi物联网模块 (OBLOQ)
-export const obloqModule: ComponentDefinition = {
-  id: 'obloq',
-  type: 'obloq',
+export const iotModule: ComponentDefinition = {
+  id: 'iot-module',
+  type: 'iot-module',
   category: 'network',
-  name: 'OBLOQ模块',
-  description: 'DFRobot OBLOQ WiFi物联网模块',
+  name: 'IoT模块',
+  description: 'WiFi物联网通信模块',
   width: 90,
   height: 70,
   pins: [
@@ -284,7 +284,7 @@ export const componentDefinitions: ComponentDefinition[] = [
   buzzer,
   servo,
   relay,
-  obloqModule,
+  iotModule,
   router,
   pcServer,
   database,
@@ -296,7 +296,7 @@ export const componentsByCategory = {
   mainboard: [microbitBoard, expansionBoard],
   sensor: [tempHumiditySensor, lightSensor, infraredSensor, soundSensor],
   actuator: [ledStrip, buzzer, servo, relay],
-  network: [obloqModule, router],
+  network: [iotModule, router],
   server: [pcServer, database, browser],
 };
 
