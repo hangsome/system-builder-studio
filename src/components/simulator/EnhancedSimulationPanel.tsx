@@ -214,6 +214,15 @@ export function EnhancedSimulationPanel() {
 
           // 模拟HTTP GET请求（参数附加在URL后）
           const requestPath = `/upload?temperature=${value?.toFixed(1) ?? 0}`;
+          const fullUrl = `http://${serverConfig.ip}:${serverConfig.port}${requestPath}`;
+          
+          // 记录发送的请求详情
+          addLog({
+            type: 'info',
+            message: `发送请求: GET ${fullUrl}`,
+            source: 'IoT模块',
+          });
+          
           const result = simulateFlaskRoute(
             {
               method: 'GET',
@@ -226,20 +235,27 @@ export function EnhancedSimulationPanel() {
 
           // 记录请求结果
           if (result.response.status === 200) {
+            const responseBody = result.response.body as { status?: string; id?: number; message?: string };
             addLog({
               type: 'info',
-              message: `GET ${requestPath} -> ${result.response.status}`,
+              message: `响应: ${result.response.status} OK - ${responseBody.message || '数据已保存'} (ID: ${responseBody.id})`,
               source: 'Flask',
             });
 
             // 更新数据库
             if (result.updatedDatabase) {
               updateDatabase(result.updatedDatabase);
+              addLog({
+                type: 'data',
+                message: `数据库已更新: sensorlog 表新增1条记录`,
+                source: 'SQLite',
+              });
             }
           } else {
+            const errorBody = result.response.body as { error?: string; path?: string; method?: string };
             addLog({
               type: 'error',
-              message: `请求失败: ${result.response.status}`,
+              message: `请求失败: ${result.response.status} - ${errorBody.error || '未知错误'} (路径: ${errorBody.path}, 方法: ${errorBody.method})`,
               source: 'Flask',
             });
           }
