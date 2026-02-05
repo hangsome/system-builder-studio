@@ -36,6 +36,7 @@ import { EnhancedSimulationPanel } from './EnhancedSimulationPanel';
 import { ConnectionValidationPanel } from './ConnectionValidationPanel';
 import { BrowserSimulator } from './BrowserSimulator';
 import { scenarios, loadScenario } from '@/data/scenarios';
+import { useSimulationRunner } from '@/hooks/useSimulationRunner';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -73,6 +74,9 @@ function savePanelState(state: PanelState) {
 }
 
 export function SimulatorLayout() {
+  // 启动后台仿真运行器
+  useSimulationRunner();
+  
   const [activeTab, setActiveTab] = useState('hardware');
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(() => loadPanelState().leftCollapsed);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => loadPanelState().rightCollapsed);

@@ -49,6 +49,10 @@ interface SimulatorStore {
   // 连接反馈
   lastConnectionResult: { success: boolean; message: string; type: string } | null;
   
+  // 仿真状态 - 全局共享
+  sensorValues: Record<string, number>;
+  autoFluctuation: boolean;
+  
   // Actions
   setZoom: (zoom: number) => void;
   setPan: (pan: { x: number; y: number }) => void;
@@ -80,6 +84,10 @@ interface SimulatorStore {
   addLog: (log: Omit<LogEntry, 'timestamp'>) => void;
   clearLogs: () => void;
   clearConnectionResult: () => void;
+  
+  setSensorValue: (instanceId: string, value: number) => void;
+  setSensorValues: (values: Record<string, number>) => void;
+  setAutoFluctuation: (enabled: boolean) => void;
   
   resetSimulator: () => void;
   loadScenario: (scenario: {
@@ -278,6 +286,8 @@ const initialState = {
   },
   logs: [],
   lastConnectionResult: null,
+  sensorValues: {},
+  autoFluctuation: true,
 };
 
 export const useSimulatorStore = create<SimulatorStore>()(
@@ -522,6 +532,12 @@ export const useSimulatorStore = create<SimulatorStore>()(
       clearLogs: () => set({ logs: [] }),
       clearConnectionResult: () => set({ lastConnectionResult: null }),
       
+      setSensorValue: (instanceId, value) => set((state) => ({
+        sensorValues: { ...state.sensorValues, [instanceId]: value },
+      })),
+      setSensorValues: (values) => set({ sensorValues: values }),
+      setAutoFluctuation: (enabled) => set({ autoFluctuation: enabled }),
+      
       resetSimulator: () => set({
         ...initialState,
         microbitCode: defaultMicrobitCode,
@@ -539,6 +555,7 @@ export const useSimulatorStore = create<SimulatorStore>()(
         selectedComponentId: null,
         isRunning: false,
         codeBurned: false,
+        sensorValues: {},
       }),
     }),
     {
