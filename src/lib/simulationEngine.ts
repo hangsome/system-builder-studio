@@ -86,21 +86,25 @@ export function simulateFlaskRoute(
   serverConfig: ServerConfig,
   database: DatabaseState
 ): { response: SimulatedHttpResponse; updatedDatabase?: DatabaseState } {
-  const route = serverConfig.routes.find(
-    r => r.path === request.path && r.method === request.method
-  );
-
   // 支持带参数的GET请求匹配（如 /upload?temperature=25）
   const pathWithoutParams = request.path.split('?')[0];
-  const matchedRoute = route || serverConfig.routes.find(
+  
+  // 首先尝试精确匹配（路径+方法）
+  let matchedRoute = serverConfig.routes.find(
     r => r.path === pathWithoutParams && r.method === request.method
   );
+  
+  // 如果没有找到，尝试只匹配路径（兼容POST/GET混用情况）
+  // 这样即使配置的是POST，GET请求也能正常处理
+  if (!matchedRoute) {
+    matchedRoute = serverConfig.routes.find(r => r.path === pathWithoutParams);
+  }
 
   if (!matchedRoute) {
     return {
       response: {
         status: 404,
-        body: { error: 'Not Found' },
+        body: { error: 'Not Found', path: pathWithoutParams, method: request.method },
         timestamp: new Date(),
       },
     };
