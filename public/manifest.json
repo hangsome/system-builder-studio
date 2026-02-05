@@ -1,0 +1,19 @@
+ {
+   "name": "信息系统搭建模拟器",
+   "short_name": "模拟器",
+   "description": "面向教育的物联网仿真平台",
+   "start_url": "/",
+   "display": "standalone",
+   "background_color": "#ffffff",
+   "theme_color": "#3b82f6",
+   "orientation": "landscape",
+   "icons": [
+     {
+       "src": "/favicon.ico",
+       "sizes": "64x64",
+       "type": "image/x-icon"
+     }
+   ],
+   "categories": ["education", "utilities"],
+   "lang": "zh-CN"
+ }
