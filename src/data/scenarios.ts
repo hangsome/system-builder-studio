@@ -9,58 +9,54 @@ export const classroomTemperatureScenario: Scenario = {
     {
       instanceId: 'microbit-1',
       definitionId: 'microbit',
-      position: { x: 80, y: 60 },
+      position: { x: 60, y: 20 },
       state: { powered: true, active: false },
     },
     {
       instanceId: 'expansion-1',
       definitionId: 'expansion-board',
-      position: { x: 280, y: 40 },
+      position: { x: 60, y: 180 },
       state: { powered: true, active: false },
     },
     {
       instanceId: 'temp-sensor-1',
       definitionId: 'temp-humidity-sensor',
-      position: { x: 80, y: 260 },
+      position: { x: 60, y: 420 },
       state: { powered: true, active: false, value: 25 },
     },
     {
-      instanceId: 'obloq-1',
-      definitionId: 'obloq',
-      position: { x: 280, y: 280 },
+      instanceId: 'iot-1',
+      definitionId: 'iot-module',
+      position: { x: 200, y: 420 },
       state: { powered: true, active: false },
     },
     {
       instanceId: 'router-1',
       definitionId: 'router',
-      position: { x: 480, y: 140 },
+      position: { x: 420, y: 180 },
       state: { powered: true, active: true },
     },
     {
       instanceId: 'server-1',
       definitionId: 'pc-server',
-      position: { x: 620, y: 100 },
+      position: { x: 580, y: 160 },
       state: { powered: true, active: true },
     },
     {
       instanceId: 'database-1',
       definitionId: 'database',
-      position: { x: 620, y: 220 },
+      position: { x: 600, y: 300 },
+      state: { powered: true, active: true },
+    },
+    {
+      instanceId: 'browser-1',
+      definitionId: 'browser',
+      position: { x: 580, y: 420 },
       state: { powered: true, active: true },
     },
   ],
   connections: [
-    // micro:bit USB连接PC服务器
-    {
-      id: 'conn-usb',
-      fromComponent: 'microbit-1',
-      fromPin: 'usb',
-      toComponent: 'server-1',
-      toPin: 'usb',
-      type: 'data',
-      valid: true,
-    },
-    // micro:bit 3V连接扩展板
+    // micro:bit 与扩展板全连接
     {
       id: 'conn-mb-3v',
       fromComponent: 'microbit-1',
@@ -70,7 +66,6 @@ export const classroomTemperatureScenario: Scenario = {
       type: 'power',
       valid: true,
     },
-    // micro:bit GND连接扩展板
     {
       id: 'conn-mb-gnd',
       fromComponent: 'microbit-1',
@@ -78,6 +73,33 @@ export const classroomTemperatureScenario: Scenario = {
       toComponent: 'expansion-1',
       toPin: 'slot-gnd',
       type: 'ground',
+      valid: true,
+    },
+    {
+      id: 'conn-mb-p0',
+      fromComponent: 'microbit-1',
+      fromPin: 'p0',
+      toComponent: 'expansion-1',
+      toPin: 'slot-p0',
+      type: 'data',
+      valid: true,
+    },
+    {
+      id: 'conn-mb-p1',
+      fromComponent: 'microbit-1',
+      fromPin: 'p1',
+      toComponent: 'expansion-1',
+      toPin: 'slot-p1',
+      type: 'data',
+      valid: true,
+    },
+    {
+      id: 'conn-mb-p2',
+      fromComponent: 'microbit-1',
+      fromPin: 'p2',
+      toComponent: 'expansion-1',
+      toPin: 'slot-p2',
+      type: 'data',
       valid: true,
     },
     // 温湿度传感器 VCC
@@ -110,44 +132,54 @@ export const classroomTemperatureScenario: Scenario = {
       type: 'data',
       valid: true,
     },
-    // OBLOQ VCC - 关键电源连接
+    // IoT模块 VCC
     {
-      id: 'conn-obloq-vcc',
-      fromComponent: 'obloq-1',
+      id: 'conn-iot-vcc',
+      fromComponent: 'iot-1',
       fromPin: 'vcc',
       toComponent: 'expansion-1',
       toPin: '3v-out2',
       type: 'power',
       valid: true,
     },
-    // OBLOQ GND - 关键接地连接
+    // IoT模块 GND
     {
-      id: 'conn-obloq-gnd',
-      fromComponent: 'obloq-1',
+      id: 'conn-iot-gnd',
+      fromComponent: 'iot-1',
       fromPin: 'gnd',
       toComponent: 'expansion-1',
       toPin: 'gnd-out2',
       type: 'ground',
       valid: true,
     },
-    // OBLOQ TX -> 扩展板 RX (串口交叉)
+    // IoT模块 TX -> 扩展板 RX (串口交叉)
     {
-      id: 'conn-obloq-tx',
-      fromComponent: 'obloq-1',
+      id: 'conn-iot-tx',
+      fromComponent: 'iot-1',
       fromPin: 'tx',
       toComponent: 'expansion-1',
       toPin: 'rx',
       type: 'serial',
       valid: true,
     },
-    // OBLOQ RX -> 扩展板 TX (串口交叉)
+    // IoT模块 RX -> 扩展板 TX (串口交叉)
     {
-      id: 'conn-obloq-rx',
-      fromComponent: 'obloq-1',
+      id: 'conn-iot-rx',
+      fromComponent: 'iot-1',
       fromPin: 'rx',
       toComponent: 'expansion-1',
       toPin: 'tx',
       type: 'serial',
+      valid: true,
+    },
+    // IoT模块 WIFI -> 路由器 WIFI (无线连接)
+    {
+      id: 'conn-iot-wifi',
+      fromComponent: 'iot-1',
+      fromPin: 'wifi',
+      toComponent: 'router-1',
+      toPin: 'wifi',
+      type: 'wireless',
       valid: true,
     },
     // 路由器连接服务器
@@ -160,13 +192,23 @@ export const classroomTemperatureScenario: Scenario = {
       type: 'data',
       valid: true,
     },
-    // 服务器连接数据库
+    // 服务器DB连接数据库CONN
     {
       id: 'conn-server-db',
       fromComponent: 'server-1',
-      fromPin: 'network',
+      fromPin: 'db',
       toComponent: 'database-1',
       toPin: 'connection',
+      type: 'data',
+      valid: true,
+    },
+    // 浏览器连接路由器
+    {
+      id: 'conn-browser-router',
+      fromComponent: 'browser-1',
+      fromPin: 'http',
+      toComponent: 'router-1',
+      toPin: 'lan',
       type: 'data',
       valid: true,
     },
@@ -283,7 +325,7 @@ if __name__ == '__main__':
     ssid: 'School_WiFi',
     password: '12345678',
     ip: '192.168.1.1',
-    connectedDevices: ['OBLOQ-001', 'PC-Server'],
+    connectedDevices: ['IoT-001', 'PC-Server', 'Browser'],
   },
   serverConfig: {
     ip: '192.168.1.100',
