@@ -238,8 +238,8 @@ export function SimulatorLayout() {
               网格
             </Button>
             
-            <Button variant="outline" size="sm">
-              <Save className="h-4 w-4 mr-1" onClick={handleSave} />
+            <Button variant="outline" size="sm" onClick={handleSave}>
+              <Save className="h-4 w-4 mr-1" />
               保存
               {!featureAccess.canSave && <Lock className="h-3 w-3 ml-1 text-muted-foreground" />}
             </Button>

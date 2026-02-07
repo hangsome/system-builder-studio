@@ -39,21 +39,24 @@
      setSuccess(null);
    };
    
-   const handleActivate = async () => {
-     if (!licenseKey.trim()) {
-       setError('请输入序列号');
-       return;
-     }
-     
-     const result = await activate(licenseKey);
-     
-     if (result.success) {
-       setSuccess(result.message);
-       setError(null);
-       // 延迟跳转
-       setTimeout(() => {
-         navigate('/');
-       }, 1500);
+  const handleActivate = async () => {
+    if (!licenseKey.trim()) {
+      setError('请输入序列号');
+      return;
+    }
+    
+    const result = await activate(licenseKey);
+    
+    if (result.success) {
+      const remainingTip = typeof result.remainingDevices === 'number'
+        ? `，剩余设备数：${result.remainingDevices}`
+        : '';
+      setSuccess(`${result.message}${remainingTip}`);
+      setError(null);
+      // 延迟跳转
+      setTimeout(() => {
+        navigate('/');
+      }, 1500);
      } else {
        setError(result.message);
        setSuccess(null);
@@ -84,11 +87,17 @@
                  <span className="text-muted-foreground">序列号</span>
                  <span className="font-mono">{licenseState.licenseKey}</span>
                </div>
-               <div className="flex justify-between">
-                 <span className="text-muted-foreground">激活时间</span>
-                 <span>{licenseState.activatedAt ? new Date(licenseState.activatedAt).toLocaleDateString() : '-'}</span>
-               </div>
-             </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">激活时间</span>
+                <span>{licenseState.activatedAt ? new Date(licenseState.activatedAt).toLocaleDateString() : '-'}</span>
+              </div>
+              {typeof licenseState.remainingDevices === 'number' && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">剩余设备数</span>
+                  <span>{licenseState.remainingDevices}</span>
+                </div>
+              )}
+            </div>
              
              <Button onClick={() => navigate('/')} className="w-full">
                进入模拟器

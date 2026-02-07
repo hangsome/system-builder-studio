@@ -3,30 +3,48 @@
   * 用于与阿里云后端服务通信
   */
  
- // API 配置 - 部署后端后修改此处
- const API_CONFIG = {
-   // 开发环境使用 mock 模式
-   useMock: true,
-   // 后端 API 地址（部署后修改）
-   baseUrl: 'https://api.your-domain.com',
-   // 请求超时时间（毫秒）
-   timeout: 10000,
- };
+// API 配置 - 由环境变量控制
+const API_CONFIG = {
+  // 开发环境使用 mock 模式，生产默认关闭
+  useMock: (
+    import.meta.env.VITE_API_USE_MOCK ??
+    (import.meta.env.MODE === 'development' ? 'true' : 'false')
+  ) === 'true',
+  // 后端 API 地址（部署后修改）
+  baseUrl: import.meta.env.VITE_API_BASE_URL || 'https://api.your-domain.com',
+  // 请求超时时间（毫秒）
+  timeout: Number(import.meta.env.VITE_API_TIMEOUT_MS || 10000),
+};
  
  // API 响应类型
- export interface ActivateResponse {
-   success: boolean;
-   licenseType?: 'personal' | 'teacher';
-   expiresAt?: string | null;
-   message?: string;
-   error?: string;
- }
- 
- export interface VerifyResponse {
-   valid: boolean;
-   licenseType?: 'personal' | 'teacher';
-   message?: string;
- }
+export interface ActivateResponse {
+  success: boolean;
+  licenseType?: 'personal' | 'teacher';
+  expiresAt?: string | null;
+  remainingDevices?: number;
+  message?: string;
+  error?: string;
+}
+
+export interface VerifyResponse {
+  valid: boolean;
+  licenseType?: 'personal' | 'teacher';
+  expiresAt?: string | null;
+  remainingDevices?: number;
+  message?: string;
+  offline?: boolean;
+}
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
  
  /**
   * Mock 数据 - 用于开发测试
@@ -52,27 +70,29 @@
    
    // 真实 API 调用
    try {
-     const response = await fetch(`${API_CONFIG.baseUrl}/api/activate`, {
-       method: 'POST',
-       headers: {
-         'Content-Type': 'application/json',
-       },
-       body: JSON.stringify({ licenseKey, deviceId }),
-     });
+    const response = await fetchWithTimeout(`${API_CONFIG.baseUrl}/api/activate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ licenseKey, deviceId }),
+    }, API_CONFIG.timeout);
      
      if (!response.ok) {
        throw new Error(`HTTP error! status: ${response.status}`);
      }
      
      return await response.json();
-   } catch (error) {
-     console.error('激活请求失败:', error);
-     return {
-       success: false,
-       error: '网络连接失败，请检查网络后重试',
-     };
-   }
- }
+  } catch (error) {
+    console.error('激活请求失败:', error);
+    return {
+      success: false,
+      error: error instanceof DOMException && error.name === 'AbortError'
+        ? '请求超时，请检查网络后重试'
+        : '网络连接失败，请检查网络后重试',
+    };
+  }
+}
  
  /**
   * 验证激活状态
@@ -88,27 +108,30 @@
    
    // 真实 API 调用
    try {
-     const response = await fetch(`${API_CONFIG.baseUrl}/api/verify`, {
-       method: 'POST',
-       headers: {
-         'Content-Type': 'application/json',
-       },
-       body: JSON.stringify({ licenseKey, deviceId }),
-     });
+    const response = await fetchWithTimeout(`${API_CONFIG.baseUrl}/api/verify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ licenseKey, deviceId }),
+    }, API_CONFIG.timeout);
      
      if (!response.ok) {
        throw new Error(`HTTP error! status: ${response.status}`);
      }
      
      return await response.json();
-   } catch (error) {
-     console.error('验证请求失败:', error);
-     return {
-       valid: false,
-       message: '无法连接服务器',
-     };
-   }
- }
+  } catch (error) {
+    console.error('验证请求失败:', error);
+    return {
+      valid: false,
+      message: error instanceof DOMException && error.name === 'AbortError'
+        ? '验证超时，请稍后重试'
+        : '无法连接服务器',
+      offline: true,
+    };
+  }
+}
  
  /**
   * Mock 激活逻辑
@@ -118,7 +141,7 @@ function mockActivate(licenseKey: string, _deviceId: string): Promise<ActivateRe
    const license = MOCK_LICENSES[key];
    
   return new Promise<ActivateResponse>(resolve => {
-     setTimeout(() => {
+    setTimeout(() => {
       if (!license) {
         resolve({
           success: false,
@@ -142,11 +165,12 @@ function mockActivate(licenseKey: string, _deviceId: string): Promise<ActivateRe
         success: true,
         licenseType: license.type,
         expiresAt: null,
+        remainingDevices: license.type === 'teacher' ? 2 : 0,
         message: '激活成功！',
       });
-     }, 800);
+    }, 800);
   });
- }
+}
  
  /**
   * Mock 验证逻辑
@@ -155,11 +179,12 @@ function mockActivate(licenseKey: string, _deviceId: string): Promise<ActivateRe
    const key = licenseKey.toUpperCase();
    const license = MOCK_LICENSES[key];
    
-   return {
-     valid: !!license,
-     licenseType: license?.type,
-   };
- }
+  return {
+    valid: !!license,
+    licenseType: license?.type,
+    remainingDevices: license?.type === 'teacher' ? 2 : 0,
+  };
+}
  
  /**
   * 设置 API 配置

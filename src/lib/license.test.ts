@@ -90,86 +90,100 @@
  
    describe('isActivated', () => {
      it('should return true for activated license', () => {
-       const state: LicenseState = {
-         licenseKey: 'SIMU-P001-TEST-0001',
-         licenseType: 'personal',
-         deviceId: 'test-device',
-         activatedAt: new Date().toISOString(),
-         expiresAt: null,
-       };
-       expect(isActivated(state)).toBe(true);
-     });
+      const state: LicenseState = {
+        licenseKey: 'SIMU-P001-TEST-0001',
+        licenseType: 'personal',
+        deviceId: 'test-device',
+        activatedAt: new Date().toISOString(),
+        expiresAt: null,
+        remainingDevices: 0,
+        lastVerifiedAt: new Date().toISOString(),
+      };
+      expect(isActivated(state)).toBe(true);
+    });
  
      it('should return false for trial', () => {
-       const state: LicenseState = {
-         licenseKey: null,
-         licenseType: 'trial',
-         deviceId: 'test-device',
-         activatedAt: null,
-         expiresAt: null,
-       };
-       expect(isActivated(state)).toBe(false);
-     });
-   });
+      const state: LicenseState = {
+        licenseKey: null,
+        licenseType: 'trial',
+        deviceId: 'test-device',
+        activatedAt: null,
+        expiresAt: null,
+        remainingDevices: null,
+        lastVerifiedAt: null,
+      };
+      expect(isActivated(state)).toBe(false);
+    });
+  });
  
    describe('isExpired', () => {
      it('should return false when no expiration', () => {
-       const state: LicenseState = {
-         licenseKey: 'SIMU-P001-TEST-0001',
-         licenseType: 'personal',
-         deviceId: 'test-device',
-         activatedAt: new Date().toISOString(),
-         expiresAt: null,
-       };
-       expect(isExpired(state)).toBe(false);
-     });
+      const state: LicenseState = {
+        licenseKey: 'SIMU-P001-TEST-0001',
+        licenseType: 'personal',
+        deviceId: 'test-device',
+        activatedAt: new Date().toISOString(),
+        expiresAt: null,
+        remainingDevices: 0,
+        lastVerifiedAt: new Date().toISOString(),
+      };
+      expect(isExpired(state)).toBe(false);
+    });
  
      it('should return true when expired', () => {
-       const state: LicenseState = {
-         licenseKey: 'SIMU-P001-TEST-0001',
-         licenseType: 'personal',
-         deviceId: 'test-device',
-         activatedAt: new Date().toISOString(),
-         expiresAt: '2020-01-01T00:00:00.000Z', // past date
-       };
-       expect(isExpired(state)).toBe(true);
-     });
+      const state: LicenseState = {
+        licenseKey: 'SIMU-P001-TEST-0001',
+        licenseType: 'personal',
+        deviceId: 'test-device',
+        activatedAt: new Date().toISOString(),
+        expiresAt: '2020-01-01T00:00:00.000Z', // past date
+        remainingDevices: 0,
+        lastVerifiedAt: new Date().toISOString(),
+      };
+      expect(isExpired(state)).toBe(true);
+    });
  
      it('should return false when not expired', () => {
        const futureDate = new Date();
        futureDate.setFullYear(futureDate.getFullYear() + 1);
        
-       const state: LicenseState = {
-         licenseKey: 'SIMU-P001-TEST-0001',
-         licenseType: 'personal',
-         deviceId: 'test-device',
-         activatedAt: new Date().toISOString(),
-         expiresAt: futureDate.toISOString(),
-       };
-       expect(isExpired(state)).toBe(false);
-     });
-   });
+      const state: LicenseState = {
+        licenseKey: 'SIMU-P001-TEST-0001',
+        licenseType: 'personal',
+        deviceId: 'test-device',
+        activatedAt: new Date().toISOString(),
+        expiresAt: futureDate.toISOString(),
+        remainingDevices: 0,
+        lastVerifiedAt: new Date().toISOString(),
+      };
+      expect(isExpired(state)).toBe(false);
+    });
+  });
  
    describe('saveLicenseState and clearLicenseState', () => {
      it('should save license state to localStorage', () => {
-       saveLicenseState({
-         licenseKey: 'SIMU-P001-TEST-0001',
-         licenseType: 'personal',
-         activatedAt: '2024-01-01T00:00:00.000Z',
-         expiresAt: null,
-       });
+      saveLicenseState({
+        licenseKey: 'SIMU-P001-TEST-0001',
+        licenseType: 'personal',
+        activatedAt: '2024-01-01T00:00:00.000Z',
+        expiresAt: null,
+        remainingDevices: 0,
+        lastVerifiedAt: '2024-01-01T00:00:00.000Z',
+      });
  
        expect(localStorage.getItem('simu_license_key')).toBe('SIMU-P001-TEST-0001');
        expect(localStorage.getItem('simu_license_type')).toBe('personal');
      });
  
      it('should clear license state from localStorage', () => {
-       saveLicenseState({
-         licenseKey: 'SIMU-P001-TEST-0001',
-         licenseType: 'personal',
-         activatedAt: '2024-01-01T00:00:00.000Z',
-         expiresAt: null,
-       });
+      saveLicenseState({
+        licenseKey: 'SIMU-P001-TEST-0001',
+        licenseType: 'personal',
+        activatedAt: '2024-01-01T00:00:00.000Z',
+        expiresAt: null,
+        remainingDevices: 0,
+        lastVerifiedAt: '2024-01-01T00:00:00.000Z',
+      });
  
        clearLicenseState();
  

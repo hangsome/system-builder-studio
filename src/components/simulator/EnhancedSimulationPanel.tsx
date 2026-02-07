@@ -92,15 +92,36 @@ export function EnhancedSimulationPanel() {
   const { powerStatus, obloqPowered, obloqConnected } = useMemo(() => {
     const validation = validateSystem(placedComponents, connections);
     
-    // 检查IoT模块是否有电源
-    const iotModule = placedComponents.find(c => c.definitionId === 'iot-module');
+    // 检查IOT模块是否有电源
+    const iotModule = placedComponents.find(
+      c => c.definitionId === 'iot-module' || c.definitionId === 'obloq'
+    );
     const iotHasPower = iotModule ? validation.powerStatus.get(iotModule.instanceId) : false;
     
-    // 检查IoT模块是否有串口连接（TX/RX连到扩展板）
-    const iotHasSerial = iotModule ? connections.some(c => 
-      (c.fromComponent === iotModule.instanceId || c.toComponent === iotModule.instanceId) &&
-      (c.type === 'serial')
-    ) : false;
+    // 检查IOT模块是否有串口连接（TX/RX交叉到扩展板P15/P16）
+    const hasMatchedSerialConnection = (iotPin: 'tx' | 'rx', expansionPin: 'p15' | 'p16') =>
+      iotModule
+        ? connections.some((connection) => {
+            const iotOnFromSide =
+              connection.fromComponent === iotModule.instanceId && connection.fromPin === iotPin;
+            const iotOnToSide =
+              connection.toComponent === iotModule.instanceId && connection.toPin === iotPin;
+
+            if (!iotOnFromSide && !iotOnToSide) {
+              return false;
+            }
+
+            const otherComponentId = iotOnFromSide ? connection.toComponent : connection.fromComponent;
+            const otherPinId = iotOnFromSide ? connection.toPin : connection.fromPin;
+            const otherComponent = placedComponents.find((component) => component.instanceId === otherComponentId);
+
+            return otherComponent?.definitionId === 'expansion-board' && otherPinId === expansionPin;
+          })
+        : false;
+
+    const iotHasSerial =
+      hasMatchedSerialConnection('tx', 'p15') &&
+      hasMatchedSerialConnection('rx', 'p16');
     
     return {
       powerStatus: validation.powerStatus,
@@ -122,22 +143,22 @@ export function EnhancedSimulationPanel() {
     });
   }, [sensorComponents, sensorValues, setSensorValue]);
 
-  // 模拟网络连接 - 需要OBLOQ有电源和串口连接
+  // 模拟网络连接 - 需要IOT模块有电源和串口连接
   useEffect(() => {
     if (isRunning && codeBurned && obloqConnected) {
       // 模拟WiFi连接过程
-      addLog({ type: 'info', message: '正在连接WiFi...', source: 'IoT模块' });
+      addLog({ type: 'info', message: '正在连接WiFi...', source: 'IOT模块' });
       const timer = setTimeout(() => {
         setNetworkConnected(true);
-        addLog({ type: 'info', message: `已连接到 ${routerConfig.ssid}`, source: 'IoT模块' });
-        addLog({ type: 'info', message: `IP地址: 192.168.1.${Math.floor(Math.random() * 100) + 100}`, source: 'IoT模块' });
+        addLog({ type: 'info', message: `已连接到 ${routerConfig.ssid}`, source: 'IOT模块' });
+        addLog({ type: 'info', message: `IP地址: 192.168.1.${Math.floor(Math.random() * 100) + 100}`, source: 'IOT模块' });
       }, 1500);
       return () => clearTimeout(timer);
     } else if (isRunning && codeBurned && !obloqConnected) {
       if (!obloqPowered) {
-        addLog({ type: 'warning', message: 'IoT模块未供电，无法连接WiFi', source: 'System' });
+        addLog({ type: 'warning', message: 'IOT模块未供电，无法连接WiFi', source: 'System' });
       } else {
-        addLog({ type: 'warning', message: 'IoT模块串口未连接(需要TX/RX交叉连接)', source: 'System' });
+        addLog({ type: 'warning', message: 'IOT模块串口未连接(需要TX->P15、RX->P16交叉连接)', source: 'System' });
       }
       setNetworkConnected(false);
     } else {
@@ -455,3 +476,4 @@ export function EnhancedSimulationPanel() {
     </div>
   );
 }
+

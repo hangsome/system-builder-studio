@@ -109,7 +109,7 @@ const defaultMicrobitCode = `# ============================================
 # ============================================
 
 from microbit import *
-import obloq  # 导入OBLOQ物联网模块库
+import obloq  # 导入IOT物联网模块库
 
 # ========== 网络配置 ==========
 # WiFi连接参数（需与路由器设置一致）
@@ -302,81 +302,105 @@ export const useSimulatorStore = create<SimulatorStore>()(
       addComponent: (component) => {
         const state = get();
         const newComponents = [...state.placedComponents, component];
-        
-        // 检查是否需要自动连接 micro:bit 和扩展板
         const microbit = newComponents.find(c => c.definitionId === 'microbit');
         const expansionBoard = newComponents.find(c => c.definitionId === 'expansion-board');
-        
-        if (microbit && expansionBoard) {
-          // 检查是否已存在自动连接
-          const autoConnectionExists = state.connections.some(
-            c => (c.fromComponent === microbit.instanceId && c.toComponent === expansionBoard.instanceId) ||
-                 (c.fromComponent === expansionBoard.instanceId && c.toComponent === microbit.instanceId)
+        const pendingConnections: Connection[] = [];
+        const autoMessages: string[] = [];
+
+        const isIotDefinition = (definitionId: string) =>
+          definitionId === 'iot-module' || definitionId === 'obloq';
+
+        const hasExactConnection = (
+          fromComponent: string,
+          fromPin: string,
+          toComponent: string,
+          toPin: string
+        ) =>
+          state.connections.some(
+            (c) =>
+              (c.fromComponent === fromComponent &&
+                c.fromPin === fromPin &&
+                c.toComponent === toComponent &&
+                c.toPin === toPin) ||
+              (c.fromComponent === toComponent &&
+                c.fromPin === toPin &&
+                c.toComponent === fromComponent &&
+                c.toPin === fromPin)
           );
-          
-          if (!autoConnectionExists) {
-            // 创建 micro:bit 到扩展板的自动连接
-            const autoConnections: Connection[] = [
-              {
-                id: createId(),
-                fromComponent: microbit.instanceId,
-                fromPin: 'p0',
-                toComponent: expansionBoard.instanceId,
-                toPin: 'slot-p0',
-                type: 'data',
-                valid: true,
-              },
-              {
-                id: createId(),
-                fromComponent: microbit.instanceId,
-                fromPin: 'p1',
-                toComponent: expansionBoard.instanceId,
-                toPin: 'slot-p1',
-                type: 'data',
-                valid: true,
-              },
-              {
-                id: createId(),
-                fromComponent: microbit.instanceId,
-                fromPin: 'p2',
-                toComponent: expansionBoard.instanceId,
-                toPin: 'slot-p2',
-                type: 'data',
-                valid: true,
-              },
-              {
-                id: createId(),
-                fromComponent: microbit.instanceId,
-                fromPin: '3v',
-                toComponent: expansionBoard.instanceId,
-                toPin: 'slot-3v',
-                type: 'power',
-                valid: true,
-              },
-              {
-                id: createId(),
-                fromComponent: microbit.instanceId,
-                fromPin: 'gnd',
-                toComponent: expansionBoard.instanceId,
-                toPin: 'slot-gnd',
-                type: 'ground',
-                valid: true,
-              },
-            ];
-            
-            set({
-              placedComponents: newComponents,
-              connections: [...state.connections, ...autoConnections],
-              lastConnectionResult: {
-                success: true,
-                message: 'micro:bit 已自动插入扩展板',
-                type: 'power',
-              },
-            });
+
+        const pushAutoConnection = (
+          fromComponent: string,
+          fromPin: string,
+          toComponent: string,
+          toPin: string,
+          type: Connection['type']
+        ) => {
+          if (hasExactConnection(fromComponent, fromPin, toComponent, toPin)) {
             return;
           }
+
+          pendingConnections.push({
+            id: createId(),
+            fromComponent,
+            fromPin,
+            toComponent,
+            toPin,
+            type,
+            valid: true,
+          });
+        };
+
+        if (microbit && expansionBoard) {
+          const beforeCount = pendingConnections.length;
+          pushAutoConnection(microbit.instanceId, 'p0', expansionBoard.instanceId, 'slot-p0', 'data');
+          pushAutoConnection(microbit.instanceId, 'p1', expansionBoard.instanceId, 'slot-p1', 'data');
+          pushAutoConnection(microbit.instanceId, 'p2', expansionBoard.instanceId, 'slot-p2', 'data');
+          pushAutoConnection(microbit.instanceId, '3v', expansionBoard.instanceId, 'slot-3v', 'power');
+          pushAutoConnection(microbit.instanceId, 'gnd', expansionBoard.instanceId, 'slot-gnd', 'ground');
+          if (pendingConnections.length > beforeCount) {
+            autoMessages.push('micro:bit 已自动插入扩展板');
+          }
         }
-        
+
+        if (expansionBoard) {
+          const iotComponents = newComponents.filter((c) => isIotDefinition(c.definitionId));
+          let autoConnectedIotCount = 0;
+
+          iotComponents.forEach((iot) => {
+            const beforeCount = pendingConnections.length;
+            pushAutoConnection(iot.instanceId, 'vcc', expansionBoard.instanceId, '3v-out2', 'power');
+            pushAutoConnection(iot.instanceId, 'gnd', expansionBoard.instanceId, 'gnd-out2', 'ground');
+            pushAutoConnection(iot.instanceId, 'tx', expansionBoard.instanceId, 'p15', 'serial');
+            pushAutoConnection(iot.instanceId, 'rx', expansionBoard.instanceId, 'p16', 'serial');
+            if (pendingConnections.length > beforeCount) {
+              autoConnectedIotCount += 1;
+            }
+          });
+
+          if (autoConnectedIotCount === 1) {
+            autoMessages.push('IOT模块已自动连接到扩展板(P15/P16)');
+          } else if (autoConnectedIotCount > 1) {
+            autoMessages.push(`已自动连接 ${autoConnectedIotCount} 个IOT模块到扩展板(P15/P16)`);
+          }
+        }
+
+        if (pendingConnections.length > 0) {
+          const feedbackType =
+            pendingConnections.find((connection) => connection.type === 'serial')?.type ??
+            pendingConnections[0].type;
+
+          set({
+            placedComponents: newComponents,
+            connections: [...state.connections, ...pendingConnections],
+            lastConnectionResult: {
+              success: true,
+              message: autoMessages.join('；'),
+              type: feedbackType,
+            },
+          });
+          return;
+        }
+
         set({ placedComponents: newComponents });
       },
       
@@ -470,9 +494,18 @@ export const useSimulatorStore = create<SimulatorStore>()(
         } else if (fromPinId.includes('gnd') || toPinId.includes('gnd')) {
           connectionType = 'ground';
           connectionLabel = '接地(GND)';
-        } else if (fromPinId.includes('tx') || fromPinId.includes('rx') || toPinId.includes('tx') || toPinId.includes('rx')) {
+        } else if (
+          fromPinId.includes('tx') ||
+          fromPinId.includes('rx') ||
+          toPinId.includes('tx') ||
+          toPinId.includes('rx') ||
+          fromPinId === 'p15' ||
+          fromPinId === 'p16' ||
+          toPinId === 'p15' ||
+          toPinId === 'p16'
+        ) {
           connectionType = 'serial';
-          connectionLabel = '串口(TX/RX)';
+          connectionLabel = '串口(TX/RX-P15/P16)';
         } else {
           connectionLabel = '数据';
         }

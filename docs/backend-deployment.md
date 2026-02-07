@@ -1,20 +1,22 @@
- # 后端部署指南 - 阿里云服务器
+﻿ # 后端部署指南 - 阿里云服务器
  
- 本文档提供完整的 Node.js 后端代码和部署步骤，用于序列号激活验证服务。
+本文档提供 Node.js 后端部署步骤，用于序列号激活验证服务。具体实现以仓库 `simu-api/` 目录为准。
  
  ## 目录结构
  
- 将以下代码保存到阿里云服务器的 `/var/www/simu-api/` 目录下：
+ 后端代码已放在仓库根目录的 `simu-api/` 中，上传到阿里云服务器的 `/var/www/simu-api/` 目录即可：
  
  ```text
  simu-api/
  ├── index.js              # 主入口
  ├── routes/
- │   ├── activate.js       # 激活接口
+ │   ├── activate.js       # 激活接口（支持多设备）
  │   ├── verify.js         # 验证接口
- │   └── admin.js          # 管理接口
+ │   ├── admin.js          # 管理接口
+ │   └── webhooks.js       # 发卡平台回调
  ├── db/
- │   └── init.js           # 数据库初始化
+ │   ├── init.js           # 数据库初始化
+ │   └── licenses.db       # SQLite 数据库文件
  ├── utils/
  │   ├── license.js        # 序列号生成/验证
  │   └── auth.js           # 管理员认证
@@ -53,11 +55,25 @@
  # 服务器端口
  PORT=3000
  
- # 管理员密钥（用于生成序列号）
+ # 管理员密钥（用于生成序列号/撤销）
  ADMIN_SECRET=your-super-secret-key-change-this
  
  # 允许的前端域名（逗号分隔）
  ALLOWED_ORIGINS=https://your-domain.com,http://localhost:5173
+ 
+ # Webhook 回调签名密钥
+ WEBHOOK_SECRET=your-webhook-secret
+ 
+ # 发卡平台商品ID映射（逗号分隔）
+ PRODUCT_PERSONAL_IDS=personal_product_id_1,personal_product_id_2
+ PRODUCT_TEACHER_IDS=teacher_product_id_1,teacher_product_id_2
+ 
+ # 设备数量限制
+ MAX_DEVICES_PERSONAL=1
+ MAX_DEVICES_TEACHER=3
+ 
+ # 数据库路径（可选）
+ DB_PATH=./db/licenses.db
  ```
  
  ### index.js
@@ -108,48 +124,78 @@
  ```
  
  ### db/init.js
- 
- ```javascript
- const Database = require('better-sqlite3');
- const path = require('path');
- 
- const dbPath = path.join(__dirname, 'licenses.db');
- let db;
- 
- function getDatabase() {
-   if (!db) {
-     db = new Database(dbPath);
-     db.pragma('journal_mode = WAL');
-   }
-   return db;
- }
- 
- function initDatabase() {
-   const db = getDatabase();
-   
-   db.exec(`
-     CREATE TABLE IF NOT EXISTS licenses (
-       id INTEGER PRIMARY KEY AUTOINCREMENT,
-       license_key TEXT UNIQUE NOT NULL,
-       license_type TEXT NOT NULL CHECK(license_type IN ('personal', 'teacher')),
-       status TEXT DEFAULT 'unused' CHECK(status IN ('unused', 'activated', 'revoked')),
-       device_id TEXT,
-       activated_at DATETIME,
-       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-       notes TEXT
-     );
-     
-     CREATE INDEX IF NOT EXISTS idx_license_key ON licenses(license_key);
-     CREATE INDEX IF NOT EXISTS idx_status ON licenses(status);
-   `);
-   
-   console.log('✅ 数据库初始化完成');
- }
- 
- module.exports = { getDatabase, initDatabase };
- ```
- 
- ### utils/license.js
+
+```javascript
+const Database = require('better-sqlite3');
+const path = require('path');
+
+const dbPath = process.env.DB_PATH || path.join(__dirname, 'licenses.db');
+let db;
+
+function getDatabase() {
+  if (!db) {
+    db = new Database(dbPath);
+    db.pragma('journal_mode = WAL');
+    db.pragma('foreign_keys = ON');
+  }
+  return db;
+}
+
+function initDatabase() {
+  const db = getDatabase();
+  
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS licenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      license_key TEXT UNIQUE NOT NULL,
+      license_type TEXT NOT NULL CHECK(license_type IN ('personal', 'teacher')),
+      status TEXT DEFAULT 'unused' CHECK(status IN ('unused', 'activated', 'revoked')),
+      activated_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      notes TEXT
+    );
+    
+    CREATE TABLE IF NOT EXISTS license_devices (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      license_key TEXT NOT NULL,
+      device_id TEXT NOT NULL,
+      activated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(license_key, device_id),
+      FOREIGN KEY(license_key) REFERENCES licenses(license_key) ON DELETE CASCADE
+    );
+    
+    CREATE TABLE IF NOT EXISTS license_orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id TEXT UNIQUE NOT NULL,
+      product_id TEXT NOT NULL,
+      quantity INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'processing',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    CREATE TABLE IF NOT EXISTS license_order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id TEXT NOT NULL,
+      license_key TEXT NOT NULL,
+      license_type TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(order_id, license_key),
+      FOREIGN KEY(order_id) REFERENCES license_orders(order_id) ON DELETE CASCADE
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_license_key ON licenses(license_key);
+    CREATE INDEX IF NOT EXISTS idx_license_status ON licenses(status);
+    CREATE INDEX IF NOT EXISTS idx_license_devices_key ON license_devices(license_key);
+    CREATE INDEX IF NOT EXISTS idx_license_orders_order_id ON license_orders(order_id);
+    CREATE INDEX IF NOT EXISTS idx_license_order_items_order_id ON license_order_items(order_id);
+  `);
+  
+  console.log('数据库初始化完成');
+}
+
+module.exports = { getDatabase, initDatabase };
+```
+### utils/license.js
  
  ```javascript
  const crypto = require('crypto');
@@ -490,9 +536,22 @@
  module.exports = router;
  ```
  
- ---
- 
- ## 部署步骤
+---
+
+## Webhook 回调说明（自动发卡）
+
+后端已提供 `POST /api/webhooks/card-platform` 回调入口，签名规则：  
+`sign = md5(order_id + product_id + quantity + WEBHOOK_SECRET)`  
+
+商品ID映射请在 `.env` 中配置：
+- `PRODUCT_PERSONAL_IDS`
+- `PRODUCT_TEACHER_IDS`
+
+具体字段与平台对接细节以 `simu-api/routes/webhooks.js` 为准。
+
+---
+
+## 部署步骤
  
  ### 1. 服务器环境准备
  
@@ -622,15 +681,13 @@
  
  ## 前端配置
  
- 部署后端后，修改前端 `src/lib/api.ts` 中的配置：
- 
- ```typescript
- const API_CONFIG = {
-   useMock: false,  // 关闭 mock 模式
-   baseUrl: 'https://api.your-domain.com',  // 替换为你的域名
-   timeout: 10000,
- };
- ```
+部署后端后，配置前端环境变量（`.env` 或 `.env.production`）：
+
+```bash
+VITE_API_BASE_URL=https://api.your-domain.com
+VITE_API_USE_MOCK=false
+VITE_API_TIMEOUT_MS=10000
+```
  
  ---
  
@@ -649,3 +706,4 @@
  # 备份数据库
  cp /var/www/simu-api/db/licenses.db ~/backups/licenses_$(date +%Y%m%d).db
  ```
+
