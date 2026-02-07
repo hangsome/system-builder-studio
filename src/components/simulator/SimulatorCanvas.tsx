@@ -897,10 +897,11 @@ function ComponentVisual({ type, state }: { type: string; state?: PlacedComponen
         </div>
       );
     
+    case 'iot-module':
     case 'obloq':
       return (
         <div className="w-full h-full flex flex-col items-center justify-center bg-blue-600 rounded">
-          <span className="text-white text-xs font-bold">OBLOQ</span>
+          <span className="text-white text-xs font-bold">IOT</span>
           <span className="text-blue-200 text-[8px]">WiFi</span>
         </div>
       );
@@ -994,11 +995,11 @@ function PowerGuidePanel() {
             </li>
             <li className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5 flex-shrink-0"></span>
-              <span><b className="text-foreground">OBLOQ</b>: 连接 <span className="text-red-500 font-medium">VCC</span>/<span className="text-gray-500 font-medium">GND</span> 并将 <span className="text-green-500 font-medium">TX→RX</span>，<span className="text-green-400 font-medium">RX→TX</span> 交叉连接</span>
+              <span><b className="text-foreground">IOT模块</b>: 连接 <span className="text-red-500 font-medium">VCC</span>/<span className="text-gray-500 font-medium">GND</span> 并将 <span className="text-green-500 font-medium">TX→P15(RX)</span>，<span className="text-green-400 font-medium">RX→P16(TX)</span> 交叉连接</span>
             </li>
           </ul>
           <div className="mt-3 p-2 bg-muted/50 rounded text-xs text-muted-foreground">
-            💡 <b>串口交叉</b>: OBLOQ的TX连扩展板RX，OBLOQ的RX连扩展板TX
+            💡 <b>串口交叉</b>: IOT模块的TX连扩展板P15(RX)，IOT模块的RX连扩展板P16(TX)
           </div>
         </div>
       )}

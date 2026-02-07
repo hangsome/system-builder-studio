@@ -2,6 +2,9 @@
 import { Connection, PlacedComponent, Pin } from '@/types/simulator';
 import { componentDefinitions } from '@/data/componentDefinitions';
 
+const EXPANSION_SERIAL_RX_PIN = 'p15';
+const EXPANSION_SERIAL_TX_PIN = 'p16';
+
 export interface ValidationResult {
   valid: boolean;
   type: 'power' | 'ground' | 'data' | 'serial' | 'wireless';
@@ -69,9 +72,17 @@ export function validateConnection(
     result.warnings.push(`${toPin.name} 引脚已有连接`);
   }
 
+  const isSerialPin = (pin: Pin) =>
+    pin.type === 'serial_tx' ||
+    pin.type === 'serial_rx' ||
+    pin.id === 'tx' ||
+    pin.id === 'rx' ||
+    pin.id === EXPANSION_SERIAL_TX_PIN ||
+    pin.id === EXPANSION_SERIAL_RX_PIN;
+
   // 确定连接类型并验证
   const connectionType = determineConnectionType(fromPin.type, toPin.type, fromPinId, toPinId);
-  result.type = connectionType;
+  result.type = isSerialPin(fromPin) || isSerialPin(toPin) ? 'serial' : connectionType;
 
   // 电源连接规则
   if (fromPin.type === 'power' || toPin.type === 'power') {
@@ -99,21 +110,25 @@ export function validateConnection(
     }
   }
 
+  const isTxPin = (pin: Pin) =>
+    pin.type === 'serial_tx' || pin.id === 'tx' || pin.id === EXPANSION_SERIAL_TX_PIN;
+  const isRxPin = (pin: Pin) =>
+    pin.type === 'serial_rx' || pin.id === 'rx' || pin.id === EXPANSION_SERIAL_RX_PIN;
+
   // 串口连接规则 - TX必须连RX
-  if (fromPin.type === 'serial_tx' || toPin.type === 'serial_tx' ||
-      fromPin.type === 'serial_rx' || toPin.type === 'serial_rx') {
+  if (isSerialPin(fromPin) || isSerialPin(toPin)) {
     result.type = 'serial';
     
-    if (fromPin.type === 'serial_tx' && toPin.type !== 'serial_rx') {
+    if (isTxPin(fromPin) && !isRxPin(toPin)) {
       result.valid = false;
       result.errors.push('TX引脚必须连接到RX引脚');
-    } else if (fromPin.type === 'serial_rx' && toPin.type !== 'serial_tx') {
+    } else if (isRxPin(fromPin) && !isTxPin(toPin)) {
       result.valid = false;
       result.errors.push('RX引脚必须连接到TX引脚');
-    } else if (toPin.type === 'serial_tx' && fromPin.type !== 'serial_rx') {
+    } else if (isTxPin(toPin) && !isRxPin(fromPin)) {
       result.valid = false;
       result.errors.push('TX引脚必须连接到RX引脚');
-    } else if (toPin.type === 'serial_rx' && fromPin.type !== 'serial_tx') {
+    } else if (isRxPin(toPin) && !isTxPin(fromPin)) {
       result.valid = false;
       result.errors.push('RX引脚必须连接到TX引脚');
     }
@@ -130,7 +145,7 @@ export function validateConnection(
     }
   }
 
-  // WIFI无线连接规则 - OBLOQ的WIFI引脚连接到路由器的WIFI引脚
+  // WIFI无线连接规则 - IOT模块的WIFI引脚连接到路由器的WIFI引脚
   if (fromPin.id === 'wifi' || toPin.id === 'wifi') {
     if (fromPin.id === 'wifi' && toPin.id === 'wifi') {
       result.valid = true;
@@ -149,6 +164,18 @@ function determineConnectionType(fromType: string, toType: string, fromId?: stri
   if (fromId === 'wifi' && toId === 'wifi') return 'wireless';
   if (fromType === 'power' || toType === 'power') return 'power';
   if (fromType === 'ground' || toType === 'ground') return 'ground';
+  if (
+    fromId === 'tx' ||
+    fromId === 'rx' ||
+    toId === 'tx' ||
+    toId === 'rx' ||
+    fromId === EXPANSION_SERIAL_TX_PIN ||
+    fromId === EXPANSION_SERIAL_RX_PIN ||
+    toId === EXPANSION_SERIAL_TX_PIN ||
+    toId === EXPANSION_SERIAL_RX_PIN
+  ) {
+    return 'serial';
+  }
   if (fromType === 'serial_tx' || fromType === 'serial_rx' ||
       toType === 'serial_tx' || toType === 'serial_rx') return 'serial';
   return 'data';
@@ -245,28 +272,38 @@ export function validateSystem(
     }
   });
 
-  // 检查IoT模块的TX/RX连接
-  const iotComponents = placedComponents.filter(c => c.definitionId === 'iot-module');
+  // 检查IOT模块的TX/RX连接
+  const iotComponents = placedComponents.filter(
+    c => c.definitionId === 'iot-module' || c.definitionId === 'obloq'
+  );
   iotComponents.forEach(iot => {
-    const iotConnections = connections.filter(
-      c => c.fromComponent === iot.instanceId || c.toComponent === iot.instanceId
-    );
-    
-    const hasTxConnection = iotConnections.some(conn => {
-      const pin = conn.fromComponent === iot.instanceId ? conn.fromPin : conn.toPin;
-      return pin === 'tx';
-    });
-    
-    const hasRxConnection = iotConnections.some(conn => {
-      const pin = conn.fromComponent === iot.instanceId ? conn.fromPin : conn.toPin;
-      return pin === 'rx';
-    });
+    const hasMatchedSerialConnection = (
+      iotPinId: 'tx' | 'rx',
+      expectedExpansionPinId: string
+    ) =>
+      connections.some((conn) => {
+        const iotOnFromSide = conn.fromComponent === iot.instanceId && conn.fromPin === iotPinId;
+        const iotOnToSide = conn.toComponent === iot.instanceId && conn.toPin === iotPinId;
+
+        if (!iotOnFromSide && !iotOnToSide) {
+          return false;
+        }
+
+        const otherComponentId = iotOnFromSide ? conn.toComponent : conn.fromComponent;
+        const otherPinId = iotOnFromSide ? conn.toPin : conn.fromPin;
+        const otherComponent = placedComponents.find(c => c.instanceId === otherComponentId);
+
+        return otherComponent?.definitionId === 'expansion-board' && otherPinId === expectedExpansionPinId;
+      });
+
+    const hasTxConnection = hasMatchedSerialConnection('tx', EXPANSION_SERIAL_RX_PIN);
+    const hasRxConnection = hasMatchedSerialConnection('rx', EXPANSION_SERIAL_TX_PIN);
 
     if (!hasTxConnection) {
-      issues.push('IoT模块的TX引脚未连接到扩展板的RX');
+      issues.push(`IOT模块的TX引脚未连接到扩展板${EXPANSION_SERIAL_RX_PIN.toUpperCase()}(RX)`);
     }
     if (!hasRxConnection) {
-      issues.push('IoT模块的RX引脚未连接到扩展板的TX');
+      issues.push(`IOT模块的RX引脚未连接到扩展板${EXPANSION_SERIAL_TX_PIN.toUpperCase()}(TX)`);
     }
   });
 
@@ -292,3 +329,4 @@ export function getConnectionColorByType(type: 'power' | 'ground' | 'data' | 'se
     default: return '#3b82f6'; // 蓝色
   }
 }
+

@@ -77,20 +77,37 @@
    }, [placedComponents, connections]);
  
    // 检查 IoT 模块连接状态
-   const checkNetworkStatus = useCallback(() => {
-     const powerStatus = getPowerStatus();
-     const iotComponent = placedComponents.find(c => c.definitionId === 'iot-module');
+    const checkNetworkStatus = useCallback(() => {
+      const powerStatus = getPowerStatus();
+      const iotComponent = placedComponents.find(
+        c => c.definitionId === 'iot-module' || c.definitionId === 'obloq'
+      );
      
      if (!iotComponent) return false;
      
      const iotPowered = powerStatus.get(iotComponent.instanceId) ?? false;
      
-     // 检查 TX/RX 连接
-     const iotConnections = connections.filter(
-       c => c.fromComponent === iotComponent.instanceId || c.toComponent === iotComponent.instanceId
-     );
-     const hasTxRx = iotConnections.some(c => c.fromPin === 'tx' || c.toPin === 'tx') &&
-                     iotConnections.some(c => c.fromPin === 'rx' || c.toPin === 'rx');
+     const hasMatchedSerialConnection = (iotPin: 'tx' | 'rx', expansionPin: 'p15' | 'p16') =>
+       connections.some((connection) => {
+         const iotOnFromSide =
+           connection.fromComponent === iotComponent.instanceId && connection.fromPin === iotPin;
+         const iotOnToSide =
+           connection.toComponent === iotComponent.instanceId && connection.toPin === iotPin;
+
+         if (!iotOnFromSide && !iotOnToSide) {
+           return false;
+         }
+
+         const otherComponentId = iotOnFromSide ? connection.toComponent : connection.fromComponent;
+         const otherPinId = iotOnFromSide ? connection.toPin : connection.fromPin;
+         const otherComponent = placedComponents.find((component) => component.instanceId === otherComponentId);
+
+         return otherComponent?.definitionId === 'expansion-board' && otherPinId === expansionPin;
+       });
+
+     const hasTxRx =
+       hasMatchedSerialConnection('tx', 'p15') &&
+       hasMatchedSerialConnection('rx', 'p16');
      
      return iotPowered && hasTxRx && !!routerConfig.ssid;
    }, [placedComponents, connections, routerConfig.ssid, getPowerStatus]);
@@ -154,7 +171,7 @@
            addLog({
              type: 'info',
              message: `发送请求: GET ${fullUrl}`,
-             source: 'IoT模块',
+             source: 'IOT模块',
            });
            
            const result = simulateFlaskRoute(
@@ -199,3 +216,4 @@
  
    return null;
  }
+

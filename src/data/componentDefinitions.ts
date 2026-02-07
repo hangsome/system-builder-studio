@@ -25,7 +25,7 @@ export const expansionBoard: ComponentDefinition = {
   type: 'expansion-board',
   category: 'mainboard',
   name: '扩展板',
-  description: '完整的micro:bit扩展板，提供P0-P20引脚、3V和GND',
+  description: '完整的micro:bit扩展板，提供P0-P20引脚、3V和GND（含P15/P16串口）',
   width: 280,
   height: 200,
   pins: [
@@ -47,8 +47,8 @@ export const expansionBoard: ComponentDefinition = {
     // 右侧引脚
     { id: 'p13', name: 'P13', type: 'digital', position: { x: 280, y: 40 } },
     { id: 'p14', name: 'P14', type: 'digital', position: { x: 280, y: 60 } },
-    { id: 'p15', name: 'P15', type: 'digital', position: { x: 280, y: 80 } },
-    { id: 'p16', name: 'P16', type: 'digital', position: { x: 280, y: 100 } },
+    { id: 'p15', name: 'P15(RX)', type: 'serial_rx', position: { x: 280, y: 80 } },
+    { id: 'p16', name: 'P16(TX)', type: 'serial_tx', position: { x: 280, y: 100 } },
     
     // 底部电源引脚（扩展为4组3V和4组GND）
     { id: '3v-out1', name: '3V', type: 'power', position: { x: 30, y: 200 } },
@@ -59,10 +59,6 @@ export const expansionBoard: ComponentDefinition = {
     { id: 'gnd-out2', name: 'GND', type: 'ground', position: { x: 165, y: 200 } },
     { id: 'gnd-out3', name: 'GND', type: 'ground', position: { x: 190, y: 200 } },
     { id: 'gnd-out4', name: 'GND', type: 'ground', position: { x: 215, y: 200 } },
-    
-    // 串口引脚（用于IoT模块）
-    { id: 'tx', name: 'TX', type: 'serial_tx', position: { x: 240, y: 200 } },
-    { id: 'rx', name: 'RX', type: 'serial_rx', position: { x: 265, y: 200 } },
   ],
 };
 
@@ -194,13 +190,13 @@ export const relay: ComponentDefinition = {
   ],
 };
 
-// WiFi物联网模块 (OBLOQ)
+// WiFi物联网模块 (IOT)
 export const iotModule: ComponentDefinition = {
   id: 'iot-module',
   type: 'iot-module',
   category: 'network',
-  name: 'IoT模块',
-  description: 'WiFi物联网通信模块',
+  name: 'IOT模块',
+  description: 'IOT物联网通信模块',
   width: 90,
   height: 70,
   pins: [
@@ -211,6 +207,15 @@ export const iotModule: ComponentDefinition = {
     // WiFi 信号引脚 - 表示无线连接到路由器
     { id: 'wifi', name: 'WIFI', type: 'data', position: { x: 45, y: 0 } },
   ],
+};
+
+// IOT 模块（兼容旧ID）
+export const obloqModule: ComponentDefinition = {
+  ...iotModule,
+  id: 'obloq',
+  type: 'obloq',
+  name: 'IOT模块（兼容旧ID）',
+  description: 'IOT物联网通信模块（兼容旧ID）',
 };
 
 // 路由器
@@ -250,7 +255,7 @@ export const webServer: ComponentDefinition = {
   type: 'web-server',
   category: 'server',
   name: 'Web服务器',
-  description: '运行Flask服务的Web服务器，IoT模块通过WiFi访问',
+  description: '运行Flask服务的Web服务器，IOT模块通过WiFi访问',
   width: 110,
   height: 90,
   pins: [
@@ -301,6 +306,7 @@ export const componentDefinitions: ComponentDefinition[] = [
   servo,
   relay,
   iotModule,
+  obloqModule,
   router,
   pcComputer,
   webServer,
@@ -324,3 +330,4 @@ export const categoryNames: Record<string, string> = {
   network: '网络设备',
   server: '服务器端',
 };
+

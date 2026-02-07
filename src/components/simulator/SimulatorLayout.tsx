@@ -195,7 +195,7 @@ export function SimulatorLayout() {
               网格
             </Button>
             
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleSave}>
               <Save className="h-4 w-4 mr-1" />
               保存
             </Button>

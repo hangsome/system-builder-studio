@@ -171,6 +171,7 @@ function ComponentIcon({ type }: { type: string }) {
           <Lightbulb className="h-full w-full" />
         </div>
       );
+    case 'iot-module':
     case 'obloq':
     case 'router':
       return (

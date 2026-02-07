@@ -14,9 +14,9 @@ const expansionBoard: PlacedComponent = {
   position: { x: 0, y: 0 },
 };
 
-const obloq: PlacedComponent = {
-  instanceId: "obloq-1",
-  definitionId: "obloq",
+const iotModule: PlacedComponent = {
+  instanceId: "iot-1",
+  definitionId: "iot-module",
   position: { x: 0, y: 0 },
 };
 
@@ -51,11 +51,11 @@ describe("validateConnection", () => {
 
   it("rejects invalid serial connections", () => {
     const result = validateConnection(
-      obloq.instanceId,
+      iotModule.instanceId,
       "tx",
       expansionBoard.instanceId,
-      "tx",
-      [obloq, expansionBoard],
+      "p16",
+      [iotModule, expansionBoard],
       [],
     );
 

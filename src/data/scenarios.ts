@@ -153,7 +153,7 @@ export const classroomTemperatureScenario: Scenario = {
       type: 'data',
       valid: true,
     },
-    // IoT模块 VCC
+    // IOT模块 VCC
     {
       id: 'conn-iot-vcc',
       fromComponent: 'iot-1',
@@ -163,7 +163,7 @@ export const classroomTemperatureScenario: Scenario = {
       type: 'power',
       valid: true,
     },
-    // IoT模块 GND
+    // IOT模块 GND
     {
       id: 'conn-iot-gnd',
       fromComponent: 'iot-1',
@@ -173,27 +173,27 @@ export const classroomTemperatureScenario: Scenario = {
       type: 'ground',
       valid: true,
     },
-    // IoT模块 TX -> 扩展板 RX (串口交叉)
+    // IOT模块 TX -> 扩展板 P15(RX) (串口交叉)
     {
       id: 'conn-iot-tx',
       fromComponent: 'iot-1',
       fromPin: 'tx',
       toComponent: 'expansion-1',
-      toPin: 'rx',
+      toPin: 'p15',
       type: 'serial',
       valid: true,
     },
-    // IoT模块 RX -> 扩展板 TX (串口交叉)
+    // IOT模块 RX -> 扩展板 P16(TX) (串口交叉)
     {
       id: 'conn-iot-rx',
       fromComponent: 'iot-1',
       fromPin: 'rx',
       toComponent: 'expansion-1',
-      toPin: 'tx',
+      toPin: 'p16',
       type: 'serial',
       valid: true,
     },
-    // IoT模块 WIFI -> 路由器 WIFI (无线连接)
+    // IOT模块 WIFI -> 路由器 WIFI (无线连接)
     {
       id: 'conn-iot-wifi',
       fromComponent: 'iot-1',
@@ -268,12 +268,12 @@ export const classroomTemperatureScenario: Scenario = {
 # 教室温度监测系统 - micro:bit 端代码
 # ============================================
 # 功能：采集教室温度，通过WiFi上传到服务器
-# 硬件：micro:bit + 扩展板 + 温湿度传感器 + IoT模块
+# 硬件：micro:bit + 扩展板 + 温湿度传感器 + IOT模块
 # 通信：HTTP GET 请求（参数附加在URL后）
 # ============================================
 
 from microbit import *
-import obloq  # 导入OBLOQ物联网模块库
+import obloq  # 导入IOT物联网模块库
 
 # ========== 配置参数 ==========
 # WiFi连接配置
@@ -655,3 +655,4 @@ export const scenarios: Scenario[] = [
 export function loadScenario(scenarioId: string) {
   return scenarios.find((s) => s.id === scenarioId);
 }
+
