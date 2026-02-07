@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/tooltip';
 
 const PANEL_STATE_KEY = 'simulator-panel-state';
+const MANUAL_SAVE_KEY = 'simulator-manual-save';
 
 interface PanelState {
   leftCollapsed: boolean;
@@ -113,6 +114,28 @@ export function SimulatorLayout() {
 
   const handleRun = () => {
     setRunning(!isRunning);
+  };
+
+  const handleSave = () => {
+    try {
+      const state = useSimulatorStore.getState();
+      const snapshot = {
+        savedAt: new Date().toISOString(),
+        data: {
+          placedComponents: state.placedComponents,
+          connections: state.connections,
+          microbitCode: state.microbitCode,
+          flaskCode: state.flaskCode,
+          database: state.database,
+          routerConfig: state.routerConfig,
+          serverConfig: state.serverConfig,
+        },
+      };
+      localStorage.setItem(MANUAL_SAVE_KEY, JSON.stringify(snapshot));
+      console.info('[simulator] Manual save completed', snapshot.savedAt);
+    } catch (error) {
+      console.error('[simulator] Manual save failed', error);
+    }
   };
 
   return (
