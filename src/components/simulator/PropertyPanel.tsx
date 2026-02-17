@@ -10,8 +10,10 @@ export function PropertyPanel() {
     selectedComponentId,
     placedComponents,
     connections,
+    sensorValues,
     removeComponent,
     removeConnection,
+    setSensorValue,
   } = useSimulatorStore();
 
   const selectedComponent = placedComponents.find(
@@ -27,6 +29,16 @@ export function PropertyPanel() {
       c.fromComponent === selectedComponentId ||
       c.toComponent === selectedComponentId
   );
+
+  const sensorValueFromStore =
+    selectedComponentId ? sensorValues[selectedComponentId] : undefined;
+  const sensorValueFromState = selectedComponent?.state?.value;
+  const sensorControlValue =
+    typeof sensorValueFromStore === 'number'
+      ? sensorValueFromStore
+      : typeof sensorValueFromState === 'number'
+        ? sensorValueFromState
+        : 0;
 
   if (!selectedComponent || !definition) {
     return (
@@ -171,10 +183,11 @@ export function PropertyPanel() {
             <h3 className="text-sm font-medium text-foreground">模拟数值</h3>
             <SensorValueControl
               type={definition.type}
-              value={selectedComponent.state?.value as number || 0}
+              value={sensorControlValue}
               onChange={(value) => {
-                // TODO: 更新传感器值
-                console.log('Sensor value:', value);
+                if (selectedComponentId) {
+                  setSensorValue(selectedComponentId, value);
+                }
               }}
             />
           </div>
