@@ -13,6 +13,7 @@ import {
   Play,
   Square,
   Save,
+  FolderOpen,
   RotateCcw,
   Layers,
   Code,
@@ -44,9 +45,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { toast } from '@/components/ui/use-toast';
+import { loadManualSnapshot, saveManualSnapshot } from '@/lib/manualSnapshot';
 
 const PANEL_STATE_KEY = 'simulator-panel-state';
-const MANUAL_SAVE_KEY = 'simulator-manual-save';
 
 interface PanelState {
   leftCollapsed: boolean;
@@ -99,6 +101,7 @@ export function SimulatorLayout() {
     toggleGrid,
     resetSimulator,
     loadScenario: loadScenarioToStore,
+    setSensorValues,
   } = useSimulatorStore();
 
   const handleScenarioChange = (scenarioId: string) => {
@@ -119,22 +122,63 @@ export function SimulatorLayout() {
   const handleSave = () => {
     try {
       const state = useSimulatorStore.getState();
-      const snapshot = {
-        savedAt: new Date().toISOString(),
-        data: {
-          placedComponents: state.placedComponents,
-          connections: state.connections,
-          microbitCode: state.microbitCode,
-          flaskCode: state.flaskCode,
-          database: state.database,
-          routerConfig: state.routerConfig,
-          serverConfig: state.serverConfig,
-        },
-      };
-      localStorage.setItem(MANUAL_SAVE_KEY, JSON.stringify(snapshot));
-      console.info('[simulator] Manual save completed', snapshot.savedAt);
+      const snapshot = saveManualSnapshot({
+        placedComponents: state.placedComponents,
+        connections: state.connections,
+        microbitCode: state.microbitCode,
+        flaskCode: state.flaskCode,
+        database: state.database,
+        routerConfig: state.routerConfig,
+        serverConfig: state.serverConfig,
+        sensorValues: state.sensorValues,
+      });
+      toast({
+        title: '保存成功',
+        description: `已保存快照：${new Date(snapshot.savedAt).toLocaleString()}`,
+      });
     } catch (error) {
       console.error('[simulator] Manual save failed', error);
+      toast({
+        title: '保存失败',
+        description: '无法写入本地快照，请检查浏览器存储权限。',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRestore = () => {
+    const snapshot = loadManualSnapshot();
+    if (!snapshot) {
+      toast({
+        title: '没有可恢复快照',
+        description: '请先点击“保存”创建本地快照。',
+      });
+      return;
+    }
+
+    try {
+      loadScenarioToStore({
+        components: snapshot.data.placedComponents,
+        connections: snapshot.data.connections,
+        microbitCode: snapshot.data.microbitCode,
+        flaskCode: snapshot.data.flaskCode,
+        database: snapshot.data.database,
+        routerConfig: snapshot.data.routerConfig,
+        serverConfig: snapshot.data.serverConfig,
+      });
+      setSensorValues(snapshot.data.sensorValues ?? {});
+      setRunning(false);
+      toast({
+        title: '恢复成功',
+        description: `已恢复快照：${new Date(snapshot.savedAt).toLocaleString()}`,
+      });
+    } catch (error) {
+      console.error('[simulator] Manual restore failed', error);
+      toast({
+        title: '恢复失败',
+        description: '快照格式异常，请重新保存后再试。',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -221,6 +265,11 @@ export function SimulatorLayout() {
             <Button variant="outline" size="sm" onClick={handleSave}>
               <Save className="h-4 w-4 mr-1" />
               保存
+            </Button>
+
+            <Button variant="outline" size="sm" onClick={handleRestore}>
+              <FolderOpen className="h-4 w-4 mr-1" />
+              恢复
             </Button>
             
             <Button variant="outline" size="sm" onClick={resetSimulator}>
