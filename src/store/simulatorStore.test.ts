@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSimulatorStore } from "@/store/simulatorStore";
 import type { PlacedComponent } from "@/types/simulator";
 
@@ -97,5 +97,17 @@ describe("simulatorStore", () => {
     expect(hasConnection("tx", "p15")).toBe(true);
     expect(hasConnection("rx", "p16")).toBe(true);
     expect(state.lastConnectionResult?.message).toContain("IOT模块已自动连接到扩展板(P15/P16)");
+  });
+  it("updates sensor values through sensor actions", () => {
+    const store = useSimulatorStore.getState();
+
+    store.setSensorValue("temp-1", 28.5);
+    let state = useSimulatorStore.getState();
+    expect(state.sensorValues["temp-1"]).toBe(28.5);
+
+    store.setSensorValues({ "temp-1": 21.2, "temp-2": 18.7 });
+    state = useSimulatorStore.getState();
+    expect(state.sensorValues["temp-1"]).toBe(21.2);
+    expect(state.sensorValues["temp-2"]).toBe(18.7);
   });
 });
