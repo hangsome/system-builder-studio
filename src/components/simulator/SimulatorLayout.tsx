@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { ReactNode, useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { useSimulatorStore } from '@/store/simulatorStore';
@@ -42,6 +42,9 @@ import { BrowserSimulator } from './BrowserSimulator';
 import { scenarios, loadScenario } from '@/data/scenarios';
 import { useSimulationRunner } from '@/hooks/useSimulationRunner';
 import { cn } from '@/lib/utils';
+import { UserRole } from '@/types/edu';
+import { TeachingSubmissionPanel } from './TeachingSubmissionPanel';
+import { toast } from 'sonner';
 import {
   Tooltip,
   TooltipContent,
@@ -50,6 +53,19 @@ import {
 } from '@/components/ui/tooltip';
 
 const PANEL_STATE_KEY = 'simulator-panel-state';
+const MANUAL_SAVE_KEY = 'simulator-manual-save';
+
+interface SubmissionContext {
+  assignmentId: number;
+  assignmentTitle?: string;
+  onSubmitted?: () => void;
+}
+
+interface SimulatorLayoutProps {
+  role?: UserRole;
+  submissionContext?: SubmissionContext;
+  headerActions?: ReactNode;
+}
 
 interface PanelState {
   leftCollapsed: boolean;
@@ -77,20 +93,17 @@ function savePanelState(state: PanelState) {
   }
 }
 
-export function SimulatorLayout() {
-  // 启动后台仿真运行器
+export function SimulatorLayout({ role, submissionContext, headerActions }: SimulatorLayoutProps) {
   useSimulationRunner();
-  
-  // 许可证状态
+
   const { licenseState, featureAccess } = useLicense();
   const upgradePrompt = useUpgradePrompt();
-  
+
   const [activeTab, setActiveTab] = useState('hardware');
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(() => loadPanelState().leftCollapsed);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => loadPanelState().rightCollapsed);
   const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(() => loadPanelState().bottomCollapsed);
 
-  // 持久化面板状态
   useEffect(() => {
     savePanelState({
       leftCollapsed: leftPanelCollapsed,
@@ -98,7 +111,7 @@ export function SimulatorLayout() {
       bottomCollapsed: bottomPanelCollapsed,
     });
   }, [leftPanelCollapsed, rightPanelCollapsed, bottomPanelCollapsed]);
-  
+
   const {
     isRunning,
     setRunning,
@@ -108,16 +121,29 @@ export function SimulatorLayout() {
     loadScenario: loadScenarioToStore,
   } = useSimulatorStore();
 
+  const canLoadPresetScenarios = role === 'teacher' || role === 'admin' || !role;
+
+  useEffect(() => {
+    if (role === 'student') {
+      resetSimulator();
+    }
+  }, [role, resetSimulator]);
+
   const handleScenarioChange = (scenarioId: string) => {
-    // 体验版限制场景
+    if (!canLoadPresetScenarios && scenarioId !== 'blank') {
+      toast.error('学生仅可使用空白画布');
+      resetSimulator();
+      return;
+    }
+
     if (!featureAccess.canUseAllComponents && scenarioId !== 'blank') {
-      const scenarioIndex = scenarios.findIndex(s => s.id === scenarioId);
+      const scenarioIndex = scenarios.findIndex((s) => s.id === scenarioId);
       if (scenarioIndex >= featureAccess.maxScenarios) {
         upgradePrompt.show('该预设场景');
         return;
       }
     }
-    
+
     if (scenarioId === 'blank') {
       resetSimulator();
     } else {
@@ -131,61 +157,92 @@ export function SimulatorLayout() {
   const handleRun = () => {
     setRunning(!isRunning);
   };
-  
+
   const handleSave = () => {
     if (!featureAccess.canSave) {
       upgradePrompt.show('保存功能');
       return;
     }
-    // TODO: 实现保存逻辑
+
+    try {
+      const state = useSimulatorStore.getState();
+      const snapshot = {
+        savedAt: new Date().toISOString(),
+        data: {
+          placedComponents: state.placedComponents,
+          connections: state.connections,
+          microbitCode: state.microbitCode,
+          flaskCode: state.flaskCode,
+          database: state.database,
+          routerConfig: state.routerConfig,
+          serverConfig: state.serverConfig,
+        },
+      };
+      localStorage.setItem(MANUAL_SAVE_KEY, JSON.stringify(snapshot));
+      console.info('[simulator] Manual save completed', snapshot.savedAt);
+    } catch (error) {
+      console.error('[simulator] Manual save failed', error);
+    }
   };
 
   return (
     <TooltipProvider>
       <div className="h-screen flex flex-col bg-background">
-        {/* 升级提示弹窗 */}
         <upgradePrompt.UpgradePromptComponent />
-        
-        {/* 顶部工具栏 */}
+
         <header className="h-14 border-b border-border flex items-center justify-between px-4 bg-card">
           <div className="flex items-center gap-4">
             <h1 className="text-lg font-semibold text-foreground flex items-center gap-2">
               <span className="text-2xl">📐</span>
               信息系统搭建模拟器
               {licenseState && (
-                <span className={cn(
-                  "text-xs px-2 py-0.5 rounded-full",
-                  licenseState.licenseType === 'trial' 
-                    ? "bg-muted text-muted-foreground" 
-                    : "bg-primary/10 text-primary"
-                )}>
+                <span
+                  className={cn(
+                    'text-xs px-2 py-0.5 rounded-full',
+                    licenseState.licenseType === 'trial'
+                      ? 'bg-muted text-muted-foreground'
+                      : 'bg-primary/10 text-primary'
+                  )}
+                >
                   {getLicenseDisplayName(licenseState.licenseType)}
                 </span>
               )}
             </h1>
-            
-            <Select onValueChange={handleScenarioChange}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="选择预设场景" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="blank">空白画布</SelectItem>
-                {scenarios.map((scenario, index) => (
-                  <SelectItem key={scenario.id} value={scenario.id} className="flex items-center">
-                    <span className="flex items-center gap-2">
-                      {scenario.name}
-                      {!featureAccess.canUseAllComponents && index >= featureAccess.maxScenarios && (
-                        <Lock className="h-3 w-3 text-muted-foreground" />
-                      )}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+            {canLoadPresetScenarios ? (
+              <Select onValueChange={handleScenarioChange}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="选择预设场景" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="blank">空白画布</SelectItem>
+                  {scenarios.map((scenario, index) => (
+                    <SelectItem key={scenario.id} value={scenario.id} className="flex items-center">
+                      <span className="flex items-center gap-2">
+                        {scenario.name}
+                        {!featureAccess.canUseAllComponents && index >= featureAccess.maxScenarios && (
+                          <Lock className="h-3 w-3 text-muted-foreground" />
+                        )}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="text-xs px-3 py-2 rounded-md border bg-muted/50">学生模式：仅允许空白画布</div>
+            )}
+
+            {submissionContext ? (
+              <div className="text-xs px-3 py-2 rounded-md border bg-muted/50">
+                作业 #{submissionContext.assignmentId}
+                {submissionContext.assignmentTitle ? ` - ${submissionContext.assignmentTitle}` : ''}
+              </div>
+            ) : null}
           </div>
 
           <div className="flex items-center gap-2">
-            {/* 面板切换按钮 */}
+            {headerActions ? <div className="flex items-center gap-2 mr-2">{headerActions}</div> : null}
+
             <div className="flex items-center gap-1 mr-2 border-r border-border pr-2">
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -202,9 +259,7 @@ export function SimulatorLayout() {
                     )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  {leftPanelCollapsed ? '展开组件库' : '收起组件库'}
-                </TooltipContent>
+                <TooltipContent>{leftPanelCollapsed ? '展开组件库' : '收起组件库'}</TooltipContent>
               </Tooltip>
 
               <Tooltip>
@@ -222,9 +277,7 @@ export function SimulatorLayout() {
                     )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  {rightPanelCollapsed ? '展开属性面板' : '收起属性面板'}
-                </TooltipContent>
+                <TooltipContent>{rightPanelCollapsed ? '展开属性面板' : '收起属性面板'}</TooltipContent>
               </Tooltip>
             </div>
 
@@ -237,23 +290,19 @@ export function SimulatorLayout() {
               <Grid3X3 className="h-4 w-4 mr-1" />
               网格
             </Button>
-            
+
             <Button variant="outline" size="sm" onClick={handleSave}>
               <Save className="h-4 w-4 mr-1" />
               保存
               {!featureAccess.canSave && <Lock className="h-3 w-3 ml-1 text-muted-foreground" />}
             </Button>
-            
+
             <Button variant="outline" size="sm" onClick={resetSimulator}>
               <RotateCcw className="h-4 w-4 mr-1" />
               重置
             </Button>
-            
-            <Button
-              size="sm"
-              onClick={handleRun}
-              variant={isRunning ? 'destructive' : 'default'}
-            >
+
+            <Button size="sm" onClick={handleRun} variant={isRunning ? 'destructive' : 'default'}>
               {isRunning ? (
                 <>
                   <Square className="h-4 w-4 mr-1" />
@@ -266,16 +315,22 @@ export function SimulatorLayout() {
                 </>
               )}
             </Button>
+
+            {role === 'student' && submissionContext ? (
+              <TeachingSubmissionPanel
+                assignmentId={submissionContext.assignmentId}
+                assignmentTitle={submissionContext.assignmentTitle}
+                onSubmitted={submissionContext.onSubmitted}
+              />
+            ) : null}
           </div>
         </header>
 
-        {/* 主内容区 */}
         <div className="flex-1 flex overflow-hidden">
-          {/* 左侧组件库 */}
           <div
             className={cn(
-              "flex-shrink-0 transition-all duration-300 ease-in-out border-r border-border",
-              leftPanelCollapsed ? "w-12" : "w-56"
+              'flex-shrink-0 transition-all duration-300 ease-in-out border-r border-border',
+              leftPanelCollapsed ? 'w-12' : 'w-56'
             )}
           >
             {leftPanelCollapsed ? (
@@ -285,46 +340,42 @@ export function SimulatorLayout() {
             )}
           </div>
 
-          {/* 中间主区域 */}
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            {/* 上半部分：画布 */}
-            <div className={cn(
-              "min-h-0 relative transition-all duration-300",
-              bottomPanelCollapsed ? "flex-1" : "flex-1"
-            )}>
+            <div className={cn('min-h-0 relative transition-all duration-300', bottomPanelCollapsed ? 'flex-1' : 'flex-1')}>
               <SimulatorCanvas />
             </div>
 
-            {/* 下半部分：标签页面板 */}
-            <div className={cn(
-              "border-t border-border flex-shrink-0 transition-all duration-300",
-              bottomPanelCollapsed ? "h-10" : "h-72"
-            )}>
+            <div
+              className={cn(
+                'border-t border-border flex-shrink-0 transition-all duration-300',
+                bottomPanelCollapsed ? 'h-10' : 'h-72'
+              )}
+            >
               <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
                 <div className="flex items-center justify-between px-4 pt-2">
                   <TabsList className="self-start">
                     <TabsTrigger value="hardware" className="gap-1.5">
                       <Layers className="h-4 w-4" />
-                      {!bottomPanelCollapsed && "硬件连接"}
+                      {!bottomPanelCollapsed && '硬件连接'}
                     </TabsTrigger>
                     <TabsTrigger value="code" className="gap-1.5">
                       <Code className="h-4 w-4" />
-                      {!bottomPanelCollapsed && "代码编辑"}
+                      {!bottomPanelCollapsed && '代码编辑'}
                     </TabsTrigger>
                     <TabsTrigger value="database" className="gap-1.5">
                       <Database className="h-4 w-4" />
-                      {!bottomPanelCollapsed && "数据库"}
+                      {!bottomPanelCollapsed && '数据库'}
                     </TabsTrigger>
                     <TabsTrigger value="simulation" className="gap-1.5">
                       <Activity className="h-4 w-4" />
-                      {!bottomPanelCollapsed && "运行仿真"}
+                      {!bottomPanelCollapsed && '运行仿真'}
                     </TabsTrigger>
                     <TabsTrigger value="browser" className="gap-1.5">
                       <Globe className="h-4 w-4" />
-                      {!bottomPanelCollapsed && "浏览器"}
+                      {!bottomPanelCollapsed && '浏览器'}
                     </TabsTrigger>
                   </TabsList>
-                  
+
                   <Button
                     variant="ghost"
                     size="sm"
@@ -348,19 +399,19 @@ export function SimulatorLayout() {
                     <TabsContent value="hardware" className="flex-1 m-0 overflow-hidden">
                       <ConnectionValidationPanel />
                     </TabsContent>
-                    
+
                     <TabsContent value="code" className="flex-1 m-0 overflow-hidden">
                       <EnhancedCodeEditor />
                     </TabsContent>
-                    
+
                     <TabsContent value="database" className="flex-1 m-0 overflow-hidden">
                       <EnhancedDatabasePanel />
                     </TabsContent>
-                    
+
                     <TabsContent value="simulation" className="flex-1 m-0 overflow-hidden">
                       <EnhancedSimulationPanel />
                     </TabsContent>
-                    
+
                     <TabsContent value="browser" className="flex-1 m-0 overflow-hidden p-2">
                       <BrowserSimulator />
                     </TabsContent>
@@ -370,11 +421,10 @@ export function SimulatorLayout() {
             </div>
           </div>
 
-          {/* 右侧属性面板 */}
           <div
             className={cn(
-              "flex-shrink-0 transition-all duration-300 ease-in-out",
-              rightPanelCollapsed ? "w-12" : "w-64"
+              'flex-shrink-0 transition-all duration-300 ease-in-out',
+              rightPanelCollapsed ? 'w-12' : 'w-64'
             )}
           >
             {rightPanelCollapsed ? (
@@ -389,28 +439,20 @@ export function SimulatorLayout() {
   );
 }
 
-// 收起状态的左侧面板
 function CollapsedLeftPanel({ onExpand }: { onExpand: () => void }) {
   return (
     <div className="h-full bg-card flex flex-col items-center py-3 gap-2">
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onExpand}
-            className="h-8 w-8 p-0"
-          >
+          <Button variant="ghost" size="sm" onClick={onExpand} className="h-8 w-8 p-0">
             <Package className="h-4 w-4" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="right">
-          展开组件库
-        </TooltipContent>
+        <TooltipContent side="right">展开组件库</TooltipContent>
       </Tooltip>
-      
+
       <div className="w-6 h-px bg-border my-1" />
-      
+
       <div className="flex-1 flex flex-col gap-1 items-center">
         <Tooltip>
           <TooltipTrigger asChild>
@@ -457,30 +499,22 @@ function CollapsedLeftPanel({ onExpand }: { onExpand: () => void }) {
   );
 }
 
-// 收起状态的右侧面板
 function CollapsedRightPanel({ onExpand }: { onExpand: () => void }) {
   const { selectedComponentId } = useSimulatorStore();
-  
+
   return (
     <div className="h-full bg-card border-l border-border flex flex-col items-center py-3 gap-2">
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onExpand}
-            className="h-8 w-8 p-0"
-          >
+          <Button variant="ghost" size="sm" onClick={onExpand} className="h-8 w-8 p-0">
             <Settings className="h-4 w-4" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="left">
-          展开属性面板
-        </TooltipContent>
+        <TooltipContent side="left">展开属性面板</TooltipContent>
       </Tooltip>
-      
+
       <div className="w-6 h-px bg-border my-1" />
-      
+
       {selectedComponentId && (
         <Tooltip>
           <TooltipTrigger asChild>
@@ -488,9 +522,7 @@ function CollapsedRightPanel({ onExpand }: { onExpand: () => void }) {
               <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
             </div>
           </TooltipTrigger>
-          <TooltipContent side="left">
-            已选中组件
-          </TooltipContent>
+          <TooltipContent side="left">已选中组件</TooltipContent>
         </Tooltip>
       )}
     </div>

@@ -426,11 +426,11 @@ export function SimulatorCanvas() {
                 x2={points.to.x}
                 y2={points.to.y}
                 stroke={color}
-                strokeWidth={20}
+                strokeWidth={10}
                 strokeLinecap="round"
-                opacity={0.15}
+                opacity={0.1}
                 filter="url(#glow)"
-                strokeDasharray={isWireless ? "20,15" : undefined}
+                strokeDasharray={isWireless ? "14,10" : undefined}
               />
               {/* 中层阴影 */}
               <line
@@ -439,10 +439,10 @@ export function SimulatorCanvas() {
                 x2={points.to.x}
                 y2={points.to.y}
                 stroke={color}
-                strokeWidth={12}
+                strokeWidth={6}
                 strokeLinecap="round"
-                opacity={0.3}
-                strokeDasharray={isWireless ? "15,10" : undefined}
+                opacity={0.2}
+                strokeDasharray={isWireless ? "10,8" : undefined}
               />
               {/* 主连线 - 更粗，无线连接用虚线 */}
               <line
@@ -451,7 +451,7 @@ export function SimulatorCanvas() {
                 x2={points.to.x}
                 y2={points.to.y}
                 stroke={color}
-                strokeWidth={5}
+                strokeWidth={3}
                 strokeLinecap="round"
                 strokeDasharray={strokeDasharray}
               />
@@ -462,27 +462,27 @@ export function SimulatorCanvas() {
                 x2={points.to.x}
                 y2={points.to.y}
                 stroke="#ffffff"
-                strokeWidth={1.5}
+                strokeWidth={1}
                 strokeLinecap="round"
-                opacity={0.5}
+                opacity={0.35}
                 strokeDasharray={strokeDasharray}
               />
               {/* 连线端点圆圈 - 无线连接用wifi信号图标样式 */}
               {isWireless ? (
                 <>
                   {/* 无线信号图标 - 起点 */}
-                  <circle cx={points.from.x} cy={points.from.y} r={12} fill={color} stroke="#fff" strokeWidth={2} opacity={0.3} />
-                  <circle cx={points.from.x} cy={points.from.y} r={8} fill={color} stroke="#fff" strokeWidth={2} opacity={0.5} />
-                  <circle cx={points.from.x} cy={points.from.y} r={5} fill={color} stroke="#fff" strokeWidth={2} />
+                  <circle cx={points.from.x} cy={points.from.y} r={9} fill={color} stroke="#fff" strokeWidth={1.5} opacity={0.25} />
+                  <circle cx={points.from.x} cy={points.from.y} r={6} fill={color} stroke="#fff" strokeWidth={1.5} opacity={0.45} />
+                  <circle cx={points.from.x} cy={points.from.y} r={4} fill={color} stroke="#fff" strokeWidth={1.5} />
                   {/* 无线信号图标 - 终点 */}
-                  <circle cx={points.to.x} cy={points.to.y} r={12} fill={color} stroke="#fff" strokeWidth={2} opacity={0.3} />
-                  <circle cx={points.to.x} cy={points.to.y} r={8} fill={color} stroke="#fff" strokeWidth={2} opacity={0.5} />
-                  <circle cx={points.to.x} cy={points.to.y} r={5} fill={color} stroke="#fff" strokeWidth={2} />
+                  <circle cx={points.to.x} cy={points.to.y} r={9} fill={color} stroke="#fff" strokeWidth={1.5} opacity={0.25} />
+                  <circle cx={points.to.x} cy={points.to.y} r={6} fill={color} stroke="#fff" strokeWidth={1.5} opacity={0.45} />
+                  <circle cx={points.to.x} cy={points.to.y} r={4} fill={color} stroke="#fff" strokeWidth={1.5} />
                 </>
               ) : (
                 <>
-                  <circle cx={points.from.x} cy={points.from.y} r={10} fill={color} stroke="#fff" strokeWidth={3} />
-                  <circle cx={points.to.x} cy={points.to.y} r={10} fill={color} stroke="#fff" strokeWidth={3} />
+                  <circle cx={points.from.x} cy={points.from.y} r={7} fill={color} stroke="#fff" strokeWidth={2} />
+                  <circle cx={points.to.x} cy={points.to.y} r={7} fill={color} stroke="#fff" strokeWidth={2} />
                 </>
               )}
               {/* 连线类型标签 - 更大更清晰 */}
