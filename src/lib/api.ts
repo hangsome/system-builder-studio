@@ -15,6 +15,13 @@ const API_CONFIG = {
   // 请求超时时间（毫秒）
   timeout: Number(import.meta.env.VITE_API_TIMEOUT_MS || 10000),
 };
+
+function buildApiUrl(path: string) {
+  const baseUrl = API_CONFIG.baseUrl.replace(/\/$/, '');
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const apiBase = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
+  return `${apiBase}${normalizedPath}`;
+}
  
  // API 响应类型
 export interface ActivateResponse {
@@ -70,7 +77,7 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
    
    // 真实 API 调用
    try {
-    const response = await fetchWithTimeout(`${API_CONFIG.baseUrl}/api/activate`, {
+    const response = await fetchWithTimeout(buildApiUrl('/activate'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -108,7 +115,7 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
    
    // 真实 API 调用
    try {
-    const response = await fetchWithTimeout(`${API_CONFIG.baseUrl}/api/verify`, {
+    const response = await fetchWithTimeout(buildApiUrl('/verify'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
