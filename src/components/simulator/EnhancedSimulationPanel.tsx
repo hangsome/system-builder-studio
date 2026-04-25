@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useShallow } from 'zustand/react/shallow';
+import { DataTransferTrace } from './DataTransferTrace';
 
 export function EnhancedSimulationPanel() {
   const {
@@ -47,6 +48,7 @@ export function EnhancedSimulationPanel() {
     updateRouterConfig,
     updateServerConfig,
     logs,
+    database,
     addLog,
     clearLogs,
     codeBurned,
@@ -67,6 +69,7 @@ export function EnhancedSimulationPanel() {
       updateRouterConfig: state.updateRouterConfig,
       updateServerConfig: state.updateServerConfig,
       logs: state.logs,
+      database: state.database,
       addLog: state.addLog,
       clearLogs: state.clearLogs,
       codeBurned: state.codeBurned,
@@ -78,6 +81,7 @@ export function EnhancedSimulationPanel() {
   );
 
   const [networkConnected, setNetworkConnected] = useState(false);
+  const [showDataTrace, setShowDataTrace] = useState(false);
   // 仿真循环现在由 useSimulationRunner 在后台处理
 
   // 获取画布上的传感器组件
@@ -129,6 +133,23 @@ export function EnhancedSimulationPanel() {
       obloqConnected: iotHasPower && iotHasSerial,
     };
   }, [placedComponents, connections]);
+
+  const traceSensors = useMemo(() => {
+    return sensorComponents.map((sensor) => {
+      const def = componentDefinitions.find((d) => d.id === sensor.definitionId);
+      const config = sensorConfigs[sensor.definitionId];
+
+      return {
+        id: sensor.instanceId,
+        name: def?.name ?? sensor.definitionId,
+        value: sensorValues[sensor.instanceId],
+        unit: config?.unit,
+        powered: powerStatus.get(sensor.instanceId) ?? false,
+      };
+    });
+  }, [sensorComponents, sensorValues, powerStatus]);
+
+  const databaseRecordCount = database.records['sensorlog']?.length ?? 0;
 
   // 检查系统状态
   const systemCheck = canRunSimulation(placedComponents, connections, codeBurned, serverConfig.running);
@@ -395,6 +416,17 @@ export function EnhancedSimulationPanel() {
             <span className="text-[10px] w-6">{simulationSpeed}x</span>
           </div>
 
+          <div className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1">
+            <Radio className="h-3 w-3 text-blue-600" />
+            <Label className="text-[10px]" htmlFor="enhanced-data-trace-switch">数据链路</Label>
+            <Switch
+              id="enhanced-data-trace-switch"
+              checked={showDataTrace}
+              onCheckedChange={setShowDataTrace}
+              aria-label="显示数据传输链路"
+            />
+          </div>
+
           <div className="flex-1" />
 
           {/* 系统状态指示器 */}
@@ -435,6 +467,21 @@ export function EnhancedSimulationPanel() {
 
         {/* 日志区域 */}
         <div className="flex-1 flex flex-col min-h-0">
+          {showDataTrace && (
+            <DataTransferTrace
+              isRunning={isRunning}
+              codeBurned={codeBurned}
+              sensors={traceSensors}
+              serialConnected={obloqConnected}
+              networkConnected={networkConnected}
+              routerSsid={routerConfig.ssid}
+              serverRunning={serverConfig.running}
+              serverAddress={`${serverConfig.ip}:${serverConfig.port}`}
+              databaseRecordCount={databaseRecordCount}
+              logs={logs}
+            />
+          )}
+
           <div className="flex items-center justify-between px-2 py-1 border-b border-border">
             <span className="text-[10px] font-medium">通信日志</span>
             <Button size="sm" variant="ghost" className="h-5 text-[10px]" onClick={clearLogs}>

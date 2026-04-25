@@ -6,6 +6,7 @@ import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   RotateCcw, 
@@ -14,9 +15,11 @@ import {
   Wifi,
   Server,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Radio
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
+import { DataTransferTrace } from './DataTransferTrace';
 
 export function SimulationPanel() {
   const {
@@ -54,6 +57,7 @@ export function SimulationPanel() {
   );
 
   const [sensorValues, setSensorValues] = useState<Record<string, number>>({});
+  const [showDataTrace, setShowDataTrace] = useState(false);
 
   // 获取画布上的传感器组件
   const sensorComponents = useMemo(() => {
@@ -62,6 +66,25 @@ export function SimulationPanel() {
       return def?.category === 'sensor';
     });
   }, [placedComponents]);
+
+  const traceSensors = useMemo(() => {
+    return sensorComponents.map((sensor) => {
+      const def = componentDefinitions.find((d) => d.id === sensor.definitionId);
+      const config = getSensorConfig(sensor.definitionId);
+      const value = sensorValues[sensor.instanceId] ?? config.defaultValue;
+
+      return {
+        id: sensor.instanceId,
+        name: def?.name ?? sensor.definitionId,
+        value,
+        unit: config.unit,
+        powered: true,
+      };
+    });
+  }, [sensorComponents, sensorValues]);
+
+  const databaseRecordCount = database.records['sensorlog']?.length ?? 0;
+  const basicNetworkConnected = isRunning && codeBurned && serverConfig.running;
 
   // 模拟运行效果
   useEffect(() => {
@@ -261,6 +284,16 @@ export function SimulationPanel() {
                 className="w-20"
               />
               <span className="text-xs w-8">{simulationSpeed}x</span>
+              <div className="ml-2 flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1">
+                <Radio className="h-3.5 w-3.5 text-blue-600" />
+                <Label className="text-xs" htmlFor="basic-data-trace-switch">数据链路</Label>
+                <Switch
+                  id="basic-data-trace-switch"
+                  checked={showDataTrace}
+                  onCheckedChange={setShowDataTrace}
+                  aria-label="显示数据传输链路"
+                />
+              </div>
             </div>
           </div>
           
@@ -289,6 +322,21 @@ export function SimulationPanel() {
 
         {/* 日志 */}
         <div className="flex-1 flex flex-col min-h-0">
+          {showDataTrace && (
+            <DataTransferTrace
+              isRunning={isRunning}
+              codeBurned={codeBurned}
+              sensors={traceSensors}
+              serialConnected={codeBurned}
+              networkConnected={basicNetworkConnected}
+              routerSsid={routerConfig.ssid}
+              serverRunning={serverConfig.running}
+              serverAddress={`${serverConfig.ip}:${serverConfig.port}`}
+              databaseRecordCount={databaseRecordCount}
+              logs={logs}
+            />
+          )}
+
           <div className="flex items-center justify-between px-3 py-2 border-b border-border">
             <span className="text-xs font-medium">通信日志</span>
             <Button size="sm" variant="ghost" onClick={clearLogs}>

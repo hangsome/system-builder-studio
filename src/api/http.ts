@@ -27,9 +27,14 @@ export class HttpError extends Error {
   }
 }
 
+export type HttpJsonInit = Omit<RequestInit, 'body'> & {
+  token?: string;
+  body?: unknown;
+};
+
 export async function httpJson<T>(
   path: string,
-  init: RequestInit & { token?: string } = {}
+  init: HttpJsonInit = {}
 ) {
   const { token, headers, body, ...rest } = init;
   const nextHeaders = new Headers(headers || {});
@@ -52,7 +57,7 @@ export async function httpJson<T>(
   const response = await fetch(joinUrl(path), {
     ...rest,
     headers: nextHeaders,
-    body: shouldSerializeBody ? JSON.stringify(body) : body,
+    body: shouldSerializeBody ? JSON.stringify(body) : (body as BodyInit | null | undefined),
   });
 
   const rawText = await response.text();
