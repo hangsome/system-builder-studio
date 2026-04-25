@@ -60,13 +60,40 @@
    ].join('|');
  }
  
- async function hashString(str: string): Promise<string> {
-   const encoder = new TextEncoder();
-   const data = encoder.encode(str);
-   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-   const hashArray = Array.from(new Uint8Array(hashBuffer));
-   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
- }
+async function hashString(str: string): Promise<string> {
+  if (!crypto?.subtle?.digest) {
+    return hashStringFallback(str);
+  }
+
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  try {
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return hashStringFallback(str);
+  }
+}
+
+function hashStringFallback(str: string): string {
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  let h3 = 0x9e3779b9;
+  let h4 = 0x85ebca6b;
+
+  for (let i = 0; i < str.length; i += 1) {
+    const code = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ code, 0x01000193);
+    h2 = Math.imul(h2 ^ code, 0x85ebca6b);
+    h3 = Math.imul(h3 ^ code, 0xc2b2ae35);
+    h4 = Math.imul(h4 ^ code, 0x27d4eb2f);
+  }
+
+  return [h1, h2, h3, h4]
+    .map(value => (value >>> 0).toString(16).padStart(8, '0'))
+    .join('');
+}
  
  /**
   * 生成设备指纹
