@@ -5,6 +5,7 @@ import { ComponentDefinition, PlacedComponent, Pin } from '@/types/simulator';
 import { cn, createId } from '@/lib/utils';
 import { ChevronDown, ChevronRight, Zap, CheckCircle2, XCircle } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
+import { isInitiallyPowered } from '@/lib/connectionValidator';
 
 const GRID_SIZE = 20;
 
@@ -153,7 +154,7 @@ export function SimulatorCanvas() {
         definitionId: definition.id,
         position: { x: snappedX, y: snappedY },
         state: {
-          powered: false,
+          powered: isInitiallyPowered(definition.id),
           active: false,
         },
       };
@@ -406,8 +407,6 @@ export function SimulatorCanvas() {
           }
           
           const color = getConnectionColorByValidity(connection.valid);
-          const midX = (points.from.x + points.to.x) / 2;
-          const midY = (points.from.y + points.to.y) / 2;
           const isWireless = isWirelessConnection(connection.type);
           
           // 计算连线长度用于动画时长
@@ -485,31 +484,7 @@ export function SimulatorCanvas() {
                   <circle cx={points.to.x} cy={points.to.y} r={7} fill={color} stroke="#fff" strokeWidth={2} />
                 </>
               )}
-              {/* 连线类型标签 - 更大更清晰 */}
-              <rect
-                x={midX - 32}
-                y={midY - 14}
-                width={64}
-                height={28}
-                rx={8}
-                fill="rgba(15, 23, 42, 0.95)"
-                stroke={color}
-                strokeWidth={2}
-                strokeDasharray={isWireless ? "8,4" : undefined}
-              />
-              <text
-                x={midX}
-                y={midY + 5}
-                textAnchor="middle"
-                fill="#fff"
-                fontSize={11}
-                fontWeight="bold"
-              >
-                {connection.type === 'power' ? '🔴 VCC' : 
-                 connection.type === 'ground' ? '⚫ GND' : 
-                 connection.type === 'serial' ? '🟢 串口' : 
-                 connection.type === 'wireless' ? '📶 无线' : '🔵 数据'}
-              </text>
+              {/* 连线不再显示类型标签：引脚端点已经标注 VCC/GND/DATA，隐藏连线文字可降低课堂投屏噪声 */}
               {/* 数据流动画 - 双层动画效果，无线连接用波浪扩散效果 */}
               {isWireless ? (
                 <>
@@ -680,40 +655,52 @@ function CanvasComponent({
   zoom,
   pan,
 }: CanvasComponentProps) {
+  const isFaulty = component.state?.fault === true;
+
+  // 计算基础 z-index：
+  // - 扩展板（较大底板）放在最底层，避免遮挡插入其上的 micro:bit / 传感器等
+  // - micro:bit、传感器、执行器、IOT 模块等贴片组件抬升一层，保证可见
+  // - 选中时再次抬升到最上层
+  const layerZIndex = (() => {
+    if (definition.id === 'expansion-board') return 5;
+    if (definition.id === 'microbit') return 20;
+    return 10;
+  })();
+
   return (
     <div
       className={cn(
         "absolute cursor-move select-none",
         "rounded-lg border-2 bg-card shadow-md transition-shadow",
-        isSelected ? "border-primary shadow-lg ring-2 ring-primary/20" : "border-border hover:border-muted-foreground"
+        isSelected
+          ? "border-primary shadow-lg ring-2 ring-primary/20"
+          : isFaulty
+            ? "border-destructive shadow-destructive/20"
+            : "border-border hover:border-muted-foreground"
       )}
       style={{
         left: component.position.x * zoom + pan.x,
         top: component.position.y * zoom + pan.y,
         width: definition.width * zoom,
         height: definition.height * zoom,
-        zIndex: isSelected ? 100 : 10,
+        zIndex: isSelected ? 100 : layerZIndex,
         overflow: 'visible',
       }}
       onMouseDown={onMouseDown}
     >
-      {/* 组件名称 */}
-      <div 
-        className="absolute left-0 right-0 text-center pointer-events-none"
-        style={{ top: -24 * zoom }}
-      >
-        <span 
-          className="font-medium text-foreground bg-card px-2 py-0.5 rounded border border-border"
-          style={{ fontSize: 12 * zoom }}
-        >
-          {definition.name}
-        </span>
+      {/* 组件可视化内容 */}
+      <div className={cn("w-full h-full overflow-hidden rounded-md pointer-events-none", isFaulty && "opacity-50 grayscale")}>
+        <ComponentVisual type={definition.type} label={definition.name} state={component.state} />
       </div>
 
-      {/* 组件可视化内容 */}
-      <div className="w-full h-full overflow-hidden rounded-md pointer-events-none">
-        <ComponentVisual type={definition.type} state={component.state} />
-      </div>
+      {isFaulty && (
+        <div
+          className="absolute right-1 top-1 rounded-sm border border-destructive/30 bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground shadow-sm"
+          title={component.state?.faultMessage || '组件故障'}
+        >
+          故障
+        </div>
+      )}
 
       {/* 引脚 - 增强显示 */}
       {definition.pins.map((pin) => (
@@ -819,7 +806,24 @@ function getPinLabelColor(type: string) {
   }
 }
 
-function ComponentVisual({ type, state }: { type: string; state?: PlacedComponent['state'] }) {
+function ComponentName({ label, tone = 'slate' }: { label: string; tone?: 'slate' | 'light' | 'dark' | 'blue' | 'green' | 'orange' }) {
+  const toneClass = {
+    slate: 'text-slate-800',
+    light: 'text-white',
+    dark: 'text-slate-900',
+    blue: 'text-blue-900',
+    green: 'text-green-50',
+    orange: 'text-orange-900',
+  }[tone];
+
+  return (
+    <div className={cn("w-full px-1 text-center text-[11px] font-semibold leading-tight tracking-tight break-keep", toneClass)}>
+      {label}
+    </div>
+  );
+}
+
+function ComponentVisual({ type, label, state }: { type: string; label: string; state?: PlacedComponent['state'] }) {
   switch (type) {
     case 'microbit':
       return (
@@ -847,109 +851,122 @@ function ComponentVisual({ type, state }: { type: string; state?: PlacedComponen
               B
             </div>
           </div>
+          <ComponentName label={label} />
         </div>
       );
     
     case 'expansion-board':
       return (
         <div className="w-full h-full bg-green-800 rounded flex items-center justify-center">
-          <div className="text-xs text-green-200 font-mono">扩展板</div>
+          <ComponentName label={label} tone="green" />
         </div>
       );
     
     case 'temp-humidity-sensor':
       return (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-blue-100 rounded">
-          <span className="text-lg">🌡️</span>
-          <span className="text-[8px] text-blue-800">DHT11</span>
+        <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 bg-blue-100 rounded px-1">
+          <ComponentName label={label} tone="blue" />
+          <span className="text-sm font-bold text-blue-800">DHT</span>
         </div>
       );
     
     case 'light-sensor':
       return (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-yellow-100 rounded">
-          <span className="text-lg">☀️</span>
-          <span className="text-[8px] text-yellow-800">光敏</span>
+        <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 bg-yellow-100 rounded px-1">
+          <ComponentName label={label} tone="orange" />
+          <span className="text-sm font-bold text-yellow-800">LUX</span>
         </div>
       );
     
     case 'led-strip':
       return (
-        <div className="w-full h-full flex items-center justify-center gap-1 bg-gray-900 rounded px-2">
-          {[0, 1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className={cn(
-                "w-4 h-4 rounded-full",
-                state?.active
-                  ? ["bg-red-500", "bg-green-500", "bg-blue-500", "bg-yellow-500", "bg-purple-500"][i]
-                  : "bg-gray-700"
-              )}
-            />
-          ))}
+        <div className="w-full h-full flex flex-col items-center justify-center gap-1 bg-gray-900 rounded px-2">
+          <ComponentName label={label} tone="light" />
+          <div className="flex items-center justify-center gap-1">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className={cn(
+                  "w-3.5 h-3.5 rounded-full",
+                  state?.active
+                    ? ["bg-red-500", "bg-green-500", "bg-blue-500", "bg-yellow-500", "bg-purple-500"][i]
+                    : "bg-gray-700"
+                )}
+              />
+            ))}
+          </div>
         </div>
       );
     
     case 'buzzer':
       return (
-        <div className="w-full h-full flex items-center justify-center bg-gray-200 rounded">
-          <span className="text-xl">🔊</span>
+        <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 bg-gray-200 rounded px-1">
+          <ComponentName label={label} />
+          <span className="text-[10px] font-bold text-gray-700">BEEP</span>
         </div>
       );
     
     case 'iot-module':
     case 'obloq':
       return (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-blue-600 rounded">
+        <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 bg-blue-600 rounded px-1">
+          <ComponentName label={label} tone="light" />
           <span className="text-white text-xs font-bold">IOT</span>
-          <span className="text-blue-200 text-[8px]">WiFi</span>
         </div>
       );
     
     case 'router':
       return (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100 rounded">
-          <span className="text-2xl">📶</span>
-          <span className="text-[8px] text-gray-600">路由器</span>
+        <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 bg-gray-100 rounded px-1">
+          <ComponentName label={label} />
+          <span className="text-[10px] font-bold text-gray-700">WIFI</span>
         </div>
       );
     
     case 'pc-computer':
       return (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-blue-100 rounded">
-          <span className="text-2xl">🖥️</span>
-          <span className="text-[8px] text-blue-800">PC电脑</span>
+        <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 bg-blue-100 rounded px-1">
+          <ComponentName label={label} tone="blue" />
+          <span className="text-sm font-bold text-blue-800">PC</span>
         </div>
       );
     
     case 'web-server':
       return (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-800 rounded">
-          <span className="text-2xl">🌐</span>
-          <span className="text-[8px] text-gray-300">Web服务器</span>
+        <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 bg-gray-800 rounded px-1">
+          <ComponentName label={label} tone="light" />
+          <span className="text-sm font-bold text-gray-100">API</span>
         </div>
       );
     
     case 'database':
       return (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-orange-100 rounded">
-          <span className="text-2xl">🗄️</span>
-          <span className="text-[8px] text-orange-800">SQLite</span>
+        <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 bg-orange-100 rounded px-1">
+          <ComponentName label={label} tone="orange" />
+          <span className="text-sm font-bold text-orange-800">DB</span>
         </div>
       );
     
     case 'browser':
       return (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-sky-100 rounded">
-          <span className="text-2xl">🌐</span>
-          <span className="text-[8px] text-sky-800">浏览器</span>
+        <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 bg-sky-100 rounded px-1">
+          <ComponentName label={label} tone="blue" />
+          <span className="text-sm font-bold text-sky-800">WEB</span>
+        </div>
+      );
+
+    case 'mobile-client':
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 rounded-2xl border-4 border-slate-800 bg-slate-100 px-1">
+          <ComponentName label={label} />
+          <span className="text-sm font-bold text-slate-800">APP</span>
         </div>
       );
     
     default:
       return (
         <div className="w-full h-full flex items-center justify-center">
-          <span className="text-lg">📦</span>
+          <ComponentName label={label} />
         </div>
       );
   }

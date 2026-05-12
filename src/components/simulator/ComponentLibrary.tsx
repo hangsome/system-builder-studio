@@ -2,16 +2,18 @@ import { useState } from 'react';
 import { componentsByCategory, categoryNames } from '@/data/componentDefinitions';
 import { ComponentDefinition } from '@/types/simulator';
 import { useSimulatorStore } from '@/store/simulatorStore';
-import { 
-  Cpu, 
-  Thermometer, 
-  Lightbulb, 
-  Wifi, 
+import {
+  Cpu,
+  Thermometer,
+  Lightbulb,
+  Wifi,
   Server,
+  Smartphone,
   ChevronDown,
   ChevronRight
 } from 'lucide-react';
 import { cn, createId } from '@/lib/utils';
+import { isInitiallyPowered } from '@/lib/connectionValidator';
 
 const categoryIcons: Record<string, React.ReactNode> = {
   mainboard: <Cpu className="h-4 w-4" />,
@@ -54,7 +56,7 @@ export function ComponentLibrary({ onDragStart }: ComponentLibraryProps) {
       definitionId: definition.id,
       position: { x: 200 + Math.random() * 100, y: 150 + Math.random() * 100 },
       state: {
-        powered: false,
+        powered: isInitiallyPowered(definition.id),
         active: false,
       },
     };
@@ -180,12 +182,17 @@ function ComponentIcon({ type }: { type: string }) {
         </div>
       );
     case 'pc-computer':
+    case 'mobile-client':
     case 'web-server':
     case 'database':
     case 'browser':
       return (
         <div className={iconClasses}>
-          <Server className="h-full w-full" />
+          {type === 'mobile-client' ? (
+            <Smartphone className="h-full w-full" />
+          ) : (
+            <Server className="h-full w-full" />
+          )}
         </div>
       );
     default:

@@ -181,6 +181,32 @@ function determineConnectionType(fromType: string, toType: string, fromId?: stri
   return 'data';
 }
 
+// 默认即通电的组件（独立供电，不需要外接 VCC/GND）
+// 路由器、Web服务器、PC、浏览器、手机均按通电视作可用
+const SELF_POWERED_DEFINITION_IDS = new Set([
+  'router',
+  'web-server',
+  'pc-computer',
+  'browser',
+  'mobile-client',
+]);
+
+// 主板自身即视为通电（micro:bit、扩展板）
+const MAINBOARD_DEFINITION_IDS = new Set(
+  componentDefinitions
+    .filter((d) => d.category === 'mainboard')
+    .map((d) => d.id)
+);
+
+// 判断刚拖入画布时组件是否应被视为已通电
+// 主板与自带电源的设备返回 true；其余组件需要在画布上完成连线后由 validateSystem 重新计算
+export function isInitiallyPowered(definitionId: string): boolean {
+  return (
+    MAINBOARD_DEFINITION_IDS.has(definitionId) ||
+    SELF_POWERED_DEFINITION_IDS.has(definitionId)
+  );
+}
+
 // 验证整个系统连接
 export function validateSystem(
   placedComponents: PlacedComponent[],
@@ -202,10 +228,42 @@ export function validateSystem(
   // 标记主板为已供电
   powerSources.forEach(c => powerStatus.set(c.instanceId, true));
 
+  // 标记自带电源的设备（路由器、Web服务器、PC、浏览器、手机）
+  placedComponents.forEach(component => {
+    if (SELF_POWERED_DEFINITION_IDS.has(component.definitionId)) {
+      powerStatus.set(component.instanceId, true);
+    }
+  });
+
+  // 数据库：连接到 Web 服务器即视为通电
+  const webServerInstanceIds = new Set(
+    placedComponents
+      .filter((c) => c.definitionId === 'web-server')
+      .map((c) => c.instanceId)
+  );
+  placedComponents
+    .filter((c) => c.definitionId === 'database')
+    .forEach((database) => {
+      const connectedToWebServer = connections.some((conn) => {
+        if (conn.fromComponent === database.instanceId) {
+          return webServerInstanceIds.has(conn.toComponent);
+        }
+        if (conn.toComponent === database.instanceId) {
+          return webServerInstanceIds.has(conn.fromComponent);
+        }
+        return false;
+      });
+      if (connectedToWebServer) {
+        powerStatus.set(database.instanceId, true);
+      }
+    });
+
   // 检查传感器/执行器/网络设备是否有电源和接地连接
   placedComponents.forEach(component => {
     const def = componentDefinitions.find(d => d.id === component.definitionId);
     if (!def || def.category === 'mainboard' || def.category === 'server') return;
+    // 自带电源的网络设备（如路由器）已在上方标记，跳过 VCC/GND 检查
+    if (SELF_POWERED_DEFINITION_IDS.has(component.definitionId)) return;
 
     const componentConnections = connections.filter(
       c => c.fromComponent === component.instanceId || c.toComponent === component.instanceId
