@@ -10,10 +10,29 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist-root/
+dist-system-builder/
 *.local
 .env
 .env.*
 !.env.example
+
+# Local deployment and verification artifacts
+.known_hosts_sysbuilder
+askpass-sysbuilder.sh
+deploy_activity_remote.sh
+.release-pack/
+.playwright-mcp/
+.serena/
+openclass-local.png
+system-builder-latest-release.tar.gz
+docs/*资料包*.tar.gz
+
+# Runtime data and Python caches
+**/__pycache__/
+*.pyc
+*.db
+~$*.docx
 
 # Editor directories and files
 .vscode/*

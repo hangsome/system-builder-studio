@@ -93,12 +93,12 @@ export function PropertyPanel() {
               {isComponentPowered ? (
                 <>
                   <Zap className="h-4 w-4" />
-                  已供电
+                  正常
                 </>
               ) : (
                 <>
                   <ZapOff className="h-4 w-4" />
-                  未供电
+                  需检查
                 </>
               )}
             </span>

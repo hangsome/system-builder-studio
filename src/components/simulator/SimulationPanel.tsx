@@ -221,7 +221,7 @@ export function SimulationPanel() {
                 value={routerConfig.password}
                 onChange={(e) => updateRouterConfig({ password: e.target.value })}
                 className="h-8 text-xs"
-                type="password"
+                type="text"
               />
             </div>
           </div>
@@ -233,21 +233,21 @@ export function SimulationPanel() {
             服务器配置
           </h4>
           <div className="space-y-2">
-            <div className="flex gap-2">
-              <div className="flex-1">
+            <div className="grid grid-cols-[minmax(10rem,1fr)_5.5rem] gap-2">
+              <div>
                 <Label className="text-xs">IP地址</Label>
                 <Input
                   value={serverConfig.ip}
                   onChange={(e) => updateServerConfig({ ip: e.target.value })}
-                  className="h-8 text-xs"
+                  className="h-8 text-xs font-mono"
                 />
               </div>
-              <div className="w-20">
+              <div>
                 <Label className="text-xs">端口</Label>
                 <Input
                   value={serverConfig.port}
                   onChange={(e) => updateServerConfig({ port: parseInt(e.target.value) || 5000 })}
-                  className="h-8 text-xs"
+                  className="h-8 text-xs font-mono"
                   type="number"
                 />
               </div>

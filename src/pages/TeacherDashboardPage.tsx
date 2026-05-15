@@ -40,6 +40,7 @@ import {
   overrideSubmissionScoreApi,
   removeStudentFromClassApi,
 } from '@/api/eduApi';
+import { normalizeScoreDimensions } from '@/lib/scoreDimensions';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import { AssignmentInfo, ClassInfo, ScenarioInfo, StudentInfo, SubmissionInfo } from '@/types/edu';
@@ -161,7 +162,7 @@ function TableLoadingRows({ columns, rows = 3 }: { columns: number; rows?: numbe
 }
 
 function ScoreDimensionBars({ submission }: { submission: SubmissionInfo }) {
-  const dimensions = submission.auto_score?.dimensions || [];
+  const dimensions = normalizeScoreDimensions(submission);
   if (dimensions.length === 0) return null;
 
   return (
@@ -548,9 +549,14 @@ export default function TeacherDashboardPage() {
         title="教师工作台"
         subtitle="班级、学生、作业与评分"
         actions={
-          <Button variant="outline" size="sm" asChild>
+          <>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/lesson-flow">课堂流程页</Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
             <Link to="/teacher/studio">打开教师画布</Link>
-          </Button>
+            </Button>
+          </>
         }
       />
 
@@ -1078,7 +1084,11 @@ export default function TeacherDashboardPage() {
                       {!loadingSubmissions
                         ? submissions.map((submission) => {
                             const draft = getScoreDraft(submission, scoreDrafts);
-                            const studentName = submission.display_name || submission.username || `学生 #${submission.student_id}`;
+                            const studentName =
+                              submission.submitted_student_name ||
+                              submission.display_name ||
+                              submission.username ||
+                              `学生 #${submission.student_id}`;
                             return (
                               <TableRow key={submission.id}>
                                 <TableCell className="align-top">

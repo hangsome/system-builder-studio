@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>课堂活动提交后台</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --line: #d7e0eb;
+      --ink: #172033;
+      --muted: #5b697b;
+      --soft: #edf5f8;
+      --accent: #246b86;
+      --accent-2: #1f7a55;
+      --warn: #a45f1a;
+      --bad: #a13d3d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Microsoft YaHei", system-ui, sans-serif;
+    }
+    main {
+      width: min(1360px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 56px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 18px;
+    }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 0; font-size: 18px; }
+    h3 { margin: 0; font-size: 15px; }
+    p { color: var(--muted); line-height: 1.65; margin: 6px 0 0; }
+    button, input {
+      font: inherit;
+    }
+    button {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: white;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .search {
+      min-width: 260px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px 12px;
+      background: white;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .metric, .student-card, .recent-panel {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      box-shadow: 0 12px 30px rgba(23, 32, 51, .05);
+    }
+    .metric { padding: 16px; }
+    .metric span { display: block; color: var(--muted); font-size: 13px; }
+    .metric strong { display: block; margin-top: 6px; font-size: 28px; color: var(--accent); }
+    .student-list { display: grid; gap: 14px; }
+    .student-card { padding: 16px; }
+    .student-head {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) minmax(220px, 320px);
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .student-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #f8fbfd;
+      color: var(--muted);
+      padding: 5px 9px;
+      font-size: 12px;
+      line-height: 1;
+    }
+    .pill.good { border-color: #b9dfcf; background: #eefaf5; color: var(--accent-2); }
+    .pill.warn { border-color: #ead1a8; background: #fff8ed; color: var(--warn); }
+    .pill.bad { border-color: #edc4c4; background: #fff1f1; color: var(--bad); }
+    .progress-box { display: grid; gap: 8px; }
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .bar {
+      height: 10px;
+      border-radius: 999px;
+      background: #e4ebf3;
+      overflow: hidden;
+    }
+    .bar > span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    }
+    .section-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .section {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: #fbfdff;
+      min-height: 124px;
+    }
+    .section.missing {
+      background: #f7f9fc;
+      color: #8a96a7;
+    }
+    .section-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .score {
+      font-weight: 700;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    details {
+      margin-top: 10px;
+      border-top: 1px dashed var(--line);
+      padding-top: 8px;
+    }
+    summary {
+      color: var(--accent);
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .checks {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 12px;
+      background: white;
+    }
+    .checks th, .checks td {
+      border: 1px solid var(--line);
+      padding: 7px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .checks th { background: var(--soft); color: var(--ink); }
+    code {
+      display: block;
+      margin-top: 10px;
+      max-height: 260px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #f8fafc;
+      padding: 10px;
+      font-family: Consolas, "Microsoft YaHei", monospace;
+      font-size: 12px;
+    }
+    .recent-panel {
+      margin-top: 18px;
+      padding: 16px;
+    }
+    .recent-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .recent-item {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fbfdff;
+      padding: 10px;
+    }
+    .empty {
+      border: 1px dashed var(--line);
+      border-radius: 16px;
+      background: white;
+      padding: 24px;
+      color: var(--muted);
+    }
+    @media (max-width: 980px) {
+      header, .student-head { display: block; }
+      .summary, .section-grid { grid-template-columns: 1fr; }
+      .toolbar { margin-top: 12px; }
+      .search { width: 100%; min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>课堂活动提交后台</h1>
+      <p>先看学生进度和系统参考评分；需要核对具体作答时，再展开对应环节详情。</p>
+    </div>
+    <div class="toolbar">
+      <input id="studentSearch" class="search" type="search" placeholder="按班级或姓名筛选">
+      <form method="post" action="{{ classroom_url('teacher_logout') }}">
+        <button type="submit">退出登录</button>
+      </form>
+    </div>
+  </header>
+
+  <div class="summary">
+    <div class="metric"><span>提交总数</span><strong>{{ summary.total_submissions }}</strong></div>
+    <div class="metric"><span>学生数</span><strong>{{ summary.total_students }}</strong></div>
+    <div class="metric"><span>全部完成</span><strong>{{ summary.completed_students }}</strong></div>
+    <div class="metric"><span>平均得分率</span><strong>{{ summary.average_score }}%</strong></div>
+  </div>
+
+  {% if students %}
+    <div class="student-list" id="studentList">
+      {% for student in students %}
+        <section class="student-card" data-student="{{ student.class_name }} {{ student.student_name }}">
+          <div class="student-head">
+            <div>
+              <h2>{{ student.class_name }}　{{ student.student_name }}</h2>
+              <div class="student-meta">
+                <span class="pill {% if student.submitted_count == section_labels|length %}good{% else %}warn{% endif %}">
+                  已提交 {{ student.submitted_count }} / {{ section_labels|length }}
+                </span>
+                <span class="pill good">参考得分 {{ student.total_score }} / {{ student.max_total_score }}</span>
+                {% if student.updated_at %}<span class="pill">最近更新 {{ student.updated_at }}</span>{% endif %}
+              </div>
+            </div>
+            <div class="progress-box">
+              <div class="progress-label"><span>作答进度</span><strong>{{ student.completion_percent }}%</strong></div>
+              <div class="bar"><span style="width: {{ student.completion_percent }}%"></span></div>
+              <div class="progress-label"><span>得分率</span><strong>{{ student.score_percent }}%</strong></div>
+              <div class="bar"><span style="width: {{ student.score_percent }}%"></span></div>
+            </div>
+          </div>
+
+          <div class="section-grid">
+            {% for section in section_order %}
+              {% set entry = student.sections.get(section) %}
+              {% if entry %}
+                <div class="section">
+                  <div class="section-top">
+                    <h3>{{ section_labels[section] }}</h3>
+                    <span class="score">{{ entry.score.score }} / {{ entry.score.max_score }}</span>
+                  </div>
+                  <span class="pill good">已提交</span>
+                  <p>{{ entry.submitted_at }}</p>
+                  <details>
+                    <summary>查看详情</summary>
+                    <table class="checks">
+                      <thead>
+                        <tr><th>评分点</th><th>状态</th><th>得分</th></tr>
+                      </thead>
+                      <tbody>
+                        {% for check in entry.score.checks %}
+                          <tr>
+                            <td>{{ check.label }}</td>
+                            <td>{{ check.status }}</td>
+                            <td>{{ check.earned }} / {{ check.points }}</td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                    <code>{{ entry.answers_pretty }}</code>
+                  </details>
+                </div>
+              {% else %}
+                <div class="section missing">
+                  <div class="section-top">
+                    <h3>{{ section_labels[section] }}</h3>
+                  </div>
+                  <span class="pill bad">未提交</span>
+                  <p>等待学生提交该环节。</p>
+                </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </section>
+      {% endfor %}
+    </div>
+  {% else %}
+    <section class="empty">暂无学生提交。请确认学生已填写班级和姓名，并点击对应环节的提交按钮。</section>
+  {% endif %}
+
+  <section class="recent-panel">
+    <h2>最近提交记录</h2>
+    <p>这里只展示提交概览，完整答案仍需点开详情查看。</p>
+    <details>
+      <summary>展开最近 30 条提交概览</summary>
+      <div class="recent-grid">
+        {% for row in recent_submissions %}
+          <div class="recent-item">
+            <strong>{{ row.class_name }}　{{ row.student_name }}</strong>
+            <p>{{ row.section_label }}：{{ row.score.score }} / {{ row.score.max_score }}</p>
+            <p>{{ row.submitted_at }}</p>
+          </div>
+        {% else %}
+          <p>暂无提交记录。</p>
+        {% endfor %}
+      </div>
+    </details>
+  </section>
+</main>
+
+<script>
+  const input = document.getElementById('studentSearch');
+  const cards = Array.from(document.querySelectorAll('[data-student]'));
+  input?.addEventListener('input', () => {
+    const keyword = input.value.trim().toLowerCase();
+    cards.forEach((card) => {
+      card.style.display = card.dataset.student.toLowerCase().includes(keyword) ? '' : 'none';
+    });
+  });
+</script>
+</body>
+</html>

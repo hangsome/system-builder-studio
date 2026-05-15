@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>存储间温度查询</title>
+  <style>
+    body { margin: 0; font-family: "Microsoft YaHei", system-ui, sans-serif; background: #f6f8fb; color: #182333; }
+    main { max-width: 880px; margin: 0 auto; padding: 36px 20px; }
+    h1 { margin: 0 0 10px; }
+    .card { background: white; border: 1px solid #d7e0ea; border-radius: 16px; padding: 20px; box-shadow: 0 12px 30px rgba(15,23,42,.06); }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { border-bottom: 1px solid #e2e8f0; padding: 10px; text-align: left; }
+    th { color: #475569; }
+    .alarm { color: #9a392f; font-weight: 700; }
+    .ok { color: #2f6b4f; font-weight: 700; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>存储间温度监测</h1>
+  <p>本页由 Flask 首页 <code>/</code> 通过 <code>render_template</code> 渲染，用于浏览器或手机查询最近数据。</p>
+  <section class="card">
+    <strong>报警阈值：{{ threshold }}℃</strong>
+    <table>
+      <thead><tr><th>ID</th><th>传感器</th><th>温度</th><th>报警</th><th>时间</th></tr></thead>
+      <tbody>
+      {% for row in records %}
+        <tr>
+          <td>{{ row.id }}</td>
+          <td>{{ row.sensor_id }}</td>
+          <td>{{ row.value }}℃</td>
+          <td class="{{ 'alarm' if row.alarm else 'ok' }}">{{ '是' if row.alarm else '否' }}</td>
+          <td>{{ row.timestamp }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5">暂无数据。请先让 micro:bit 向 GET /upload?id=1&val=温度 上传温度。</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>

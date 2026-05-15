@@ -1,6 +1,7 @@
 import { httpJson } from '@/api/http';
 import {
   AssignmentInfo,
+  AuthUser,
   ClassInfo,
   ScenarioInfo,
   StudentInfo,
@@ -8,6 +9,12 @@ import {
   SubmissionInfo,
   TeacherInfo,
 } from '@/types/edu';
+
+export function enterOpenClassApi() {
+  return httpJson<{ token: string; user: AuthUser; assignment: AssignmentInfo }>('/edu/open-class', {
+    method: 'GET',
+  });
+}
 
 export function getScenariosApi(token: string) {
   return httpJson<{ scenarios: ScenarioInfo[] }>('/edu/scenarios', {

@@ -3,11 +3,15 @@ import { useSimulatorStore } from '@/store/simulatorStore';
 import { componentDefinitions } from '@/data/componentDefinitions';
 import { ComponentDefinition, PlacedComponent, Pin } from '@/types/simulator';
 import { cn, createId } from '@/lib/utils';
-import { ChevronDown, ChevronRight, Zap, CheckCircle2, XCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight, Zap, CheckCircle2, XCircle, Eye, EyeOff, LayoutGrid } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { isInitiallyPowered } from '@/lib/connectionValidator';
 
 const GRID_SIZE = 20;
+
+const isPowerPin = (pin: Pin) => pin.type === 'power' || pin.type === 'ground';
+const isPowerConnection = (connection: { type: string }) =>
+  connection.type === 'power' || connection.type === 'ground';
 
 // 连接成功音效
 const playConnectionSound = (success: boolean) => {
@@ -50,6 +54,7 @@ export function SimulatorCanvas() {
   const [draggedComponent, setDraggedComponent] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [showConnectionFeedback, setShowConnectionFeedback] = useState(false);
+  const [showPowerPins, setShowPowerPins] = useState(false);
   
   // 画布拖拽平移状态
   const [isPanning, setIsPanning] = useState(false);
@@ -75,6 +80,7 @@ export function SimulatorCanvas() {
     completeConnection,
     cancelConnection,
     clearConnectionResult,
+    optimizeLayout,
     setZoom,
     setPan,
   } = useSimulatorStore(
@@ -97,6 +103,7 @@ export function SimulatorCanvas() {
       completeConnection: state.completeConnection,
       cancelConnection: state.cancelConnection,
       clearConnectionResult: state.clearConnectionResult,
+      optimizeLayout: state.optimizeLayout,
       setZoom: state.setZoom,
       setPan: state.setPan,
     }))
@@ -116,6 +123,10 @@ export function SimulatorCanvas() {
   const placedById = useMemo(
     () => new Map(placedComponents.map((component) => [component.instanceId, component])),
     [placedComponents]
+  );
+  const visibleConnections = useMemo(
+    () => (showPowerPins ? connections : connections.filter((connection) => !isPowerConnection(connection))),
+    [connections, showPowerPins]
   );
   
   // 监听连接结果并显示反馈
@@ -375,6 +386,27 @@ export function SimulatorCanvas() {
         />
       )}
 
+      <div className="absolute right-4 top-4 z-40 flex flex-wrap justify-end gap-2">
+        <button
+          type="button"
+          onClick={optimizeLayout}
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-xs font-medium text-foreground shadow-sm transition hover:bg-muted"
+          title="按数据流顺序重新排布画布组件"
+        >
+          <LayoutGrid className="h-4 w-4" />
+          一键优化布局
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowPowerPins((current) => !current)}
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-xs font-medium text-foreground shadow-sm transition hover:bg-muted"
+          title={showPowerPins ? '隐藏 VCC/GND 引脚和电源线' : '显示 VCC/GND 引脚和电源线'}
+        >
+          {showPowerPins ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          {showPowerPins ? '隐藏电源引脚' : '显示电源引脚'}
+        </button>
+      </div>
+
       {/* SVG 连线层 - z-20 确保在组件之上，使用 viewBox 支持负坐标 */}
       <svg
         className="absolute pointer-events-none z-20"
@@ -399,7 +431,7 @@ export function SimulatorCanvas() {
           </filter>
         </defs>
         {/* 已完成的连线 - 超增强可视化 */}
-        {connections.map((connection) => {
+        {visibleConnections.map((connection) => {
           const points = getConnectionPoints(connection);
           if (!points) {
             console.warn('无法获取连线端点:', connection.id, connection.fromComponent, connection.fromPin, '->', connection.toComponent, connection.toPin);
@@ -562,6 +594,7 @@ export function SimulatorCanvas() {
             onMouseDown={(e) => handleComponentMouseDown(e, component.instanceId, component)}
             onPinClick={handlePinClick}
             isDrawingConnection={isDrawingConnection}
+            showPowerPins={showPowerPins}
             zoom={zoom}
             pan={pan}
           />
@@ -641,6 +674,7 @@ interface CanvasComponentProps {
   onMouseDown: (e: React.MouseEvent) => void;
   onPinClick: (e: React.MouseEvent, componentId: string, pinId: string) => void;
   isDrawingConnection: boolean;
+  showPowerPins: boolean;
   zoom: number;
   pan: { x: number; y: number };
 }
@@ -652,10 +686,12 @@ function CanvasComponent({
   onMouseDown,
   onPinClick,
   isDrawingConnection,
+  showPowerPins,
   zoom,
   pan,
 }: CanvasComponentProps) {
   const isFaulty = component.state?.fault === true;
+  const visiblePins = showPowerPins ? definition.pins : definition.pins.filter((pin) => !isPowerPin(pin));
 
   // 计算基础 z-index：
   // - 扩展板（较大底板）放在最底层，避免遮挡插入其上的 micro:bit / 传感器等
@@ -702,8 +738,7 @@ function CanvasComponent({
         </div>
       )}
 
-      {/* 引脚 - 增强显示 */}
-      {definition.pins.map((pin) => (
+      {visiblePins.map((pin) => (
         <div
           key={pin.id}
           className="absolute z-20"
@@ -898,13 +933,24 @@ function ComponentVisual({ type, label, state }: { type: string; label: string; 
         </div>
       );
     
-    case 'buzzer':
+    case 'buzzer': {
+      const alarming = Boolean(state?.active);
       return (
-        <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 bg-gray-200 rounded px-1">
-          <ComponentName label={label} />
-          <span className="text-[10px] font-bold text-gray-700">BEEP</span>
+        <div
+          className={cn(
+            "w-full h-full flex flex-col items-center justify-center gap-0.5 rounded px-1 transition-colors duration-200",
+            alarming
+              ? "bg-red-500 text-white shadow-inner"
+              : "bg-gray-200 text-gray-800"
+          )}
+        >
+          <ComponentName label={label} tone={alarming ? "light" : "slate"} />
+          <span className={cn("text-[10px] font-bold", alarming ? "text-white" : "text-gray-700")}>
+            {alarming ? "报警中" : "静默"}
+          </span>
         </div>
       );
+    }
     
     case 'iot-module':
     case 'obloq':
@@ -1012,11 +1058,11 @@ function PowerGuidePanel() {
             </li>
             <li className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5 flex-shrink-0"></span>
-              <span><b className="text-foreground">IOT模块</b>: 连接 <span className="text-red-500 font-medium">VCC</span>/<span className="text-gray-500 font-medium">GND</span> 并将 <span className="text-green-500 font-medium">TX→P15(RX)</span>，<span className="text-green-400 font-medium">RX→P16(TX)</span> 交叉连接</span>
+              <span><b className="text-foreground">IOT模块</b>: 连接 <span className="text-red-500 font-medium">VCC</span>/<span className="text-gray-500 font-medium">GND</span>，并保持与扩展板的通信引脚连接</span>
             </li>
           </ul>
           <div className="mt-3 p-2 bg-muted/50 rounded text-xs text-muted-foreground">
-            💡 <b>串口交叉</b>: IOT模块的TX连扩展板P15(RX)，IOT模块的RX连扩展板P16(TX)
+            <b>提示</b>：课堂排查重点是传感器 DATA、蜂鸣器 IO、网络、服务器与数据库链路。
           </div>
         </div>
       )}

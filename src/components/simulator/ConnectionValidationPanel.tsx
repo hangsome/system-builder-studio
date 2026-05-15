@@ -81,12 +81,12 @@ export function ConnectionValidationPanel() {
                 {isPowered ? (
                   <span className="flex items-center gap-1 text-green-600">
                     <Zap className="h-3 w-3" />
-                    已供电
+                    正常
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 text-muted-foreground">
                     <ZapOff className="h-3 w-3" />
-                    未供电
+                    需检查
                   </span>
                 )}
               </div>
@@ -176,11 +176,11 @@ export function ConnectionValidationPanel() {
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-green-500" />
-            <span>串口 TX</span>
+            <span>IoT 通信 A</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-green-400" />
-            <span>串口 RX</span>
+            <span>IoT 通信 B</span>
           </div>
         </div>
       </div>

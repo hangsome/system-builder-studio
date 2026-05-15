@@ -1,0 +1,972 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>存储间温度监测与预警系统：信息系统复习课</title>
+  <style>
+    :root {
+      --bg: #f3f6fa;
+      --paper: #ffffff;
+      --ink: #172033;
+      --muted: #5d6b7d;
+      --line: #d7e0eb;
+      --accent: #246b86;
+      --accent-dark: #184f64;
+      --accent-weak: #e6f2f6;
+      --warn: #8a5a12;
+      --warn-weak: #fff6e8;
+      --ok: #23684b;
+      --ok-weak: #eef8f2;
+      --danger: #9a392f;
+      --danger-weak: #fff0ee;
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(36, 107, 134, 0.12), transparent 28rem),
+        radial-gradient(circle at 92% 12%, rgba(35, 104, 75, 0.08), transparent 26rem),
+        linear-gradient(180deg, #f9fbfd 0%, var(--bg) 100%);
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+      line-height: 1.7;
+    }
+
+    a, button, input, textarea, select { font: inherit; }
+
+    .page {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 24px 0 56px;
+    }
+
+    header {
+      display: grid;
+      gap: 16px;
+      margin-bottom: 16px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .title-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: end;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 4.2vw, 50px);
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+    }
+
+    .subtitle {
+      margin: 10px 0 0;
+      max-width: 80ch;
+      color: var(--muted);
+      font-size: 17px;
+    }
+
+    .student-link, .submit-btn, .tab-btn {
+      border: 0;
+      cursor: pointer;
+      transition: transform .18s ease, background .18s ease, border-color .18s ease;
+    }
+
+    .student-link:active, .submit-btn:active, .tab-btn:active {
+      transform: translateY(1px);
+    }
+
+    .student-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 10px 16px;
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      color: #fff;
+      background: var(--accent);
+      text-decoration: none;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .student-link:hover { background: var(--accent-dark); }
+
+    .identity {
+      display: grid;
+      grid-template-columns: minmax(150px, 220px) minmax(180px, 260px);
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: #26374a;
+      font-weight: 700;
+    }
+
+    label small {
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    input[type="text"], textarea, select {
+      width: 100%;
+      min-height: 40px;
+      border: 1px solid #b8c6d5;
+      border-radius: 10px;
+      padding: 8px 10px;
+      color: var(--ink);
+      background: #fff;
+    }
+
+    textarea {
+      min-height: 82px;
+      resize: vertical;
+    }
+
+    input:focus, textarea:focus, select:focus, button:focus-visible, a:focus-visible {
+      outline: 3px solid rgba(36, 107, 134, 0.18);
+      outline-offset: 2px;
+      border-color: var(--accent);
+    }
+
+    .notice {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.86);
+      padding: 11px 13px;
+    }
+
+    .notice strong { color: var(--accent-dark); }
+    .notice p { margin: 2px 0 0; color: var(--muted); }
+
+    .tabs {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin: 12px 0 18px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 28px rgba(23, 32, 51, 0.06);
+    }
+
+    .tab-btn {
+      min-height: 42px;
+      border-radius: 999px;
+      color: #435164;
+      background: transparent;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .tab-btn.active {
+      color: #fff;
+      background: var(--accent);
+      box-shadow: 0 8px 18px rgba(36, 107, 134, 0.22);
+    }
+
+    main { display: grid; }
+
+    .tab-panel {
+      display: none;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 14px 34px rgba(23, 32, 51, 0.06);
+      overflow: hidden;
+    }
+
+    .tab-panel.active {
+      display: block;
+      animation: panelIn .22s ease both;
+    }
+
+    @keyframes panelIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .section-body { padding: 24px; }
+
+    h2, h3 {
+      margin: 0 0 10px;
+      line-height: 1.25;
+    }
+
+    h2 { font-size: clamp(24px, 3vw, 34px); }
+    h3 { font-size: 18px; }
+    p, li { color: var(--muted); }
+
+    .lead {
+      max-width: 88ch;
+      font-size: 18px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .task-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      background: #fff;
+    }
+
+    .scenario-card {
+      border-color: #c7d9e1;
+      background: linear-gradient(135deg, #ffffff 0%, var(--accent-weak) 100%);
+    }
+
+    .choice-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .choice {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 36px;
+      padding: 7px 10px;
+      border: 1px solid #c8d4e0;
+      border-radius: 999px;
+      background: #fff;
+      color: #344458;
+      font-weight: 600;
+    }
+
+    pre {
+      overflow: auto;
+      margin: 0;
+      padding: 14px;
+      border-radius: 12px;
+      color: #102032;
+      background: #f5f8fb;
+      border: 1px solid #dce5ef;
+      font-family: Consolas, "JetBrains Mono", "Courier New", monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th { background: #edf4f8; color: #253a4d; }
+    code { font-family: Consolas, "Courier New", monospace; }
+
+    .method-demo {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .method-box {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .method-box strong {
+      display: block;
+      color: var(--accent-dark);
+    }
+
+    .module-match {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .module-match label {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: #f9fbfd;
+    }
+
+    .code-study {
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(280px, .92fr);
+      gap: 14px;
+      align-items: start;
+      margin-top: 14px;
+    }
+
+    .question-stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .question-stack label {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    .section-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .submit-btn {
+      min-height: 42px;
+      padding: 9px 16px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 800;
+    }
+
+    .submit-btn:hover { background: var(--accent-dark); }
+    .submit-btn:disabled { cursor: not-allowed; opacity: .65; }
+
+    .status {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--danger); }
+
+
+
+    .single-select {
+      margin-top: 8px;
+    }
+
+    .score-grid {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .rating-item {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .rating-title {
+      display: block;
+      margin-bottom: 10px;
+      color: #26374a;
+      font-weight: 800;
+    }
+
+    .rating-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .self-check {
+      display: grid;
+      gap: 10px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .self-check label {
+      display: block;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: #fff;
+      font-weight: 500;
+      color: #344458;
+    }
+
+    @media (max-width: 860px) {
+      .title-row, .identity, .grid.two, .method-demo, .module-match, .code-study { grid-template-columns: 1fr; }
+      .tabs {
+        position: static;
+        grid-template-columns: 1fr;
+        border-radius: 18px;
+      }
+      .student-link { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="title-row">
+        <div>
+          <h1>存储间温度监测与预警系统复习活动</h1>
+          <p class="subtitle">某中学食堂希望夜间无人值守时也能掌握配餐间食材存储温度，并在温度异常时及时提醒值班人员。我们会把这个需求拆成硬件、软件、网络、数据和用户活动，边搭建边复习。</p>
+        </div>
+        <a class="student-link" id="studentCanvasLink" target="_blank" rel="noreferrer">打开学生半成品画布</a>
+      </div>
+
+      <div class="identity">
+        <label>
+          班级
+          <input id="className" type="text" placeholder="例如：高一（2）班">
+        </label>
+        <label>
+          姓名
+          <input id="studentName" type="text" placeholder="请填写真实姓名">
+        </label>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="课堂活动导航">
+      <button class="tab-btn active" data-tab="intro" type="button">情境导入</button>
+      <button class="tab-btn" data-tab="hardware" type="button">硬件搭建</button>
+      <button class="tab-btn" data-tab="software" type="button">软件分析</button>
+      <button class="tab-btn" data-tab="debug" type="button">运行排错</button>
+      <button class="tab-btn" data-tab="summary" type="button">知识总结</button>
+    </nav>
+
+    <main>
+      <section class="tab-panel active" data-section="intro">
+        <div class="section-body">
+          <h2>情境导入</h2>
+          <div class="task-card scenario-card">
+            <p class="lead">去年秋季，某中学食堂遇到过一次险情：早餐食材晚上存放在配餐间，工作人员下班后无人值守。一天半夜，制冷设备发生故障，第二天早上食材温度异常升高，存在变质风险，差点影响全校早餐供应。</p>
+            <p>现在你们要像学校信息技术小组成员一样，设计并模拟搭建一套“存储间温度监测与预警系统”：系统要能自动感知存储间温度变化；当温度超过安全阈值时，要能在现场发出声音提醒，并通过物联网模块把异常信息发送给值班人员；值班人员用手机访问服务器页面查看实时温度和历史记录。</p>
+            <p>请根据情境一步步判断：要感知“温度变化”，应选择哪类传感器？要发出“声音提醒”，应选择哪类执行器？程序要写在哪里，浏览器应该访问哪个地址，数据最后保存到哪里；如果运行时没有数据或蜂鸣器不响，又应该从哪一环开始排查。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-section="hardware">
+        <div class="section-body">
+          <h2>硬件搭建与连接观察</h2>
+          <p>半成品画布已经给出智能终端（micro:bit + 扩展板）、网络、服务器、数据库和用户访问端。本环节请先从食材存储情境判断：要感知温度变化应选择哪种传感器；要发出声音提醒应选择哪种执行器。再观察它们自动连到了智能终端的哪个引脚。</p>
+
+          <div class="grid two">
+            <div class="task-card">
+              <h3>课堂任务</h3>
+              <ol>
+                <li>打开学生半成品画布。</li>
+                <li>从传感器组件中选择适合“存储间温度监测”的传感器并放到画布。</li>
+                <li>从执行器组件中选择适合“现场声音提醒”的执行器并放到画布。</li>
+                <li>沿着连线观察传感器 DATA、执行器 IO 分别接到智能终端哪个引脚。</li>
+                <li>判断用户通过浏览器或手机查看数据时，这个系统更接近哪种架构。</li>
+              </ol>
+            </div>
+
+            <div class="task-card">
+              <h3>课堂记录</h3>
+              <label>你选择的传感器是：
+                <span class="choice-row" data-name="sensorChoice" data-options="温湿度传感器,光线传感器,声音传感器,红外传感器"></span>
+              </label>
+              <label>你选择的执行器是：
+                <span class="choice-row" data-name="actuatorChoice" data-options="蜂鸣器,LED灯带,舵机,继电器"></span>
+              </label>
+              <label>传感器 DATA 接到哪个引脚？
+                <span class="choice-row" data-name="sensorDataPin"></span>
+              </label>
+              <label>蜂鸣器 IO 接到哪个引脚？
+                <span class="choice-row" data-name="buzzerIoPin"></span>
+              </label>
+              <label>这个存储间监测系统是哪种架构？
+                <span class="choice-row" data-name="systemArchitecture" data-options="C/S,B/S"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="task-card" style="margin-top:14px">
+            <h3>模块功能匹配</h3>
+            <p>硬件搭建完成后，把每项功能与主要负责的模块对应起来，为下一步阅读代码做准备。</p>
+            <div class="module-match">
+              <label>读取温度数据
+                <span class="choice-row" data-name="moduleReadTemp" data-options="智能终端,IoT模块,Flask服务器,浏览器 / 手机"></span>
+              </label>
+              <label>判断是否超过阈值
+                <span class="choice-row" data-name="moduleThreshold" data-options="智能终端,IoT模块,Flask服务器,浏览器 / 手机"></span>
+              </label>
+              <label>控制蜂鸣器报警
+                <span class="choice-row" data-name="moduleBuzzer" data-options="智能终端,IoT模块,Flask服务器,浏览器 / 手机"></span>
+              </label>
+              <label>通过 WiFi 发送 HTTP 请求
+                <span class="choice-row" data-name="moduleWifiHttp" data-options="智能终端,IoT模块,Flask服务器,浏览器 / 手机"></span>
+              </label>
+              <label>接收 <code>/upload?id=...&amp;val=...</code> 请求
+                <span class="choice-row" data-name="moduleReceiveUpload" data-options="智能终端,IoT模块,Flask服务器,浏览器 / 手机"></span>
+              </label>
+              <label>查询并渲染网页
+                <span class="choice-row" data-name="moduleRenderPage" data-options="智能终端,IoT模块,Flask服务器,浏览器 / 手机"></span>
+              </label>
+              <label>查看实时温度和历史记录
+                <span class="choice-row" data-name="moduleViewRealtime" data-options="智能终端,IoT模块,Flask服务器,浏览器 / 手机"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="section-actions">
+            <span class="status" data-status="hardware">未提交</span>
+            <button class="submit-btn" data-submit="hardware" type="button">提交硬件观察</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-section="software">
+        <div class="section-body">
+          <h2>软件分析：智能终端代码与服务器端代码</h2>
+          <p>本环节重点通过左侧完整代码寻找证据，再完成右侧问题。智能终端负责采集、判断、控制和上传；Flask 服务端负责接收请求、保存数据并提供页面。</p>
+
+          <div class="code-study">
+            <div class="task-card">
+              <h3>智能终端：micro:bit 端完整代码</h3>
+              <pre>from microbit import *
+import obloq
+
+WIFI_SSID = "School_WiFi"
+WIFI_PASSWORD = "12345678"
+SERVER_IP = "192.168.1.100"
+SERVER_PORT = 5000
+UPLOAD_ROUTE = "/upload"
+TEMP_THRESHOLD = 30
+
+obloq.setup(WIFI_SSID, WIFI_PASSWORD)
+
+while True:
+    raw = pin1.read_analog()
+    temp = round(raw / 10, 1)
+    display.scroll(str(temp))
+
+    if temp &gt; TEMP_THRESHOLD:
+        pin2.write_digital(1)
+    else:
+        pin2.write_digital(0)
+
+    url = "http://" + SERVER_IP + ":" + str(SERVER_PORT) + UPLOAD_ROUTE
+    url = url + "?id=1&amp;val=" + str(temp)
+    obloq.http_get(url)
+
+    sleep(5000)</pre>
+            </div>
+
+            <div class="task-card question-stack">
+              <h3>阅读代码后填写</h3>
+              <label>WiFi 名称是：
+                <input data-field="microbitWifiSsid" type="text" placeholder="">
+              </label>
+              <label>路由器密码是：
+                <input data-field="microbitWifiPassword" type="text" placeholder="">
+              </label>
+              <label>服务器 IP 是：
+                <input data-field="microbitServerIp" type="text" placeholder="">
+              </label>
+              <label>服务器端口是：
+                <input data-field="microbitServerPort" type="text" placeholder="">
+              </label>
+              <label>上传路由是：
+                <input data-field="uploadRoute" type="text" placeholder="">
+              </label>
+              <label>GET 上传时必须带哪两个参数？（可多选）
+                <span class="choice-row" data-name="microbitGetParams" data-type="checkbox" data-options="id,val,ssid,password,pin"></span>
+              </label>
+              <label>温度阈值变量是：
+                <input data-field="microbitThreshold" type="text" placeholder="">
+              </label>
+              <label>读取温度使用的引脚是：
+                <span class="choice-row" data-name="microbitReadPin" data-options="P0,P1,P2,P3"></span>
+              </label>
+              <label>控制蜂鸣器使用的引脚是：
+                <span class="choice-row" data-name="microbitBuzzerPin" data-options="P0,P1,P2,P3"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="code-study">
+            <div class="task-card">
+              <h3>Flask 服务端完整代码</h3>
+              <pre>from flask import Flask, request, render_template
+import sqlite3
+from datetime import datetime
+
+app = Flask(__name__)
+TEMP_THRESHOLD = 30
+
+@app.route('/upload', methods=['GET'])
+def upload_data():
+    temperature = request.args.get('val')
+    sensor_id = request.args.get('id', 1)
+    if temperature is None:
+        return "缺少 val", 400
+
+    temperature = float(temperature)
+    alarm = 1 if temperature &gt; TEMP_THRESHOLD else 0
+
+    conn = sqlite3.connect('sensor.db')
+    cursor = conn.cursor()
+    cursor.execute(
+        'INSERT INTO sensorlog (sensor_id, value, alarm, timestamp) VALUES (?, ?, ?, ?)',
+        (sensor_id, temperature, alarm, datetime.now())
+    )
+    conn.commit()
+    conn.close()
+
+    command = "BUZZER_ON" if alarm else "BUZZER_OFF"
+    return "success:" + command
+
+@app.route('/', methods=['GET'])
+def index():
+    conn = sqlite3.connect('sensor.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, sensor_id, value, alarm, timestamp FROM sensorlog ORDER BY id DESC LIMIT 10')
+    rows = cursor.fetchall()
+    conn.close()
+    return render_template('index.html', records=rows)
+
+if __name__ == '__main__':
+    app.run(host='192.168.1.100', port=5000)</pre>
+            </div>
+
+            <div class="task-card question-stack">
+              <h3>阅读代码后填写</h3>
+              <label>服务器端接收 micro:bit 上传数据的路由是：
+                <input data-field="flaskUploadRoute" type="text" placeholder="">
+              </label>
+              <label>这个上传接口使用的请求方法是：
+                <span class="choice-row" data-name="flaskUploadMethod" data-options="GET,POST,PUT,DELETE"></span>
+              </label>
+              <label><code>request.args.get('id')</code> 读取的是：
+                <input data-field="flaskIdParam" type="text" placeholder="">
+              </label>
+              <label><code>request.args.get('val')</code> 读取的是：
+                <input data-field="flaskValParam" type="text" placeholder="">
+              </label>
+              <label>浏览器访问首页的路由是：
+                <input data-field="viewRoute" type="text" placeholder="">
+              </label>
+              <label>模拟浏览器地址栏应填写完整 URL：
+                <input data-field="softwareBrowserUrl" type="text" placeholder="">
+              </label>
+            </div>
+          </div>
+
+          <div class="task-card" style="margin-top:14px">
+            <h3>观察请求方向</h3>
+            <div class="method-demo">
+              <div class="method-box">
+                <strong>上传新数据</strong>
+                <p>观察通信日志：智能终端通过 GET 请求把 id 和 val 参数发给 Flask，服务器处理后保存为温度记录。</p>
+              </div>
+              <div class="method-box">
+                <strong>查看已有数据</strong>
+                <p>在模拟浏览器输入页面地址，服务器读取数据库已有记录并渲染页面给用户查看。</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-actions">
+            <span class="status" data-status="software">未提交</span>
+            <button class="submit-btn" data-submit="software" type="button">提交软件分析</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-section="debug">
+        <div class="section-body">
+          <h2>运行排错：先看画布，再看代码</h2>
+          <p>运行后如果数据不通，先核对画布上的实际连接，再判断代码中的引脚是否对应。代码和连线可以任选一边修改，但最终必须对应；浏览器也要写完整地址才能访问页面。</p>
+
+          <div class="grid two">
+            <div class="task-card">
+              <h3>排错步骤</h3>
+              <ol>
+                <li>回到画布，确认传感器 DATA 和蜂鸣器 IO 的实际引脚。</li>
+                <li>检查 <code>read_analog()</code> 读取的是哪个引脚，<code>write_digital()</code> 控制的是哪个引脚。</li>
+                <li>只改一个变量：要么改代码引脚，要么改画布连线，改完重新运行验证。</li>
+                <li>在模拟浏览器地址栏写完整 URL，再观察页面和数据库记录。</li>
+              </ol>
+            </div>
+
+            <div class="task-card">
+              <h3>排错记录</h3>
+              <label>运行排错时，传感器 DATA 实际接到：
+                <span class="choice-row" data-name="debugSensorPin"></span>
+              </label>
+              <label>运行排错时，蜂鸣器 IO 实际接到：
+                <span class="choice-row" data-name="debugBuzzerPin"></span>
+              </label>
+              <label>模拟浏览器地址栏应填写：
+                <input data-field="browserUrl" type="text" placeholder="">
+              </label>
+              <label>如果仍然不能访问，我会优先检查哪些原因？（可多选）
+                <span class="choice-row" data-name="debugCauses" data-type="checkbox" data-options="传感器或蜂鸣器未添加,代码引脚与画布不一致,Flask服务器未启动,浏览器URL写错,数据库故障,网络链路故障"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="task-card" style="margin-top:14px">
+            <h3>课后思考</h3>
+            <label>如果数据库已经有温度记录，但浏览器页面仍看不到数据，你会继续检查哪些环节？
+              <textarea data-field="afterClassQuestion" placeholder="课后再思考，不要求课堂马上完成"></textarea>
+            </label>
+          </div>
+
+          <div class="section-actions">
+            <span class="status" data-status="debug">未提交</span>
+            <button class="submit-btn" data-submit="debug" type="button">提交运行排错</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-section="summary">
+        <div class="section-body">
+          <h2>知识总结自评</h2>
+          <p>完成画布提交前，用 1 到 5 分给自己打分：1 分表示还需要老师带着做，5 分表示能独立说清楚并完成排查。</p>
+
+          <div class="score-grid">
+            <div class="rating-item">
+              <span class="rating-title">能识别传感器读取引脚和执行器控制引脚</span>
+              <span class="rating-row" data-name="scorePins" data-options="1,2,3,4,5"></span>
+            </div>
+            <div class="rating-item">
+              <span class="rating-title">能说出智能终端需要设置的关键参数</span>
+              <span class="rating-row" data-name="scoreMicrobitParams" data-options="1,2,3,4,5"></span>
+            </div>
+            <div class="rating-item">
+              <span class="rating-title">能根据 Flask 路由写出浏览器访问 URL</span>
+              <span class="rating-row" data-name="scoreUrl" data-options="1,2,3,4,5"></span>
+            </div>
+            <div class="rating-item">
+              <span class="rating-title">能根据现象排查可能的故障环节</span>
+              <span class="rating-row" data-name="scoreFault" data-options="1,2,3,4,5"></span>
+            </div>
+            <div class="rating-item">
+              <span class="rating-title">能说明数据从采集到存储、显示的流向</span>
+              <span class="rating-row" data-name="scoreDataFlow" data-options="1,2,3,4,5"></span>
+            </div>
+          </div>
+
+          <label>我还需要复习的问题：
+            <textarea data-field="needReview" placeholder="可以写：引脚、URL、数据库、故障排查等"></textarea>
+          </label>
+
+          <div class="section-actions">
+            <span class="status" data-status="summary">未提交</span>
+            <button class="submit-btn" data-submit="summary" type="button">提交知识总结</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    const SERVER_BASE = 'http://159.75.213.93/system-builder';
+    const DEFAULT_ACTIVITY_API_BASE = 'http://159.75.213.93/activity-submit';
+    const API_BASE =
+      new URLSearchParams(location.search).get('api') ||
+      localStorage.getItem('classroom-activity-api-base') ||
+      (location.protocol.startsWith('http') && !['localhost', '127.0.0.1'].includes(location.hostname)
+        ? `${location.origin}/activity-submit`
+        : DEFAULT_ACTIVITY_API_BASE);
+    const STORAGE_KEY = 'classroom-activity-answers-v2';
+    const LEGACY_STORAGE_KEY = 'classroom-activity-answers-v1';
+    const PIN_OPTIONS = ['P0', 'P1', 'P2', 'P3'];
+
+    document.getElementById('studentCanvasLink').href = `${SERVER_BASE}/openclass`;
+
+    function createPinChoices() {
+      document.querySelectorAll('[data-name]').forEach((wrap) => {
+        const name = wrap.dataset.name;
+        const type = wrap.dataset.type === 'checkbox' ? 'checkbox' : 'radio';
+        const options = wrap.dataset.options
+          ? wrap.dataset.options.split(',').map((item) => item.trim()).filter(Boolean)
+          : PIN_OPTIONS;
+        if (type === 'checkbox' || wrap.classList.contains('rating-row')) {
+          wrap.innerHTML = options.map((option) => `
+            <label class="choice">
+              <input type="${type}" name="${type === 'radio' ? name : `${name}[]`}" value="${option}" data-field="${name}">
+              ${option}
+            </label>
+          `).join('');
+          return;
+        }
+        wrap.innerHTML = `
+          <select class="single-select" data-field="${name}">
+            <option value="">请选择</option>
+            ${options.map((option) => `<option value="${option}">${option}</option>`).join('')}
+          </select>
+        `;
+      });
+    }
+
+    function getSaved() {
+      const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY) || '{}';
+      try { return JSON.parse(raw); }
+      catch { return {}; }
+    }
+
+    function saveAll() {
+      const data = collectAll();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function collectFields(root) {
+      const answers = {};
+      root.querySelectorAll('[data-field]').forEach((el) => {
+        const key = el.dataset.field;
+        if (!key) return;
+        if (el.type === 'radio') {
+          if (el.checked) answers[key] = el.value;
+          else if (!(key in answers)) answers[key] = '';
+        } else if (el.type === 'checkbox') {
+          if (!Array.isArray(answers[key])) answers[key] = [];
+          if (el.checked) answers[key].push(el.value || true);
+        } else {
+          answers[key] = el.value;
+        }
+      });
+      return answers;
+    }
+
+    function collectAll() {
+      return {
+        className: document.getElementById('className').value.trim(),
+        studentName: document.getElementById('studentName').value.trim(),
+        answers: collectFields(document),
+      };
+    }
+
+    function restoreSaved() {
+      const saved = getSaved();
+      if (saved.className) document.getElementById('className').value = saved.className;
+      if (saved.studentName) document.getElementById('studentName').value = saved.studentName;
+      const answers = saved.answers || {};
+      document.querySelectorAll('[data-field]').forEach((el) => {
+        const key = el.dataset.field;
+        if (!(key in answers)) return;
+        if (el.type === 'radio') el.checked = el.value === answers[key];
+        else if (el.type === 'checkbox') {
+          el.checked = Array.isArray(answers[key])
+            ? answers[key].includes(el.value)
+            : Boolean(answers[key]);
+        } else el.value = answers[key];
+      });
+    }
+
+    function collectSection(section) {
+      const node = document.querySelector(`[data-section="${section}"]`);
+      const all = collectAll();
+      const answers = collectFields(node);
+      return { className: all.className, studentName: all.studentName, section, answers };
+    }
+
+    function getClientId() {
+      const key = 'classroom-activity-client-id';
+      let value = localStorage.getItem(key);
+      if (!value) {
+        value = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+        localStorage.setItem(key, value);
+      }
+      return value;
+    }
+
+    function activateTab(key) {
+      document.querySelectorAll('[data-tab]').forEach((button) => {
+        button.classList.toggle('active', button.dataset.tab === key);
+      });
+      document.querySelectorAll('.tab-panel').forEach((panel) => {
+        panel.classList.toggle('active', panel.dataset.section === key);
+      });
+      localStorage.setItem('classroom-activity-active-tab', key);
+    }
+
+    async function submitSection(section) {
+      const status = document.querySelector(`[data-status="${section}"]`);
+      const button = document.querySelector(`[data-submit="${section}"]`);
+      const payload = collectSection(section);
+      if (!payload.className || !payload.studentName) {
+        status.textContent = '请先填写班级和姓名';
+        status.className = 'status err';
+        return;
+      }
+
+      button.disabled = true;
+      status.textContent = '提交中...';
+      status.className = 'status';
+      try {
+        const response = await fetch(`${API_BASE.replace(/\/$/, '')}/api/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...payload,
+            clientId: getClientId(),
+            pageUrl: location.href,
+            submittedAt: new Date().toISOString(),
+          }),
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || `HTTP ${response.status}`);
+        }
+        status.textContent = '已提交，老师可查看';
+        status.className = 'status ok';
+      } catch (error) {
+        status.textContent = '提交失败：请确认课堂提交服务已启动';
+        status.className = 'status err';
+        console.error(error);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    createPinChoices();
+    restoreSaved();
+    activateTab(localStorage.getItem('classroom-activity-active-tab') || 'intro');
+
+    document.addEventListener('input', saveAll);
+    document.addEventListener('change', saveAll);
+    document.querySelectorAll('[data-submit]').forEach((button) => {
+      button.addEventListener('click', () => submitSection(button.dataset.submit));
+    });
+    document.querySelectorAll('[data-tab]').forEach((button) => {
+      button.addEventListener('click', () => activateTab(button.dataset.tab));
+    });
+  </script>
+</body>
+</html>

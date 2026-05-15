@@ -5,7 +5,11 @@ import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  const base = process.env.VITE_BASE_PATH || "/";
+
+  return {
+    base,
   server: {
     host: "::",
     port: 8080,
@@ -33,10 +37,11 @@ export default defineConfig(({ mode }) => ({
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'landscape',
-        start_url: '/',
+        start_url: base,
+        scope: base,
         icons: [
           {
-            src: '/favicon.ico',
+            src: `${base}favicon.ico`,
             sizes: '64x64',
             type: 'image/x-icon',
           },
@@ -82,4 +87,5 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-}));
+  };
+});

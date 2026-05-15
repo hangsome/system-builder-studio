@@ -13,6 +13,7 @@ export function AuthTopBar({ title, subtitle, actions }: AuthTopBarProps) {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const clearSession = useAuthStore((state) => state.clearSession);
+  const showLogout = user?.role !== 'student';
 
   return (
     <header className="border-b bg-card">
@@ -25,16 +26,18 @@ export function AuthTopBar({ title, subtitle, actions }: AuthTopBarProps) {
         </div>
         <div className="flex items-center gap-2">
           {actions}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              clearSession();
-              navigate('/login', { replace: true });
-            }}
-          >
-            退出登录
-          </Button>
+          {showLogout ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                clearSession();
+                navigate('/login', { replace: true });
+              }}
+            >
+              退出登录
+            </Button>
+          ) : null}
           <Button variant="ghost" size="sm" asChild>
             <Link to="/">首页</Link>
           </Button>

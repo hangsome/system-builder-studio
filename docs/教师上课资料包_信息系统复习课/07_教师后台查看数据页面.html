@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>教师后台查看数据说明页</title>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --paper: #ffffff;
+      --ink: #172033;
+      --muted: #5d6b7c;
+      --line: #d8e0ea;
+      --accent: #2f6f8f;
+      --accent-soft: #e7f1f6;
+      --warn: #8a5b18;
+      --warn-soft: #fff5e6;
+      --ok: #2f6b4f;
+      --bad: #9a392f;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+      line-height: 1.7;
+    }
+
+    main {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 42px 0 64px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr);
+      gap: 18px;
+      align-items: stretch;
+      margin-bottom: 18px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--paper);
+      padding: 22px;
+      box-shadow: 0 14px 36px rgba(15, 23, 42, 0.06);
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(30px, 4vw, 48px);
+      line-height: 1.12;
+    }
+
+    h2 { margin: 0 0 12px; font-size: 24px; }
+    h3 { margin: 0 0 8px; font-size: 18px; }
+    p { margin: 0 0 10px; color: var(--muted); }
+
+    .links {
+      display: grid;
+      gap: 10px;
+    }
+
+    a.button {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 48px;
+      padding: 10px 14px;
+      border: 1px solid var(--accent);
+      border-radius: 12px;
+      background: var(--accent);
+      color: white;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    a.button.secondary {
+      background: white;
+      color: #1f536b;
+      border-color: #b8ccd8;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 36px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      margin: 14px 0;
+    }
+
+    .num {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 800;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      overflow: hidden;
+      border-radius: 12px;
+    }
+
+    th, td {
+      padding: 11px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f8fafc;
+      color: #475569;
+    }
+
+    code {
+      padding: 2px 6px;
+      border-radius: 7px;
+      background: #eef2f7;
+      color: #23384a;
+      font-family: Consolas, "Cascadia Mono", monospace;
+    }
+
+    .notice {
+      margin-top: 16px;
+      padding: 16px;
+      border: 1px solid #d9c493;
+      border-radius: 14px;
+      background: var(--warn-soft);
+      color: #5f4a2c;
+    }
+
+    .mock {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      background: white;
+      margin-top: 12px;
+    }
+
+    .mock-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--line);
+      color: #475569;
+    }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      padding: 14px;
+    }
+
+    .metric {
+      padding: 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      background: #fbfdff;
+    }
+
+    .metric span { display: block; color: var(--muted); font-size: 13px; }
+    .metric strong { display: block; margin-top: 6px; font-size: 26px; }
+    .ok { color: var(--ok); font-weight: 700; }
+    .bad { color: var(--bad); font-weight: 700; }
+
+    @media (max-width: 860px) {
+      .hero, .grid, .metric-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div class="card">
+      <h1>教师后台查看数据页面</h1>
+      <p>本页说明教师课中如何查看两类数据：一类是服务器系统中的学生提交画布和自动评分；另一类是 Flask 后台服务中的温度数据库记录。</p>
+      <p>正式公开课建议主要使用服务器教师后台；本地 Flask 教师页用于备课演示或解释“后台如何从数据库读取数据”。</p>
+    </div>
+    <div class="card links">
+      <a class="button" href="http://159.75.213.93/system-builder/teacher" target="_blank" rel="noopener">
+        打开服务器教师后台
+        <span>学生提交与评分</span>
+      </a>
+      <a class="button secondary" href="http://127.0.0.1:5000/teacher" target="_blank" rel="noopener">
+        打开本地 Flask 教师页
+        <span>温度数据与报警统计</span>
+      </a>
+      <a class="button secondary" href="./06_Flask后台服务示例/README.md" target="_blank" rel="noopener">
+        查看 Flask 运行说明
+        <span>本地服务启动步骤</span>
+      </a>
+    </div>
+  </section>
+
+  <section class="grid">
+    <article class="card">
+      <h2>一、服务器教师后台看学生提交</h2>
+      <div class="step">
+        <div class="num">1</div>
+        <div>
+          <h3>登录教师后台</h3>
+          <p>打开 <code>http://159.75.213.93/system-builder/teacher</code>，使用教师账号进入。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <div>
+          <h3>查看提交列表</h3>
+          <p>学生从公开课入口提交后，后台会显示学生填写的姓名、提交时间、自动总分和分项得分。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <div>
+          <h3>打开提交画布</h3>
+          <p>点击“查看画布”，核实该学生的组件、连线、micro:bit 代码、Flask 代码、数据库记录和运行日志。</p>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>课堂证据</th><th>后台看什么</th></tr></thead>
+        <tbody>
+          <tr><td>硬件任务</td><td>PC、浏览器、手机是否补全，数据链路是否完整。</td></tr>
+          <tr><td>软件任务</td><td>GET /upload?id=...&val=...、GET /、URL、服务器 IP 和端口是否正确。</td></tr>
+          <tr><td>排错任务</td><td>代码引脚是否与画布 DATA / IO 实际连线对应。</td></tr>
+          <tr><td>数据任务</td><td>sensorlog 是否新增，超阈值是否触发蜂鸣器响应。</td></tr>
+        </tbody>
+      </table>
+    </article>
+
+    <article class="card">
+      <h2>二、Flask 教师页看温度数据库</h2>
+      <div class="step">
+        <div class="num">1</div>
+        <div>
+          <h3>启动本地 Flask 服务</h3>
+          <p>进入 <code>06_Flask后台服务示例</code>，按 README 安装依赖并运行 <code>python app.py</code>。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <div>
+          <h3>上传或模拟上传数据</h3>
+          <p>micro:bit 或 curl 向 <code>GET /upload?id=1&amp;val=温度</code> 发送温度数据，Flask 写入 SQLite 的 <code>sensorlog</code> 表。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <div>
+          <h3>打开教师查看页</h3>
+          <p>访问 <code>http://127.0.0.1:5000/teacher</code>，查看总记录数、报警记录数、最新温度和最近 50 条记录。</p>
+        </div>
+      </div>
+
+      <div class="mock" aria-label="教师后台示意">
+        <div class="mock-head">
+          <strong>教师后台：温度数据查看</strong>
+          <span>每 5 秒刷新</span>
+        </div>
+        <div class="metric-row">
+          <div class="metric"><span>总记录数</span><strong>18</strong></div>
+          <div class="metric"><span>报警记录数</span><strong class="bad">4</strong></div>
+          <div class="metric"><span>最新温度</span><strong>31.5℃</strong></div>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>温度</th><th>报警</th><th>时间</th></tr></thead>
+          <tbody>
+            <tr><td>18</td><td>31.5℃</td><td class="bad">是</td><td>2026-05-18 10:28:12</td></tr>
+            <tr><td>17</td><td>28.4℃</td><td class="ok">否</td><td>2026-05-18 10:28:07</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+
+  <section class="notice">
+    <strong>课堂使用建议：</strong>
+    正式上课时，教师后台主要看学生画布提交情况；Flask 本地教师页主要作为“后台如何读取数据库并渲染页面”的代码讲解材料。不要让学生同时打开太多后台页面，避免分散注意力。
+  </section>
+</main>
+</body>
+</html>

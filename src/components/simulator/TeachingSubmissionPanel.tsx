@@ -10,7 +10,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { submitAssignmentApi } from '@/api/eduApi';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { useAuthStore } from '@/store/authStore';
@@ -29,14 +29,17 @@ export function TeachingSubmissionPanel({
 }: TeachingSubmissionPanelProps) {
   const token = useAuthStore((state) => state.token);
   const [open, setOpen] = useState(false);
-  const [evidenceNotes, setEvidenceNotes] = useState('');
-  const [troubleshooting, setTroubleshooting] = useState('');
-  const [summary, setSummary] = useState('');
+  const [studentName, setStudentName] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
     if (!token) {
       toast.error('登录已失效，请重新登录');
+      return;
+    }
+
+    if (!studentName.trim()) {
+      toast.error('请先填写姓名，方便教师后台识别提交');
       return;
     }
 
@@ -48,14 +51,16 @@ export function TeachingSubmissionPanel({
         connections: simulator.connections,
         microbitCode: simulator.microbitCode,
         flaskCode: simulator.flaskCode,
+        database: simulator.database,
         routerConfig: simulator.routerConfig,
         serverConfig: simulator.serverConfig,
       };
 
       const evidence = {
-        notes: evidenceNotes,
+        studentName: studentName.trim(),
         logs: simulator.logs.slice(-30),
         database: simulator.database,
+        sensorlogCount: simulator.database.records.sensorlog?.length ?? 0,
         counters: {
           componentCount: simulator.placedComponents.length,
           connectionCount: simulator.connections.length,
@@ -63,8 +68,7 @@ export function TeachingSubmissionPanel({
       };
 
       const labReport = {
-        summary,
-        troubleshooting,
+        studentName: studentName.trim(),
         submittedAt: new Date().toISOString(),
       };
 
@@ -78,9 +82,7 @@ export function TeachingSubmissionPanel({
         `提交成功：第 ${response.submission.attemptNo} 次，自动分 ${response.submission.finalTotal}`
       );
       setOpen(false);
-      setEvidenceNotes('');
-      setTroubleshooting('');
-      setSummary('');
+      setStudentName('');
       onSubmitted?.();
     } catch (error) {
       const message = error instanceof Error ? error.message : '提交失败';
@@ -95,44 +97,28 @@ export function TeachingSubmissionPanel({
       <DialogTrigger asChild>
         <Button size="sm">提交作业</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>提交实验作业</DialogTitle>
+          <DialogTitle>提交课堂画布</DialogTitle>
           <DialogDescription>
-            作业 #{assignmentId} {assignmentTitle ? `- ${assignmentTitle}` : ''}
+            {assignmentTitle ? `${assignmentTitle}：` : ''}
+            只需要填写姓名。系统会自动提交当前画布、连线、代码、数据库和运行日志，并自动检测关键任务得分。
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
-            <Label htmlFor="evidence-notes">证据说明</Label>
-            <Textarea
-              id="evidence-notes"
-              value={evidenceNotes}
-              onChange={(event) => setEvidenceNotes(event.target.value)}
-              placeholder="填写关键连线、运行结果、数据库证据..."
-              rows={4}
+            <Label htmlFor="student-name">姓名</Label>
+            <Input
+              id="student-name"
+              value={studentName}
+              onChange={(event) => setStudentName(event.target.value)}
+              placeholder="例如：王同学"
             />
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="troubleshooting">排错过程</Label>
-            <Textarea
-              id="troubleshooting"
-              value={troubleshooting}
-              onChange={(event) => setTroubleshooting(event.target.value)}
-              placeholder="填写故障现象、定位过程、修复步骤..."
-              rows={4}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="summary">任务单总结</Label>
-            <Textarea
-              id="summary"
-              value={summary}
-              onChange={(event) => setSummary(event.target.value)}
-              placeholder="填写实验结论、收获与改进点..."
-              rows={4}
-            />
+
+          <div className="rounded-lg border bg-muted/40 p-3 text-sm leading-6 text-muted-foreground">
+            自动提交内容：画布组件、连线、micro:bit 代码、Flask 代码、数据库记录、运行日志。教师后台可打开该同学提交的画布，并查看自动检测得分。
           </div>
         </div>
 
@@ -148,4 +134,3 @@ export function TeachingSubmissionPanel({
     </Dialog>
   );
 }
-

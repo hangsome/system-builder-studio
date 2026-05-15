@@ -4,6 +4,7 @@ function normalizeMode(value: string | undefined): FeatureMode {
   const normalized = String(value || '').trim().toLowerCase();
   if (normalized === 'teaching') return 'teaching';
   if (normalized === 'commercial') return 'commercial';
+  if (normalized === 'full') return 'full';
   return 'commercial';
 }
 
@@ -12,4 +13,3 @@ export const featureMode: FeatureMode = normalizeMode(import.meta.env.VITE_FEATU
 export function isTeachingEnabled() {
   return featureMode === 'teaching' || featureMode === 'full';
 }
-

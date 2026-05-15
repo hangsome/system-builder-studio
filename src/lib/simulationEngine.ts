@@ -1,6 +1,7 @@
 // 仿真引擎 - 阶段五核心功能
 import { PlacedComponent, Connection, DatabaseState, ServerConfig, LogEntry } from '@/types/simulator';
 import { validateSystem } from './connectionValidator';
+import { CLASSROOM_TEMPERATURE_THRESHOLD } from '@/data/classroomLesson';
 
 export interface SimulationState {
   sensorValues: Record<string, number>;
@@ -86,7 +87,7 @@ export function simulateFlaskRoute(
   serverConfig: ServerConfig,
   database: DatabaseState
 ): { response: SimulatedHttpResponse; updatedDatabase?: DatabaseState } {
-  // 支持带参数的GET请求匹配（如 /upload?temperature=25）
+  // 支持带参数的 GET 请求匹配（如 /upload?id=1&val=25）
   const pathWithoutParams = request.path.split('?')[0];
   
   // 首先尝试精确匹配（路径+方法）
@@ -94,12 +95,6 @@ export function simulateFlaskRoute(
     r => r.path === pathWithoutParams && r.method === request.method
   );
   
-  // 如果没有找到，尝试只匹配路径（兼容POST/GET混用情况）
-  // 这样即使配置的是POST，GET请求也能正常处理
-  if (!matchedRoute) {
-    matchedRoute = serverConfig.routes.find(r => r.path === pathWithoutParams);
-  }
-
   if (!matchedRoute) {
     return {
       response: {
@@ -113,23 +108,25 @@ export function simulateFlaskRoute(
   // 模拟不同路由的处理
   switch (matchedRoute.handler) {
     case 'upload_data': {
-      // 处理传感器数据上传（GET请求，参数在URL中）
-      // 解析URL参数：/upload?temperature=25.5&location=301
+      // 处理传感器数据上传：课堂版使用 GET /upload?id=传感器编号&val=温度值
       const urlParams = new URLSearchParams(request.path.split('?')[1] || '');
-      const temperature = parseFloat(urlParams.get('temperature') || '0');
+      const rawTemperature = urlParams.get('val');
+      const sensorId = Number(urlParams.get('id') || 1);
+      const temperature = Number(rawTemperature);
       
       // 如果没有有效的温度数据，返回错误
-      if (isNaN(temperature)) {
+      if (isNaN(temperature) || isNaN(sensorId)) {
         return {
-          response: { status: 400, body: { error: 'Invalid temperature parameter' }, timestamp: new Date() },
+          response: { status: 400, body: { error: 'Invalid id or val parameter' }, timestamp: new Date() },
         };
       }
 
       // 添加到数据库
       const newRecord = {
         id: (database.records['sensorlog']?.length || 0) + 1,
-        sensor_id: 1,
+        sensor_id: sensorId,
         value: temperature,
+        alarm: temperature > CLASSROOM_TEMPERATURE_THRESHOLD ? 1 : 0,
         timestamp: new Date().toISOString(),
       };
 
@@ -145,20 +142,36 @@ export function simulateFlaskRoute(
       return {
         response: { 
           status: 200, 
-          body: { status: 'success', id: newRecord.id, message: `温度 ${temperature}°C 已记录` }, 
+          body: {
+            status: 'success',
+            id: newRecord.id,
+            command: newRecord.alarm ? 'BUZZER_ON' : 'BUZZER_OFF',
+            message: `温度 ${temperature}°C 已记录`,
+          }, 
           timestamp: new Date() 
         },
         updatedDatabase,
       };
     }
 
-    case 'query_data': {
+    case 'query_data':
+    case 'index': {
       // 查询最近的传感器数据
       const records = database.records['sensorlog'] || [];
       const recentRecords = records.slice(-10).reverse();
       
       return {
-        response: { status: 200, body: recentRecords, timestamp: new Date() },
+        response: {
+          status: 200,
+          body: matchedRoute.handler === 'index'
+            ? {
+                template: 'index.html',
+                render: 'render_template',
+                records: recentRecords,
+              }
+            : recentRecords,
+          timestamp: new Date()
+        },
       };
     }
 
@@ -218,9 +231,9 @@ export function createDataFlowLog(
   } else if (type === 'info') {
     message = String(data);
   } else if (type === 'warning') {
-    message = `⚠️ ${data}`;
+    message = `警告：${data}`;
   } else {
-    message = `❌ ${data}`;
+    message = `错误：${data}`;
   }
 
   return {
@@ -239,7 +252,7 @@ export function simulateMicrobitExecution(
   let displayValue: string | number | undefined;
 
   // 简单的代码解析模拟
-  if (code.includes('temperature()')) {
+  if (code.includes('temperature()') || /\bpin\d+\s*\.\s*read_(?:analog|digital)\s*\(/.test(code)) {
     const tempSensor = Object.entries(sensorValues).find(([key]) => 
       key.includes('temp-humidity')
     );
@@ -255,6 +268,9 @@ export function simulateMicrobitExecution(
 
   if (code.includes('obloq.http_post')) {
     actions.push('发送HTTP POST请求');
+  }
+  if (code.includes('obloq.http_get') && code.includes('/upload')) {
+    actions.push('发送HTTP GET上传请求');
   }
 
   if (code.includes('obloq.http_get')) {

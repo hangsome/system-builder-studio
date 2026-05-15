@@ -1,13 +1,11 @@
 ﻿const express = require('express');
 const bcrypt = require('bcryptjs');
 const { getDatabase } = require('../db/init');
-const { authMiddleware, requireRole } = require('../middleware/auth');
+const { signAuthToken, authMiddleware, requireRole } = require('../middleware/auth');
 const { scenarioCatalog, getScenarioById } = require('../services/scenarioCatalog');
 const { scoreSubmission, resolveAssignmentConfig } = require('../services/scoring');
 
 const router = express.Router();
-
-router.use(authMiddleware);
 
 function parseCsvText(csvText) {
   const text = String(csvText || '').trim();
@@ -57,6 +55,160 @@ function parseJsonField(jsonText, fallback = null) {
     return fallback;
   }
 }
+
+function isOpenClassEnabled() {
+  const value = String(process.env.OPEN_CLASS_ENABLED || 'true').toLowerCase();
+  return !['false', '0', 'no', 'off'].includes(value);
+}
+
+let openClassFixtureReady = false;
+
+function ensureOpenClassFixture(db) {
+  if (openClassFixtureReady) return;
+
+  const teacherUsername = String(process.env.OPEN_CLASS_TEACHER_USERNAME || process.env.SEED_TEACHER_USERNAME || 'teacher01').trim();
+  const teacherPassword = String(process.env.OPEN_CLASS_TEACHER_PASSWORD || process.env.SEED_TEACHER_PASSWORD || 'Teacher@123');
+  const teacherName = String(process.env.OPEN_CLASS_TEACHER_NAME || '公开课教师').trim();
+  const studentUsername = String(process.env.OPEN_CLASS_USERNAME || 'openclass').trim();
+  const studentPassword = String(process.env.OPEN_CLASS_PASSWORD || 'Open@12345');
+  const studentName = String(process.env.OPEN_CLASS_STUDENT_NAME || '公开课学生入口').trim();
+  const classCode = String(process.env.OPEN_CLASS_CLASS_CODE || 'OPENCLASS20260518').trim();
+  const className = String(process.env.OPEN_CLASS_CLASS_NAME || '5月18日信息系统复习公开课').trim();
+  const assignmentTitle = String(process.env.OPEN_CLASS_ASSIGNMENT_TITLE || '教室温度检测信息系统课堂任务').trim();
+
+  const upsertUser = (username, password, role, displayName, refreshPassword = false) => {
+    const existing = db.prepare('SELECT id, role FROM users WHERE username = ?').get(username);
+
+    if (existing) {
+      const passwordClause = refreshPassword ? 'password_hash = ?,' : '';
+      const params = refreshPassword
+        ? [bcrypt.hashSync(password, 10), role, displayName, existing.id]
+        : [role, displayName, existing.id];
+      db.prepare(`
+        UPDATE users
+        SET ${passwordClause}
+            role = ?,
+            display_name = ?,
+            must_change_password = 0,
+            status = 'active',
+            updated_at = datetime('now')
+        WHERE id = ?
+      `).run(...params);
+      return Number(existing.id);
+    }
+
+    const hash = bcrypt.hashSync(password, 10);
+    const result = db.prepare(`
+      INSERT INTO users (username, password_hash, role, display_name, must_change_password, status)
+      VALUES (?, ?, ?, ?, 0, 'active')
+    `).run(username, hash, role, displayName);
+    return Number(result.lastInsertRowid);
+  };
+
+  const run = db.transaction(() => {
+    const teacherId = upsertUser(teacherUsername, teacherPassword, 'teacher', teacherName, false);
+    const studentId = upsertUser(studentUsername, studentPassword, 'student', studentName, true);
+
+    const existingClass = db.prepare('SELECT id FROM classes WHERE class_code = ?').get(classCode);
+    const classId = existingClass
+      ? Number(existingClass.id)
+      : Number(db.prepare(`
+          INSERT INTO classes (name, class_code, teacher_id, term)
+          VALUES (?, ?, ?, ?)
+        `).run(className, classCode, teacherId, '2026公开课').lastInsertRowid);
+
+    if (existingClass) {
+      db.prepare(`
+        UPDATE classes
+        SET name = ?, teacher_id = ?, term = ?
+        WHERE id = ?
+      `).run(className, teacherId, '2026公开课', classId);
+    }
+
+    db.prepare(`
+      INSERT OR IGNORE INTO class_students (class_id, student_id, student_no)
+      VALUES (?, ?, ?)
+    `).run(classId, studentId, 'OPEN');
+
+    const existingAssignment = db.prepare(`
+      SELECT id FROM assignments
+      WHERE class_id = ? AND scenario_id = 'classroom-temperature'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(classId);
+
+    const description = '公开课免登录入口默认加载半成品画布：学生补充 PC、浏览器、手机，修改 P1/P2 引脚后运行并提交。';
+    if (existingAssignment) {
+      db.prepare(`
+        UPDATE assignments
+        SET title = ?, description = ?, published_by = ?
+        WHERE id = ?
+      `).run(assignmentTitle, description, teacherId, existingAssignment.id);
+    } else {
+      db.prepare(`
+        INSERT INTO assignments (class_id, scenario_id, title, description, published_by)
+        VALUES (?, 'classroom-temperature', ?, ?, ?)
+      `).run(classId, assignmentTitle, description, teacherId);
+    }
+  });
+
+  run();
+  openClassFixtureReady = true;
+}
+
+router.get('/open-class', (req, res) => {
+  if (!isOpenClassEnabled()) {
+    return res.status(404).json({ error: 'Open class entry is disabled' });
+  }
+
+  const username = String(process.env.OPEN_CLASS_USERNAME || 'openclass').trim();
+  const classCode = String(process.env.OPEN_CLASS_CLASS_CODE || 'OPENCLASS20260518').trim();
+
+  const db = getDatabase();
+  ensureOpenClassFixture(db);
+
+  const student = db.prepare(`
+    SELECT id, username, role, display_name, must_change_password, status
+    FROM users
+    WHERE username = ? AND role = 'student'
+  `).get(username);
+
+  if (!student || student.status !== 'active') {
+    return res.status(404).json({ error: 'Open class student account is not ready' });
+  }
+
+  const assignment = db.prepare(`
+    SELECT a.id, a.class_id, a.scenario_id, a.title, a.description, a.due_at, a.created_at,
+           c.name AS class_name, c.class_code,
+           (SELECT COUNT(*) FROM submissions s WHERE s.assignment_id = a.id AND s.student_id = ?) AS attempt_count,
+           (SELECT s.final_total FROM submissions s WHERE s.assignment_id = a.id AND s.student_id = ? ORDER BY s.attempt_no DESC LIMIT 1) AS latest_score
+    FROM assignments a
+    JOIN classes c ON c.id = a.class_id
+    JOIN class_students cs ON cs.class_id = c.id
+    WHERE cs.student_id = ? AND c.class_code = ?
+    ORDER BY a.created_at DESC
+    LIMIT 1
+  `).get(Number(student.id), Number(student.id), Number(student.id), classCode);
+
+  if (!assignment) {
+    return res.status(404).json({ error: 'Open class assignment is not ready' });
+  }
+
+  const token = signAuthToken(student);
+  return res.json({
+    token,
+    user: {
+      id: student.id,
+      username: student.username,
+      role: student.role,
+      displayName: student.display_name,
+      mustChangePassword: Boolean(student.must_change_password),
+    },
+    assignment,
+  });
+});
+
+router.use(authMiddleware);
 
 router.get('/scenarios', (req, res) => {
   return res.json({ scenarios: scenarioCatalog });
@@ -527,12 +679,23 @@ router.get('/assignments/:assignmentId/submissions', requireRole('teacher', 'adm
   const submissions = db.prepare(`
     SELECT s.id, s.assignment_id, s.student_id, s.attempt_no, s.auto_total, s.final_total,
            s.teacher_comment, s.submitted_at, s.graded_at,
+           s.lab_report_json, s.auto_score_json,
            u.username, u.display_name
     FROM submissions s
     JOIN users u ON u.id = s.student_id
     WHERE s.assignment_id = ?
     ORDER BY s.submitted_at DESC
-  `).all(assignmentId);
+  `).all(assignmentId).map((submission) => {
+    const labReport = parseJsonField(submission.lab_report_json, {});
+    return {
+      ...submission,
+      lab_report_json: undefined,
+      auto_score_json: undefined,
+      auto_score: parseJsonField(submission.auto_score_json, null),
+      submitted_student_name: labReport.studentName || '',
+      submitted_seat_no: labReport.seatNo || '',
+    };
+  });
 
   return res.json({ submissions });
 });

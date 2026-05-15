@@ -115,22 +115,22 @@ export function validateConnection(
   const isRxPin = (pin: Pin) =>
     pin.type === 'serial_rx' || pin.id === 'rx' || pin.id === EXPANSION_SERIAL_RX_PIN;
 
-  // 串口连接规则 - TX必须连RX
+  // IoT 通信连接规则
   if (isSerialPin(fromPin) || isSerialPin(toPin)) {
     result.type = 'serial';
     
     if (isTxPin(fromPin) && !isRxPin(toPin)) {
       result.valid = false;
-      result.errors.push('TX引脚必须连接到RX引脚');
+      result.errors.push('IoT 通信引脚连接不匹配');
     } else if (isRxPin(fromPin) && !isTxPin(toPin)) {
       result.valid = false;
-      result.errors.push('RX引脚必须连接到TX引脚');
+      result.errors.push('IoT 通信引脚连接不匹配');
     } else if (isTxPin(toPin) && !isRxPin(fromPin)) {
       result.valid = false;
-      result.errors.push('TX引脚必须连接到RX引脚');
+      result.errors.push('IoT 通信引脚连接不匹配');
     } else if (isRxPin(toPin) && !isTxPin(fromPin)) {
       result.valid = false;
-      result.errors.push('RX引脚必须连接到TX引脚');
+      result.errors.push('IoT 通信引脚连接不匹配');
     }
   }
 
@@ -330,7 +330,7 @@ export function validateSystem(
     }
   });
 
-  // 检查IOT模块的TX/RX连接
+  // 检查 IOT 模块与扩展板的通信连接
   const iotComponents = placedComponents.filter(
     c => c.definitionId === 'iot-module' || c.definitionId === 'obloq'
   );
@@ -358,10 +358,10 @@ export function validateSystem(
     const hasRxConnection = hasMatchedSerialConnection('rx', EXPANSION_SERIAL_TX_PIN);
 
     if (!hasTxConnection) {
-      issues.push(`IOT模块的TX引脚未连接到扩展板${EXPANSION_SERIAL_RX_PIN.toUpperCase()}(RX)`);
+      issues.push('IOT模块与扩展板的通信连接不完整');
     }
     if (!hasRxConnection) {
-      issues.push(`IOT模块的RX引脚未连接到扩展板${EXPANSION_SERIAL_TX_PIN.toUpperCase()}(TX)`);
+      issues.push('IOT模块与扩展板的通信连接不完整');
     }
   });
 
@@ -387,4 +387,3 @@ export function getConnectionColorByType(type: 'power' | 'ground' | 'data' | 'se
     default: return '#3b82f6'; // 蓝色
   }
 }
-

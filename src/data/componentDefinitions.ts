@@ -25,7 +25,7 @@ export const expansionBoard: ComponentDefinition = {
   type: 'expansion-board',
   category: 'mainboard',
   name: '扩展板',
-  description: '完整的micro:bit扩展板，提供P0-P20引脚、3V和GND（含P15/P16串口）',
+  description: '完整的micro:bit扩展板，提供P0-P20引脚、3V和GND（含IoT通信引脚）',
   width: 280,
   height: 200,
   pins: [
@@ -293,6 +293,20 @@ export const browser: ComponentDefinition = {
   ],
 };
 
+// 手机 / 移动终端
+export const mobileClient: ComponentDefinition = {
+  id: 'mobile-client',
+  type: 'mobile-client',
+  category: 'server',
+  name: '手机 / 移动终端',
+  description: '用户通过手机浏览器访问 Flask 服务器，查看教室温度实时数据',
+  width: 70,
+  height: 100,
+  pins: [
+    { id: 'http', name: 'HTTP', type: 'data', position: { x: 35, y: 100 } },
+  ],
+};
+
 // 所有组件定义
 export const componentDefinitions: ComponentDefinition[] = [
   microbitBoard,
@@ -312,6 +326,7 @@ export const componentDefinitions: ComponentDefinition[] = [
   webServer,
   database,
   browser,
+  mobileClient,
 ];
 
 // 按类别分组
@@ -320,7 +335,7 @@ export const componentsByCategory = {
   sensor: [tempHumiditySensor, lightSensor, infraredSensor, soundSensor],
   actuator: [ledStrip, buzzer, servo, relay],
   network: [iotModule, router],
-  server: [pcComputer, webServer, database, browser],
+  server: [pcComputer, webServer, database, browser, mobileClient],
 };
 
 export const categoryNames: Record<string, string> = {
@@ -328,6 +343,5 @@ export const categoryNames: Record<string, string> = {
   sensor: '传感器',
   actuator: '执行器',
   network: '网络设备',
-  server: '服务器端',
+  server: '服务与用户端',
 };
-

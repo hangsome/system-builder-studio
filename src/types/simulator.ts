@@ -36,6 +36,9 @@ export interface ComponentState {
   value?: number | string;
   ledMatrix?: boolean[][]; // 5x5 for micro:bit
   error?: string;
+  fault?: boolean;
+  faultType?: 'hardware' | 'code' | 'network' | 'service' | 'storage' | 'client';
+  faultMessage?: string;
 }
 
 export interface Connection {

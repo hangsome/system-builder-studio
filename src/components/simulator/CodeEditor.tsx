@@ -26,7 +26,7 @@ const blockDefinitions: Block[] = [
   
   // 网络
   { id: 'wifi_connect', type: 'network', category: 'network', label: '连接WiFi', code: 'obloq.setup("WiFi名称", "密码")', color: 'bg-green-500' },
-  { id: 'http_post', type: 'network', category: 'network', label: 'HTTP POST请求', code: 'obloq.http_post(url, data)', color: 'bg-green-500' },
+  { id: 'http_get_upload', type: 'network', category: 'network', label: 'HTTP GET上传请求', code: 'obloq.http_get(url)', color: 'bg-green-500' },
   { id: 'http_get', type: 'network', category: 'network', label: 'HTTP GET请求', code: 'obloq.http_get(url)', color: 'bg-green-500' },
   
   // 显示

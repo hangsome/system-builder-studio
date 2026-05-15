@@ -155,7 +155,7 @@ export default function TeacherSubmissionCanvasPage() {
           <>
             {submission ? (
               <span className="hidden md:inline-flex text-xs px-2 py-1 rounded border bg-muted/50">
-                学生：{submission.display_name || submission.username || '-'} | 第 {submission.attempt_no} 次提交
+                学生：{submission.submitted_student_name || submission.display_name || submission.username || '-'} | 第 {submission.attempt_no} 次提交
               </span>
             ) : null}
             <Button size="sm" variant="secondary" asChild>
