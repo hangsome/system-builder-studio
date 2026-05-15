@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import { type CSSProperties, useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { componentDefinitions } from '@/data/componentDefinitions';
-import { ComponentDefinition, PlacedComponent, Pin } from '@/types/simulator';
+import { ComponentDefinition, Connection, PlacedComponent, Pin } from '@/types/simulator';
 import { cn, createId } from '@/lib/utils';
 import { ChevronDown, ChevronRight, Zap, CheckCircle2, XCircle, Eye, EyeOff, LayoutGrid } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -12,6 +12,112 @@ const GRID_SIZE = 20;
 const isPowerPin = (pin: Pin) => pin.type === 'power' || pin.type === 'ground';
 const isPowerConnection = (connection: { type: string }) =>
   connection.type === 'power' || connection.type === 'ground';
+
+type PinSide = 'top' | 'right' | 'bottom' | 'left';
+
+interface PinLayout {
+  position: { x: number; y: number };
+  side: PinSide;
+}
+
+type GetPinLayout = (component: PlacedComponent, definition: ComponentDefinition, pin: Pin) => PinLayout;
+
+const PIN_EDGE_MARGIN = 14;
+
+const pinKey = (componentId: string, pinId: string) => `${componentId}:${pinId}`;
+
+const clamp = (value: number, min: number, max: number) => {
+  if (max < min) return (min + max) / 2;
+  return Math.min(max, Math.max(min, value));
+};
+
+const getComponentCenter = (component: PlacedComponent, definition: ComponentDefinition) => ({
+  x: component.position.x + definition.width / 2,
+  y: component.position.y + definition.height / 2,
+});
+
+const inferPinSide = (pin: Pin, definition: ComponentDefinition): PinSide => {
+  const distances = [
+    { side: 'top' as const, distance: pin.position.y },
+    { side: 'right' as const, distance: definition.width - pin.position.x },
+    { side: 'bottom' as const, distance: definition.height - pin.position.y },
+    { side: 'left' as const, distance: pin.position.x },
+  ];
+
+  return distances.reduce((nearest, current) =>
+    current.distance < nearest.distance ? current : nearest
+  ).side;
+};
+
+const chooseDockSide = (
+  component: PlacedComponent,
+  definition: ComponentDefinition,
+  peerComponent: PlacedComponent,
+  peerDefinition: ComponentDefinition
+): PinSide => {
+  const center = getComponentCenter(component, definition);
+  const peerCenter = getComponentCenter(peerComponent, peerDefinition);
+  const dx = peerCenter.x - center.x;
+  const dy = peerCenter.y - center.y;
+
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return dx >= 0 ? 'right' : 'left';
+  }
+
+  return dy >= 0 ? 'bottom' : 'top';
+};
+
+const projectPinToSide = (pin: Pin, definition: ComponentDefinition, side: PinSide) => {
+  const horizontalMargin = Math.min(PIN_EDGE_MARGIN, definition.width / 2);
+  const verticalMargin = Math.min(PIN_EDGE_MARGIN, definition.height / 2);
+  const originalSide = inferPinSide(pin, definition);
+  const projectedX =
+    originalSide === 'left' || originalSide === 'right'
+      ? (pin.position.y / definition.height) * definition.width
+      : pin.position.x;
+  const projectedY =
+    originalSide === 'top' || originalSide === 'bottom'
+      ? (pin.position.x / definition.width) * definition.height
+      : pin.position.y;
+
+  switch (side) {
+    case 'top':
+      return {
+        x: clamp(projectedX, horizontalMargin, definition.width - horizontalMargin),
+        y: 0,
+      };
+    case 'right':
+      return {
+        x: definition.width,
+        y: clamp(projectedY, verticalMargin, definition.height - verticalMargin),
+      };
+    case 'bottom':
+      return {
+        x: clamp(projectedX, horizontalMargin, definition.width - horizontalMargin),
+        y: definition.height,
+      };
+    case 'left':
+    default:
+      return {
+        x: 0,
+        y: clamp(projectedY, verticalMargin, definition.height - verticalMargin),
+      };
+  }
+};
+
+const getPinLabelStyle = (side: PinSide, zoom: number): CSSProperties => {
+  switch (side) {
+    case 'top':
+      return { left: '50%', top: -22 * zoom, transform: 'translateX(-50%)' };
+    case 'right':
+      return { left: 12 * zoom, top: '50%', transform: 'translateY(-50%)' };
+    case 'bottom':
+      return { left: '50%', top: 12 * zoom, transform: 'translateX(-50%)' };
+    case 'left':
+    default:
+      return { left: -12 * zoom, top: '50%', transform: 'translate(-100%, -50%)' };
+  }
+};
 
 // 连接成功音效
 const playConnectionSound = (success: boolean) => {
@@ -54,7 +160,6 @@ export function SimulatorCanvas() {
   const [draggedComponent, setDraggedComponent] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [showConnectionFeedback, setShowConnectionFeedback] = useState(false);
-  const [showPowerPins, setShowPowerPins] = useState(false);
   
   // 画布拖拽平移状态
   const [isPanning, setIsPanning] = useState(false);
@@ -72,6 +177,7 @@ export function SimulatorCanvas() {
     connectionStart,
     tempConnectionEnd,
     lastConnectionResult,
+    detailsVisible,
     addComponent,
     updateComponentPosition,
     selectComponent,
@@ -81,6 +187,7 @@ export function SimulatorCanvas() {
     cancelConnection,
     clearConnectionResult,
     optimizeLayout,
+    toggleDetailsVisible,
     setZoom,
     setPan,
   } = useSimulatorStore(
@@ -95,6 +202,7 @@ export function SimulatorCanvas() {
       connectionStart: state.connectionStart,
       tempConnectionEnd: state.tempConnectionEnd,
       lastConnectionResult: state.lastConnectionResult,
+      detailsVisible: state.detailsVisible,
       addComponent: state.addComponent,
       updateComponentPosition: state.updateComponentPosition,
       selectComponent: state.selectComponent,
@@ -104,6 +212,7 @@ export function SimulatorCanvas() {
       cancelConnection: state.cancelConnection,
       clearConnectionResult: state.clearConnectionResult,
       optimizeLayout: state.optimizeLayout,
+      toggleDetailsVisible: state.toggleDetailsVisible,
       setZoom: state.setZoom,
       setPan: state.setPan,
     }))
@@ -124,9 +233,27 @@ export function SimulatorCanvas() {
     () => new Map(placedComponents.map((component) => [component.instanceId, component])),
     [placedComponents]
   );
+  const connectionPeerByPin = useMemo(() => {
+    const map = new Map<string, string>();
+
+    connections.forEach((connection) => {
+      const fromKey = pinKey(connection.fromComponent, connection.fromPin);
+      const toKey = pinKey(connection.toComponent, connection.toPin);
+
+      if (!map.has(fromKey) || !isPowerConnection(connection)) {
+        map.set(fromKey, connection.toComponent);
+      }
+
+      if (!map.has(toKey) || !isPowerConnection(connection)) {
+        map.set(toKey, connection.fromComponent);
+      }
+    });
+
+    return map;
+  }, [connections]);
   const visibleConnections = useMemo(
-    () => (showPowerPins ? connections : connections.filter((connection) => !isPowerConnection(connection))),
-    [connections, showPowerPins]
+    () => (detailsVisible ? connections : connections.filter((connection) => !isPowerConnection(connection))),
+    [connections, detailsVisible]
   );
   
   // 监听连接结果并显示反馈
@@ -316,16 +443,35 @@ export function SimulatorCanvas() {
     [zoom, setZoom, pan, setPan]
   );
 
+  const getPinLocalLayout: GetPinLayout = useCallback(
+    (component, definition, pin) => {
+      const peerComponentId = connectionPeerByPin.get(pinKey(component.instanceId, pin.id));
+      const peerComponent = peerComponentId ? placedById.get(peerComponentId) : null;
+      const peerDefinition = peerComponent ? definitionById.get(peerComponent.definitionId) : null;
+      const side = peerComponent && peerDefinition
+        ? chooseDockSide(component, definition, peerComponent, peerDefinition)
+        : inferPinSide(pin, definition);
+
+      return {
+        position: peerComponent ? projectPinToSide(pin, definition, side) : pin.position,
+        side,
+      };
+    },
+    [connectionPeerByPin, definitionById, placedById]
+  );
+
   // 获取引脚的绝对位置
-  const getPinPosition = (component: PlacedComponent, pin: Pin) => {
+  const getPinPosition = (component: PlacedComponent, definition: ComponentDefinition, pin: Pin) => {
+    const layout = getPinLocalLayout(component, definition, pin);
+
     return {
-      x: component.position.x + pin.position.x,
-      y: component.position.y + pin.position.y,
+      x: component.position.x + layout.position.x,
+      y: component.position.y + layout.position.y,
     };
   };
 
   // 获取连线的引脚位置
-  const getConnectionPoints = (connection: typeof connections[0]) => {
+  const getConnectionPoints = (connection: Connection) => {
     const fromComponent = placedById.get(connection.fromComponent);
     const toComponent = placedById.get(connection.toComponent);
     
@@ -342,8 +488,8 @@ export function SimulatorCanvas() {
     if (!fromPin || !toPin) return null;
     
     return {
-      from: getPinPosition(fromComponent, fromPin),
-      to: getPinPosition(toComponent, toPin),
+      from: getPinPosition(fromComponent, fromDef, fromPin),
+      to: getPinPosition(toComponent, toDef, toPin),
     };
   };
 
@@ -398,12 +544,12 @@ export function SimulatorCanvas() {
         </button>
         <button
           type="button"
-          onClick={() => setShowPowerPins((current) => !current)}
+          onClick={toggleDetailsVisible}
           className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-xs font-medium text-foreground shadow-sm transition hover:bg-muted"
-          title={showPowerPins ? '隐藏 VCC/GND 引脚和电源线' : '显示 VCC/GND 引脚和电源线'}
+          title={detailsVisible ? '隐藏 VCC/GND 引脚、电源线和手动运行细节' : '显示 VCC/GND 引脚、电源线和手动运行细节'}
         >
-          {showPowerPins ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          {showPowerPins ? '隐藏电源引脚' : '显示电源引脚'}
+          {detailsVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          {detailsVisible ? '隐藏细节' : '显示细节'}
         </button>
       </div>
 
@@ -564,7 +710,7 @@ export function SimulatorCanvas() {
           const fromPin = pinsByDefinitionId.get(fromDef.id)?.get(connectionStart.pinId);
           if (!fromPin) return null;
           
-          const fromPos = getPinPosition(fromComponent, fromPin);
+          const fromPos = getPinPosition(fromComponent, fromDef, fromPin);
           
           return (
             <line
@@ -594,9 +740,10 @@ export function SimulatorCanvas() {
             onMouseDown={(e) => handleComponentMouseDown(e, component.instanceId, component)}
             onPinClick={handlePinClick}
             isDrawingConnection={isDrawingConnection}
-            showPowerPins={showPowerPins}
+            showPowerPins={detailsVisible}
             zoom={zoom}
             pan={pan}
+            getPinLayout={getPinLocalLayout}
           />
         );
       })}
@@ -612,7 +759,7 @@ export function SimulatorCanvas() {
       )}
 
       {/* 供电说明浮窗 - 可折叠 */}
-      <PowerGuidePanel />
+      {detailsVisible && <PowerGuidePanel />}
       
       {/* 连接成功/失败反馈 */}
       {showConnectionFeedback && lastConnectionResult && (
@@ -677,6 +824,7 @@ interface CanvasComponentProps {
   showPowerPins: boolean;
   zoom: number;
   pan: { x: number; y: number };
+  getPinLayout: GetPinLayout;
 }
 
 function CanvasComponent({
@@ -689,6 +837,7 @@ function CanvasComponent({
   showPowerPins,
   zoom,
   pan,
+  getPinLayout,
 }: CanvasComponentProps) {
   const isFaulty = component.state?.fault === true;
   const visiblePins = showPowerPins ? definition.pins : definition.pins.filter((pin) => !isPowerPin(pin));
@@ -738,13 +887,16 @@ function CanvasComponent({
         </div>
       )}
 
-      {visiblePins.map((pin) => (
+      {visiblePins.map((pin) => {
+        const pinLayout = getPinLayout(component, definition, pin);
+
+        return (
         <div
           key={pin.id}
           className="absolute z-20"
           style={{
-            left: pin.position.x * zoom,
-            top: pin.position.y * zoom,
+            left: pinLayout.position.x * zoom,
+            top: pinLayout.position.y * zoom,
           }}
         >
           {/* 引脚圆点 */}
@@ -773,11 +925,7 @@ function CanvasComponent({
           {/* 引脚名称标签 - 始终显示 */}
           <div
             className="absolute pointer-events-none whitespace-nowrap"
-            style={{
-              left: '50%',
-              top: pin.position.y < definition.height / 2 ? -22 * zoom : 12 * zoom,
-              transform: 'translateX(-50%)',
-            }}
+            style={getPinLabelStyle(pinLayout.side, zoom)}
           >
             <span
               className="px-1 py-0.5 rounded text-xs font-bold bg-card border border-border shadow-sm"
@@ -790,7 +938,8 @@ function CanvasComponent({
             </span>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

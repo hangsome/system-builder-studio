@@ -115,6 +115,7 @@ export function EnhancedSimulationPanel() {
     setAutoFluctuation,
     demoSweepActive,
     setDemoSweepActive,
+    detailsVisible,
   } = useSimulatorStore(
     useShallow((state) => ({
       isRunning: state.isRunning,
@@ -138,6 +139,7 @@ export function EnhancedSimulationPanel() {
       setAutoFluctuation: state.setAutoFluctuation,
       demoSweepActive: state.demoSweepActive,
       setDemoSweepActive: state.setDemoSweepActive,
+      detailsVisible: state.detailsVisible,
     }))
   );
 
@@ -470,29 +472,31 @@ export function EnhancedSimulationPanel() {
               )}
               <Label className="text-[10px]">Flask服务器</Label>
             </div>
-            <div className="grid grid-cols-[minmax(9rem,1fr)_4.75rem] gap-1">
+            <div className="grid grid-cols-[minmax(0,1fr)_4.25rem] gap-1">
               <Input
                 value={serverConfig.ip}
                 onChange={(e) => updateServerConfig({ ip: e.target.value })}
-                className="h-7 text-[11px] font-mono"
+                className="h-7 min-w-0 text-[11px] font-mono"
                 placeholder="IP"
               />
               <Input
                 value={serverConfig.port}
                 onChange={(e) => updateServerConfig({ port: parseInt(e.target.value) || 5000 })}
-                className="h-7 text-[11px] font-mono"
+                className="h-7 min-w-0 text-center text-[11px] font-mono"
                 type="number"
                 placeholder="端口"
               />
             </div>
-            <Button
-              size="sm"
-              variant={serverConfig.running ? 'destructive' : 'outline'}
-              className="w-full h-6 text-[10px]"
-              onClick={() => updateServerConfig({ running: !serverConfig.running })}
-            >
-              {serverConfig.running ? '停止服务器' : '启动服务器'}
-            </Button>
+            {detailsVisible && (
+              <Button
+                size="sm"
+                variant={serverConfig.running ? 'destructive' : 'outline'}
+                className="w-full h-6 text-[10px]"
+                onClick={() => updateServerConfig({ running: !serverConfig.running })}
+              >
+                {serverConfig.running ? '停止服务器' : '启动服务器'}
+              </Button>
+            )}
           </div>
         </div>
       </div>

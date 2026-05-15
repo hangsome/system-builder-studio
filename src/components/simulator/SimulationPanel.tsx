@@ -37,6 +37,7 @@ export function SimulationPanel() {
     database,
     updateDatabase,
     codeBurned,
+    detailsVisible,
   } = useSimulatorStore(
     useShallow((state) => ({
       isRunning: state.isRunning,
@@ -53,6 +54,7 @@ export function SimulationPanel() {
       database: state.database,
       updateDatabase: state.updateDatabase,
       codeBurned: state.codeBurned,
+      detailsVisible: state.detailsVisible,
     }))
   );
 
@@ -233,13 +235,13 @@ export function SimulationPanel() {
             服务器配置
           </h4>
           <div className="space-y-2">
-            <div className="grid grid-cols-[minmax(10rem,1fr)_5.5rem] gap-2">
+            <div className="grid grid-cols-[minmax(0,1fr)_4.5rem] gap-2">
               <div>
                 <Label className="text-xs">IP地址</Label>
                 <Input
                   value={serverConfig.ip}
                   onChange={(e) => updateServerConfig({ ip: e.target.value })}
-                  className="h-8 text-xs font-mono"
+                  className="h-8 min-w-0 text-xs font-mono"
                 />
               </div>
               <div>
@@ -247,19 +249,21 @@ export function SimulationPanel() {
                 <Input
                   value={serverConfig.port}
                   onChange={(e) => updateServerConfig({ port: parseInt(e.target.value) || 5000 })}
-                  className="h-8 text-xs font-mono"
+                  className="h-8 min-w-0 text-center text-xs font-mono"
                   type="number"
                 />
               </div>
             </div>
-            <Button
-              size="sm"
-              variant={serverConfig.running ? 'destructive' : 'default'}
-              className="w-full"
-              onClick={() => updateServerConfig({ running: !serverConfig.running })}
-            >
-              {serverConfig.running ? '停止服务器' : '启动服务器'}
-            </Button>
+            {detailsVisible && (
+              <Button
+                size="sm"
+                variant={serverConfig.running ? 'destructive' : 'default'}
+                className="w-full"
+                onClick={() => updateServerConfig({ running: !serverConfig.running })}
+              >
+                {serverConfig.running ? '停止服务器' : '启动服务器'}
+              </Button>
+            )}
           </div>
         </div>
       </div>

@@ -48,7 +48,7 @@ const categoryNames: Record<string, string> = {
 };
 
 export function CodeEditor() {
-  const { microbitCode, flaskCode, codeMode, setMicrobitCode, setFlaskCode, setCodeMode, burnCode, codeBurned } = useSimulatorStore();
+  const { microbitCode, flaskCode, codeMode, setMicrobitCode, setFlaskCode, setCodeMode, burnCode, codeBurned, detailsVisible } = useSimulatorStore();
   const [activeEditor, setActiveEditor] = useState<'microbit' | 'flask'>('microbit');
   const [selectedBlocks, setSelectedBlocks] = useState<string[]>([]);
 
@@ -106,7 +106,7 @@ export function CodeEditor() {
         
         <div className="flex-1" />
         
-        {activeEditor === 'microbit' && (
+        {detailsVisible && activeEditor === 'microbit' && (
           <Button
             size="sm"
             onClick={handleBurn}
@@ -118,7 +118,7 @@ export function CodeEditor() {
           </Button>
         )}
         
-        {activeEditor === 'flask' && (
+        {detailsVisible && activeEditor === 'flask' && (
           <Button
             size="sm"
             className="w-full"

@@ -232,7 +232,8 @@ export function EnhancedCodeEditor() {
     burnCode, 
     codeBurned,
     updateServerConfig,
-    serverConfig
+    serverConfig,
+    detailsVisible
   } = useSimulatorStore();
   
   const [activeEditor, setActiveEditor] = useState<'microbit' | 'flask'>('microbit');
@@ -350,7 +351,7 @@ export function EnhancedCodeEditor() {
         
         <div className="flex-1" />
         
-        {activeEditor === 'microbit' && (
+        {detailsVisible && activeEditor === 'microbit' && (
           <Button
             size="sm"
             onClick={handleBurn}
@@ -372,7 +373,7 @@ export function EnhancedCodeEditor() {
           </Button>
         )}
         
-        {activeEditor === 'flask' && (
+        {detailsVisible && activeEditor === 'flask' && (
           <Button
             size="sm"
             className="w-full text-xs"

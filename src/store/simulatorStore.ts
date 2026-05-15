@@ -9,6 +9,7 @@ import {
   LogEntry 
 } from '@/types/simulator';
 import { createId } from '@/lib/utils';
+import { componentDefinitions } from '@/data/componentDefinitions';
 import {
   classroomDatabase,
   classroomFlaskCode,
@@ -75,6 +76,9 @@ interface SimulatorStore {
   browserPageRecords: BrowserPageRecord[] | null;
   browserLastUpdate: number | null;
   browserAutoRefresh: boolean;
+
+  // 课堂细节显示
+  detailsVisible: boolean;
   
   // Actions
   setZoom: (zoom: number) => void;
@@ -125,6 +129,7 @@ interface SimulatorStore {
   setBrowserPageRecords: (records: BrowserPageRecord[] | null) => void;
   setBrowserLastUpdate: (timestamp: number | null) => void;
   setBrowserAutoRefresh: (enabled: boolean) => void;
+  toggleDetailsVisible: () => void;
   resetBrowserState: () => void;
   
   resetSimulator: () => void;
@@ -147,6 +152,9 @@ function recoverPersistedCodeState(state: Partial<SimulatorStore> | null | undef
   if (typeof nextState.microbitCode !== 'string' || nextState.microbitCode.trim().length === 0) {
     nextState.microbitCode = defaultMicrobitCode;
   }
+  if (typeof nextState.flaskCode !== 'string' || nextState.flaskCode.trim().length === 0) {
+    nextState.flaskCode = defaultFlaskCode;
+  }
   if (!nextState.routerConfig?.password) {
     nextState.routerConfig = {
       ...createClassroomRouterConfig(),
@@ -154,7 +162,16 @@ function recoverPersistedCodeState(state: Partial<SimulatorStore> | null | undef
       password: classroomRouterConfig.password,
     };
   }
+  nextState.serverConfig = {
+    ...createClassroomServerConfig(),
+    ...(nextState.serverConfig || {}),
+    routes: (nextState.serverConfig?.routes || createClassroomServerConfig().routes).map((route) => ({ ...route })),
+    logs: nextState.serverConfig?.logs || [],
+    running: typeof nextState.flaskCode === 'string' && nextState.flaskCode.trim().length > 0,
+  };
+  nextState.codeBurned = typeof nextState.microbitCode === 'string' && nextState.microbitCode.trim().length > 0;
   nextState.codeMode = 'python';
+  nextState.detailsVisible = false;
   return nextState;
 }
 
@@ -172,6 +189,7 @@ function createClassroomRouterConfig() {
 function createClassroomServerConfig() {
   return {
     ...classroomServerConfig,
+    running: true,
     routes: classroomServerConfig.routes.map((route) => ({ ...route })),
     logs: [],
   };
@@ -192,7 +210,7 @@ const initialState = {
   microbitCode: defaultMicrobitCode,
   flaskCode: defaultFlaskCode,
   codeMode: 'python' as const,
-  codeBurned: false,
+  codeBurned: true,
   database: cloneClassroomDatabase(),
   routerConfig: createClassroomRouterConfig(),
   serverConfig: createClassroomServerConfig(),
@@ -206,6 +224,7 @@ const initialState = {
   browserPageRecords: null,
   browserLastUpdate: null,
   browserAutoRefresh: true,
+  detailsVisible: false,
 };
 
 function syncFlaskCodeServerAddress(code: string, serverConfig: ServerConfig) {
@@ -217,37 +236,98 @@ function syncFlaskCodeServerAddress(code: string, serverConfig: ServerConfig) {
 }
 
 const optimizedLayoutPositions: Record<string, { x: number; y: number }> = {
-  'pc-computer': { x: 60, y: 40 },
-  microbit: { x: 300, y: 50 },
-  'expansion-board': { x: 250, y: 240 },
-  'temp-humidity-sensor': { x: 95, y: 500 },
-  'light-sensor': { x: 95, y: 585 },
-  'sound-sensor': { x: 95, y: 665 },
-  'infrared-sensor': { x: 95, y: 745 },
-  buzzer: { x: 360, y: 510 },
-  'led-strip': { x: 450, y: 585 },
-  servo: { x: 360, y: 630 },
-  relay: { x: 455, y: 695 },
-  'iot-module': { x: 610, y: 320 },
-  obloq: { x: 610, y: 320 },
-  router: { x: 765, y: 320 },
-  'web-server': { x: 935, y: 245 },
-  database: { x: 970, y: 405 },
-  browser: { x: 1110, y: 245 },
-  'mobile-client': { x: 1120, y: 385 },
+  'pc-computer': { x: 75, y: 105 },
+  microbit: { x: 310, y: 85 },
+  'expansion-board': { x: 250, y: 260 },
+  'temp-humidity-sensor': { x: 80, y: 330 },
+  'light-sensor': { x: 85, y: 435 },
+  'sound-sensor': { x: 85, y: 535 },
+  'infrared-sensor': { x: 83, y: 638 },
+  buzzer: { x: 365, y: 515 },
+  'led-strip': { x: 330, y: 610 },
+  servo: { x: 355, y: 708 },
+  relay: { x: 360, y: 800 },
+  'iot-module': { x: 635, y: 325 },
+  obloq: { x: 635, y: 325 },
+  router: { x: 800, y: 325 },
+  'web-server': { x: 965, y: 315 },
+  database: { x: 985, y: 505 },
+  browser: { x: 1135, y: 325 },
+  'mobile-client': { x: 1145, y: 490 },
 };
 
-function getOptimizedPosition(component: PlacedComponent, duplicateIndex: number) {
-  const base = optimizedLayoutPositions[component.definitionId] ?? {
-    x: 120 + (duplicateIndex % 4) * 150,
-    y: 620 + Math.floor(duplicateIndex / 4) * 110,
+const componentDimensionsById = new Map(
+  componentDefinitions.map((definition) => [
+    definition.id,
+    { width: definition.width, height: definition.height },
+  ])
+);
+
+const layoutColumns = {
+  classroomInput: 120,
+  smartTerminal: 390,
+  iot: 680,
+  router: 850,
+  server: 1020,
+  client: 1180,
+} as const;
+
+const layoutRows = {
+  top: 150,
+  main: 360,
+  stack1: 462,
+  stack2: 562,
+  stack3: 662,
+  stack4: 540,
+  stack5: 630,
+  stack6: 730,
+  stack7: 832,
+} as const;
+
+const optimizedLayoutSlots: Record<string, { centerX: number; centerY: number }> = {
+  'pc-computer': { centerX: layoutColumns.classroomInput, centerY: layoutRows.top },
+  microbit: { centerX: layoutColumns.smartTerminal, centerY: layoutRows.top },
+  'expansion-board': { centerX: layoutColumns.smartTerminal, centerY: layoutRows.main },
+  'temp-humidity-sensor': { centerX: layoutColumns.classroomInput, centerY: layoutRows.main },
+  'light-sensor': { centerX: layoutColumns.classroomInput, centerY: layoutRows.stack1 },
+  'sound-sensor': { centerX: layoutColumns.classroomInput, centerY: layoutRows.stack2 },
+  'infrared-sensor': { centerX: layoutColumns.classroomInput, centerY: layoutRows.stack3 },
+  buzzer: { centerX: layoutColumns.smartTerminal, centerY: layoutRows.stack4 },
+  'led-strip': { centerX: layoutColumns.smartTerminal, centerY: layoutRows.stack5 },
+  servo: { centerX: layoutColumns.smartTerminal, centerY: layoutRows.stack6 },
+  relay: { centerX: layoutColumns.smartTerminal, centerY: layoutRows.stack7 },
+  'iot-module': { centerX: layoutColumns.iot, centerY: layoutRows.main },
+  obloq: { centerX: layoutColumns.iot, centerY: layoutRows.main },
+  router: { centerX: layoutColumns.router, centerY: layoutRows.main },
+  'web-server': { centerX: layoutColumns.server, centerY: layoutRows.main },
+  database: { centerX: layoutColumns.server, centerY: layoutRows.stack4 },
+  browser: { centerX: layoutColumns.client, centerY: layoutRows.main },
+  'mobile-client': { centerX: layoutColumns.client, centerY: layoutRows.stack4 },
+};
+
+function getPositionFromCenter(definitionId: string, centerX: number, centerY: number) {
+  const dimensions = componentDimensionsById.get(definitionId) ?? { width: 90, height: 70 };
+
+  return {
+    x: Math.round(centerX - dimensions.width / 2),
+    y: Math.round(centerY - dimensions.height / 2),
   };
+}
+
+function getOptimizedPosition(component: PlacedComponent, duplicateIndex: number) {
+  const slot = optimizedLayoutSlots[component.definitionId];
+  const base = slot
+    ? getPositionFromCenter(component.definitionId, slot.centerX, slot.centerY)
+    : optimizedLayoutPositions[component.definitionId] ?? {
+        x: 120 + (duplicateIndex % 4) * 150,
+        y: 620 + Math.floor(duplicateIndex / 4) * 110,
+      };
 
   if (duplicateIndex === 0) return base;
 
   return {
-    x: base.x + (duplicateIndex % 3) * 140,
-    y: base.y + Math.floor(duplicateIndex / 3) * 105,
+    x: base.x,
+    y: base.y + duplicateIndex * 96,
   };
 }
 
@@ -663,8 +743,14 @@ export const useSimulatorStore = create<SimulatorStore>()(
       setRunning: (running) => set({ isRunning: running }),
       setSimulationSpeed: (speed) => set({ simulationSpeed: speed }),
       
-      setMicrobitCode: (code) => set({ microbitCode: code, codeBurned: false }),
-      setFlaskCode: (code) => set({ flaskCode: code }),
+      setMicrobitCode: (code) => set({ microbitCode: code, codeBurned: code.trim().length > 0 }),
+      setFlaskCode: (code) => set((state) => ({
+        flaskCode: code,
+        serverConfig: {
+          ...state.serverConfig,
+          running: code.trim().length > 0,
+        },
+      })),
       setCodeMode: (mode) => set({ codeMode: mode }),
       burnCode: () => set({ codeBurned: true }),
       
@@ -697,6 +783,7 @@ export const useSimulatorStore = create<SimulatorStore>()(
       setBrowserPageRecords: (records) => set({ browserPageRecords: records }),
       setBrowserLastUpdate: (timestamp) => set({ browserLastUpdate: timestamp }),
       setBrowserAutoRefresh: (enabled) => set({ browserAutoRefresh: enabled }),
+      toggleDetailsVisible: () => set((state) => ({ detailsVisible: !state.detailsVisible })),
       resetBrowserState: () => set({
         browserUrl: initialState.browserUrl,
         browserResponse: initialState.browserResponse,
@@ -726,18 +813,20 @@ export const useSimulatorStore = create<SimulatorStore>()(
         },
         serverConfig: {
           ...scenario.serverConfig,
+          running: scenario.flaskCode.trim().length > 0 || scenario.serverConfig.running,
           routes: scenario.serverConfig.routes.map((route) => ({ ...route })),
           logs: [],
         },
         selectedComponentId: null,
         isRunning: false,
-        codeBurned: false,
+        codeBurned: scenario.microbitCode.trim().length > 0,
         sensorValues: {},
         browserUrl: '',
         browserResponse: '',
         browserPageRecords: null,
         browserLastUpdate: null,
         browserAutoRefresh: true,
+        detailsVisible: false,
       }),
     }),
     {

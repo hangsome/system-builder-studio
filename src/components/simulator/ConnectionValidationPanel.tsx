@@ -19,17 +19,27 @@ export function ConnectionValidationPanel() {
   const { 
     connections, 
     placedComponents, 
-    removeConnection 
+    removeConnection,
+    detailsVisible,
   } = useSimulatorStore();
 
   const validation = validateSystem(placedComponents, connections);
+  const visibleConnections = detailsVisible
+    ? connections
+    : connections.filter((connection) => connection.type !== 'power' && connection.type !== 'ground');
+  const visibleIssues = detailsVisible
+    ? validation.issues
+    : validation.issues.filter((issue) => !/电源|接地|VCC|3V|GND/.test(issue));
+  const visibleWarnings = detailsVisible
+    ? validation.warnings
+    : validation.warnings.filter((warning) => !/电源|接地|VCC|3V|GND/.test(warning));
 
   return (
     <div className="p-4 h-full overflow-y-auto">
       {/* 系统状态概览 */}
       <div className="mb-4">
         <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
-          {validation.issues.length === 0 ? (
+          {visibleIssues.length === 0 ? (
             <CheckCircle2 className="h-4 w-4 text-green-500" />
           ) : (
             <AlertCircle className="h-4 w-4 text-red-500" />
@@ -37,9 +47,9 @@ export function ConnectionValidationPanel() {
           连接验证
         </h3>
 
-        {validation.issues.length > 0 && (
+        {visibleIssues.length > 0 && (
           <div className="space-y-2 mb-4">
-            {validation.issues.map((issue, i) => (
+            {visibleIssues.map((issue, i) => (
               <div key={i} className="flex items-start gap-2 text-sm p-2 rounded bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400">
                 <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                 <span>{issue}</span>
@@ -48,9 +58,9 @@ export function ConnectionValidationPanel() {
           </div>
         )}
 
-        {validation.warnings.length > 0 && (
+        {visibleWarnings.length > 0 && (
           <div className="space-y-2 mb-4">
-            {validation.warnings.map((warning, i) => (
+            {visibleWarnings.map((warning, i) => (
               <div key={i} className="flex items-start gap-2 text-sm p-2 rounded bg-yellow-50 text-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-400">
                 <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                 <span>{warning}</span>
@@ -59,7 +69,7 @@ export function ConnectionValidationPanel() {
           </div>
         )}
 
-        {validation.issues.length === 0 && validation.warnings.length === 0 && (
+        {visibleIssues.length === 0 && visibleWarnings.length === 0 && (
           <div className="flex items-center gap-2 text-sm p-2 rounded bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400">
             <CheckCircle2 className="h-4 w-4" />
             <span>所有连接正常</span>
@@ -68,40 +78,42 @@ export function ConnectionValidationPanel() {
       </div>
 
       {/* 组件电源状态 */}
-      <div className="mb-4">
-        <h4 className="text-sm font-medium mb-2">组件电源状态</h4>
-        <div className="space-y-1">
-          {placedComponents.map(component => {
-            const def = componentDefinitions.find(d => d.id === component.definitionId);
-            const isPowered = validation.powerStatus.get(component.instanceId);
-            
-            return (
-              <div key={component.instanceId} className="flex items-center justify-between text-sm py-1 px-2 rounded bg-muted/50">
-                <span>{def?.name || component.definitionId}</span>
-                {isPowered ? (
-                  <span className="flex items-center gap-1 text-green-600">
-                    <Zap className="h-3 w-3" />
-                    正常
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-muted-foreground">
-                    <ZapOff className="h-3 w-3" />
-                    需检查
-                  </span>
-                )}
-              </div>
-            );
-          })}
+      {detailsVisible && (
+        <div className="mb-4">
+          <h4 className="text-sm font-medium mb-2">组件电源状态</h4>
+          <div className="space-y-1">
+            {placedComponents.map(component => {
+              const def = componentDefinitions.find(d => d.id === component.definitionId);
+              const isPowered = validation.powerStatus.get(component.instanceId);
+
+              return (
+                <div key={component.instanceId} className="flex items-center justify-between text-sm py-1 px-2 rounded bg-muted/50">
+                  <span>{def?.name || component.definitionId}</span>
+                  {isPowered ? (
+                    <span className="flex items-center gap-1 text-green-600">
+                      <Zap className="h-3 w-3" />
+                      正常
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <ZapOff className="h-3 w-3" />
+                      需检查
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 连接列表 */}
       <div>
         <h4 className="text-sm font-medium mb-2">
-          连接列表 ({connections.length})
+          连接列表 ({visibleConnections.length})
         </h4>
         
-        {connections.length === 0 ? (
+        {visibleConnections.length === 0 ? (
           <p className="text-sm text-muted-foreground flex items-center gap-2 py-4">
             <Unplug className="h-4 w-4" />
             点击组件引脚开始连线
@@ -109,7 +121,7 @@ export function ConnectionValidationPanel() {
         ) : (
           <ScrollArea className="h-[140px]">
             <div className="space-y-2 pr-4">
-              {connections.map((conn) => {
+              {visibleConnections.map((conn) => {
                 const fromComponent = placedComponents.find(c => c.instanceId === conn.fromComponent);
                 const toComponent = placedComponents.find(c => c.instanceId === conn.toComponent);
                 const fromDef = fromComponent ? componentDefinitions.find(d => d.id === fromComponent.definitionId) : null;
@@ -158,14 +170,18 @@ export function ConnectionValidationPanel() {
       <div className="mt-4 pt-4 border-t border-border">
         <h4 className="font-medium text-sm mb-2">引脚颜色说明</h4>
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500" />
-            <span>电源 (VCC/3V)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-gray-800 dark:bg-gray-300" />
-            <span>接地 (GND)</span>
-          </div>
+          {detailsVisible && (
+            <>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500" />
+                <span>电源 (VCC/3V)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-gray-800 dark:bg-gray-300" />
+                <span>接地 (GND)</span>
+              </div>
+            </>
+          )}
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-blue-500" />
             <span>数字信号</span>
