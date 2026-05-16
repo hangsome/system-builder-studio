@@ -876,7 +876,7 @@ export function SimulatorCanvas() {
       )}
 
       {/* 缩放控制 */}
-      <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-card border border-border rounded-lg p-2 shadow-sm">
+      <div className="absolute bottom-4 right-4 z-[220] flex items-center gap-2 rounded-lg border border-border bg-card/95 p-2 shadow-sm backdrop-blur">
         <button
           onClick={() => setZoom(zoom - 0.1)}
           className="p-1 hover:bg-muted rounded"

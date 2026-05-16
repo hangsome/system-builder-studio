@@ -199,8 +199,8 @@ const networkTasks = [
   },
   {
     id: 'actuator-pin',
-    title: '问题 2：服务器发送指令后，执行器没有执行',
-    symptom: 'Flask 返回 BUZZER_ON，但蜂鸣器没有响。',
+    title: '问题 2：温度过高后，执行器没有正常执行',
+    symptom: '温度超过阈值，Flask 返回 BUZZER_ON，但蜂鸣器没有响。',
     canvas: '画布上蜂鸣器 IO 自动连接到智能终端 P2。',
     question: '怎样修复才符合“代码与连线对应”？',
     options: ['把 pin3.write_digital(...) 改为 pin2.write_digital(...)，或把 IO 线调整到 P3', '把数据库表名 sensorlog 改成 sensorlist', '把 WiFi 密码删除'],
@@ -242,7 +242,7 @@ const dataCases = [
   },
   {
     id: 'alarm-missing',
-    title: '温度超过阈值但蜂鸣器不响',
+    title: '温度超过阈值后，执行器是否正常执行',
     evidence: ['sensorlog 中 value = 32.4', 'alarm = 1', 'Flask 返回 BUZZER_ON'],
     answer: '执行器引脚或执行器组件故障',
     options: ['执行器引脚或执行器组件故障', 'id 或 val 参数错误', '数据库没有初始化'],

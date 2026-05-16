@@ -733,8 +733,11 @@ if __name__ == '__main__':
               <label>模拟浏览器地址栏应填写：
                 <input data-field="browserUrl" type="text" placeholder="">
               </label>
+              <label>当温度高于阈值后，执行器是否正常执行？
+                <span class="choice-row" data-name="debugActuatorResponse" data-options="能正常执行,不能正常执行（需排查蜂鸣器IO或执行器）,无法判断"></span>
+              </label>
               <label>如果仍然不能访问，我会优先检查哪些原因？（可多选）
-                <span class="choice-row" data-name="debugCauses" data-type="checkbox" data-options="传感器或蜂鸣器未添加,代码引脚与画布不一致,Flask服务器未启动,浏览器URL写错,数据库故障,网络链路故障"></span>
+                <span class="choice-row" data-name="debugCauses" data-type="checkbox" data-options="传感器或蜂鸣器未添加,代码引脚与画布不一致,Flask服务器未启动,浏览器URL写错,数据库故障,网络链路故障,执行器故障"></span>
               </label>
             </div>
           </div>

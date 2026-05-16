@@ -188,14 +188,24 @@ def score_activity_section(section, answers):
             add_check(checks, label, each, ratio)
 
     elif section == "debug":
-        add_check(checks, "排错确认传感器 DATA 接 P1", 5, 1 if check_exact(answers, "debugSensorPin", "P1") else 0)
-        add_check(checks, "排错确认蜂鸣器 IO 接 P2", 5, 1 if check_exact(answers, "debugBuzzerPin", "P2") else 0)
-        add_check(checks, "浏览器 URL 填写完整", 6, 1 if check_url(answers, "browserUrl") else 0)
+        add_check(checks, "排错确认传感器 DATA 接 P1", 4, 1 if check_exact(answers, "debugSensorPin", "P1") else 0)
+        add_check(checks, "排错确认蜂鸣器 IO 接 P2", 4, 1 if check_exact(answers, "debugBuzzerPin", "P2") else 0)
+        add_check(checks, "浏览器 URL 填写完整", 5, 1 if check_url(answers, "browserUrl") else 0)
+        add_check(
+            checks,
+            "观察温度超阈值后的执行器响应",
+            4,
+            1 if normalize_answer(answers.get("debugActuatorResponse")) else 0,
+        )
         add_check(
             checks,
             "优先排查代码、服务器、URL、网络等关键环节",
-            9,
-            score_multi_select(answers, "debugCauses", ["代码引脚与画布不一致", "Flask服务器未启动", "浏览器URL写错", "网络链路故障"]),
+            8,
+            score_multi_select(
+                answers,
+                "debugCauses",
+                ["代码引脚与画布不一致", "Flask服务器未启动", "浏览器URL写错", "网络链路故障", "执行器故障"],
+            ),
         )
 
     elif section == "summary":
