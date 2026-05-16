@@ -170,7 +170,7 @@ def score_activity_section(section, answers):
             ("路由器密码 12345678", check_exact(answers, "microbitWifiPassword", "12345678")),
             ("服务器 IP 192.168.1.100", check_exact(answers, "microbitServerIp", "192.168.1.100")),
             ("服务器端口 5000", check_exact(answers, "microbitServerPort", "5000")),
-            ("micro:bit 上传路由 /upload", check_route(answers, "uploadRoute", "/upload")),
+            ("智能终端上传路由 /upload", check_route(answers, "uploadRoute", "/upload")),
             ("GET 参数选择 id 和 val", score_multi_select(answers, "microbitGetParams", ["id", "val"])),
             ("阈值变量或阈值识别正确", check_any(answers, "microbitThreshold", ["TEMP_THRESHOLD", "30"])),
             ("读取温度引脚 P1", check_exact(answers, "microbitReadPin", "P1")),

@@ -165,7 +165,7 @@ export function EnhancedSimulationPanel() {
     );
     const iotHasPower = iotModule ? validation.powerStatus.get(iotModule.instanceId) : false;
     
-    // 检查 IOT 模块与扩展板之间的通信连接
+    // 检查 IOT 模块与智能终端之间的通信连接
     const hasMatchedSerialConnection = (iotPin: 'tx' | 'rx', expansionPin: 'p15' | 'p16') =>
       iotModule
         ? connections.some((connection) => {
@@ -214,7 +214,7 @@ export function EnhancedSimulationPanel() {
       ? getComponentFaultMessage(faultSummary.sensor, '传感器故障，采集端没有有效数据')
       : undefined,
     microbit: faultSummary.microbit
-      ? getComponentFaultMessage(faultSummary.microbit, 'micro:bit 故障，程序无法上传数据')
+      ? getComponentFaultMessage(faultSummary.microbit, '智能终端故障，程序无法上传数据')
       : undefined,
     network: faultSummary.iot || faultSummary.router
       ? getComponentFaultMessage(faultSummary.iot || faultSummary.router, '网络链路故障，HTTP 请求无法到达服务器')
@@ -284,7 +284,7 @@ export function EnhancedSimulationPanel() {
       if (!obloqPowered) {
         addLog({ type: 'warning', message: 'IOT模块未供电，无法连接WiFi', source: 'System' });
       } else {
-        addLog({ type: 'warning', message: 'IOT模块与扩展板的通信连接未建立，无法进入无线链路', source: 'System' });
+        addLog({ type: 'warning', message: 'IOT模块与智能终端的通信连接未建立，无法进入无线链路', source: 'System' });
       }
       setNetworkConnected(false);
     } else {

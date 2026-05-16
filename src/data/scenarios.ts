@@ -8,15 +8,12 @@ import {
 } from './classroomLesson';
 
 const classroomCoreComponents: Scenario['components'] = [
-  { instanceId: 'pc-1', definitionId: 'pc-computer', position: { x: 60, y: 40 }, state: { powered: true, active: true } },
-  { instanceId: 'microbit-1', definitionId: 'microbit', position: { x: 300, y: 50 }, state: { powered: true, active: false } },
-  { instanceId: 'expansion-1', definitionId: 'expansion-board', position: { x: 250, y: 240 }, state: { powered: true, active: false } },
-  { instanceId: 'iot-1', definitionId: 'iot-module', position: { x: 610, y: 320 }, state: { powered: true, active: false } },
-  { instanceId: 'router-1', definitionId: 'router', position: { x: 765, y: 320 }, state: { powered: true, active: true } },
-  { instanceId: 'server-1', definitionId: 'web-server', position: { x: 935, y: 245 }, state: { powered: true, active: true } },
-  { instanceId: 'database-1', definitionId: 'database', position: { x: 970, y: 405 }, state: { powered: true, active: true } },
-  { instanceId: 'browser-1', definitionId: 'browser', position: { x: 1110, y: 245 }, state: { powered: true, active: true } },
-  { instanceId: 'mobile-1', definitionId: 'mobile-client', position: { x: 1120, y: 385 }, state: { powered: true, active: true } },
+  { instanceId: 'microbit-1', definitionId: 'microbit', position: { x: 310, y: 85 }, state: { powered: true, active: false } },
+  { instanceId: 'expansion-1', definitionId: 'expansion-board', position: { x: 250, y: 260 }, state: { powered: true, active: false } },
+  { instanceId: 'iot-1', definitionId: 'iot-module', position: { x: 635, y: 325 }, state: { powered: true, active: false } },
+  { instanceId: 'router-1', definitionId: 'router', position: { x: 800, y: 325 }, state: { powered: true, active: true } },
+  { instanceId: 'server-1', definitionId: 'web-server', position: { x: 965, y: 315 }, state: { powered: true, active: true } },
+  { instanceId: 'database-1', definitionId: 'database', position: { x: 985, y: 505 }, state: { powered: true, active: true } },
 ];
 
 const classroomHardwareChallengeComponents: Scenario['components'] = [
@@ -39,10 +36,6 @@ const classroomCoreConnections: Scenario['connections'] = [
 
   { id: 'conn-router-server', fromComponent: 'router-1', fromPin: 'lan', toComponent: 'server-1', toPin: 'network', type: 'data', valid: true },
   { id: 'conn-server-db', fromComponent: 'server-1', fromPin: 'db', toComponent: 'database-1', toPin: 'connection', type: 'data', valid: true },
-
-  { id: 'conn-mb-usb', fromComponent: 'microbit-1', fromPin: 'usb', toComponent: 'pc-1', toPin: 'usb', type: 'data', valid: true },
-  { id: 'conn-browser-router', fromComponent: 'browser-1', fromPin: 'http', toComponent: 'router-1', toPin: 'lan', type: 'data', valid: true },
-  { id: 'conn-mobile-router', fromComponent: 'mobile-1', fromPin: 'http', toComponent: 'router-1', toPin: 'lan', type: 'data', valid: true },
 ];
 
 const classroomHardwareChallengeConnections: Scenario['connections'] = [
@@ -79,7 +72,7 @@ export const classroomTemperatureDemoScenario: Scenario = {
   database: classroomDatabase,
   routerConfig: {
     ...classroomRouterConfig,
-    connectedDevices: ['IoT-001', 'Flask-Server', 'Browser', 'Mobile'],
+    connectedDevices: ['IoT-001', 'Flask-Server'],
   },
   serverConfig: classroomServerConfig,
 };

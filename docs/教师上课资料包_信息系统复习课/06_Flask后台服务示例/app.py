@@ -1,7 +1,7 @@
 # 存储间温度监测与预警系统 - Flask 后台服务示例
 # 用途：给教师备课、课堂讲解或本地演示使用。
 # 路由设计：
-#   GET /upload?id=1&val=温度   micro:bit 上传温度数据
+#   GET /upload?id=1&val=温度   智能终端上传温度数据
 #   GET  /         浏览器/手机查看最近温度记录
 #   GET  /teacher  教师查看数据与报警统计，同时查看课堂活动提交
 #   POST /api/submit  接收“老师上课带学生用_活动页面.html”的学生作答
@@ -161,7 +161,7 @@ def build_activity_students(rows):
 
 @app.route("/upload", methods=["GET"])
 def upload_data():
-    # 课堂约定：micro:bit 用 GET 请求上传，id 表示传感器编号，val 表示温度值。
+    # 课堂约定：智能终端用 GET 请求上传，id 表示传感器编号，val 表示温度值。
     # 这里用 request.args.get(...) 读取 URL 参数。
     temperature = request.args.get("val")
     sensor_id = request.args.get("id", 1)
@@ -267,7 +267,7 @@ if __name__ == "__main__":
     print("Flask 服务已启动：")
     print("  学生/浏览器查询：http://127.0.0.1:5000/")
     print("  学生活动页面：   http://127.0.0.1:5000/activity")
-    print("  micro:bit 上传：  GET http://127.0.0.1:5000/upload?id=1&val=31.5")
+    print("  智能终端上传：  GET http://127.0.0.1:5000/upload?id=1&val=31.5")
     print("  活动页提交：     POST http://127.0.0.1:5000/api/submit")
     print("  教师查看数据：   http://127.0.0.1:5000/teacher")
     app.run(host="0.0.0.0", port=5000, debug=True)

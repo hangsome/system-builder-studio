@@ -118,7 +118,7 @@ export function TeachingSubmissionPanel({
           </div>
 
           <div className="rounded-lg border bg-muted/40 p-3 text-sm leading-6 text-muted-foreground">
-            自动提交内容：画布组件、连线、micro:bit 代码、Flask 代码、数据库记录、运行日志。教师后台可打开该同学提交的画布，并查看自动检测得分。
+            自动提交内容：画布组件、连线、智能终端（micro:bit）代码、Flask 代码、数据库记录、运行日志。教师后台可打开该同学提交的画布，并查看自动检测得分。
           </div>
         </div>
 

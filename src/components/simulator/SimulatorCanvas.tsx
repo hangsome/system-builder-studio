@@ -1,6 +1,6 @@
 import { type CSSProperties, useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { useSimulatorStore } from '@/store/simulatorStore';
-import { componentDefinitions } from '@/data/componentDefinitions';
+import { componentDefinitions, smartTerminalDefinition } from '@/data/componentDefinitions';
 import { ComponentDefinition, Connection, PlacedComponent, Pin } from '@/types/simulator';
 import { cn, createId } from '@/lib/utils';
 import { ChevronDown, ChevronRight, Zap, CheckCircle2, XCircle, Eye, EyeOff, LayoutGrid } from 'lucide-react';
@@ -25,6 +25,37 @@ type GetPinLayout = (component: PlacedComponent, definition: ComponentDefinition
 const PIN_EDGE_MARGIN = 14;
 
 const pinKey = (componentId: string, pinId: string) => `${componentId}:${pinId}`;
+
+interface SmartTerminalPair {
+  microbit: PlacedComponent;
+  expansionBoard: PlacedComponent;
+}
+
+const createSmartTerminalComponent = ({ microbit, expansionBoard }: SmartTerminalPair): PlacedComponent => ({
+  ...expansionBoard,
+  definitionId: smartTerminalDefinition.id,
+  state: {
+    powered: expansionBoard.state?.powered ?? microbit.state?.powered ?? true,
+    active: expansionBoard.state?.active ?? microbit.state?.active ?? false,
+    ...expansionBoard.state,
+    fault: Boolean(expansionBoard.state?.fault || microbit.state?.fault),
+    faultType: expansionBoard.state?.faultType || microbit.state?.faultType,
+    faultMessage: expansionBoard.state?.faultMessage || microbit.state?.faultMessage,
+    error: expansionBoard.state?.error || microbit.state?.error,
+  },
+});
+
+const isSmartTerminalInternalConnection = (connection: Connection, pairs: SmartTerminalPair[]) =>
+  pairs.some(({ microbit, expansionBoard }) => {
+    const fromMicrobitToExpansion =
+      connection.fromComponent === microbit.instanceId &&
+      connection.toComponent === expansionBoard.instanceId;
+    const fromExpansionToMicrobit =
+      connection.fromComponent === expansionBoard.instanceId &&
+      connection.toComponent === microbit.instanceId;
+
+    return fromMicrobitToExpansion || fromExpansionToMicrobit;
+  });
 
 const clamp = (value: number, min: number, max: number) => {
   if (max < min) return (min + max) / 2;
@@ -179,6 +210,7 @@ export function SimulatorCanvas() {
     lastConnectionResult,
     detailsVisible,
     addComponent,
+    addSmartTerminal,
     updateComponentPosition,
     selectComponent,
     startConnection,
@@ -204,6 +236,7 @@ export function SimulatorCanvas() {
       lastConnectionResult: state.lastConnectionResult,
       detailsVisible: state.detailsVisible,
       addComponent: state.addComponent,
+      addSmartTerminal: state.addSmartTerminal,
       updateComponentPosition: state.updateComponentPosition,
       selectComponent: state.selectComponent,
       startConnection: state.startConnection,
@@ -219,24 +252,78 @@ export function SimulatorCanvas() {
   );
 
   const definitionById = useMemo(
-    () => new Map(componentDefinitions.map((definition) => [definition.id, definition])),
+    () => new Map([...componentDefinitions, smartTerminalDefinition].map((definition) => [definition.id, definition])),
     []
   );
   const pinsByDefinitionId = useMemo(() => {
     const map = new Map<string, Map<string, Pin>>();
-    componentDefinitions.forEach((definition) => {
+    [...componentDefinitions, smartTerminalDefinition].forEach((definition) => {
       map.set(definition.id, new Map(definition.pins.map((pin) => [pin.id, pin])));
     });
     return map;
   }, []);
-  const placedById = useMemo(
-    () => new Map(placedComponents.map((component) => [component.instanceId, component])),
-    [placedComponents]
+  const smartTerminalPairs = useMemo<SmartTerminalPair[]>(() => {
+    if (detailsVisible) return [];
+
+    const microbits = placedComponents.filter((component) => component.definitionId === 'microbit');
+    const expansionBoards = placedComponents.filter((component) => component.definitionId === 'expansion-board');
+    const pairCount = Math.min(microbits.length, expansionBoards.length);
+
+    return Array.from({ length: pairCount }, (_, index) => ({
+      microbit: microbits[index],
+      expansionBoard: expansionBoards[index],
+    }));
+  }, [detailsVisible, placedComponents]);
+  const collapsedMicrobitIds = useMemo(
+    () => new Set(smartTerminalPairs.map((pair) => pair.microbit.instanceId)),
+    [smartTerminalPairs]
+  );
+  const renderedComponents = useMemo(() => {
+    if (detailsVisible || smartTerminalPairs.length === 0) {
+      return placedComponents;
+    }
+
+    const pairByExpansionId = new Map(
+      smartTerminalPairs.map((pair) => [pair.expansionBoard.instanceId, pair])
+    );
+
+    return placedComponents.flatMap((component) => {
+      if (collapsedMicrobitIds.has(component.instanceId)) {
+        return [];
+      }
+
+      const pair = pairByExpansionId.get(component.instanceId);
+      if (pair) {
+        return [createSmartTerminalComponent(pair)];
+      }
+
+      return [component];
+    });
+  }, [collapsedMicrobitIds, detailsVisible, placedComponents, smartTerminalPairs]);
+  const connectionPlacedById = useMemo(() => {
+    const map = new Map(placedComponents.map((component) => [component.instanceId, component]));
+
+    smartTerminalPairs.forEach((pair) => {
+      map.set(pair.expansionBoard.instanceId, createSmartTerminalComponent(pair));
+    });
+
+    return map;
+  }, [placedComponents, smartTerminalPairs]);
+  const visibleConnections = useMemo(
+    () =>
+      connections.filter((connection) => {
+        if (detailsVisible) return true;
+        if (isPowerConnection(connection)) return false;
+        if (isSmartTerminalInternalConnection(connection, smartTerminalPairs)) return false;
+
+        return !collapsedMicrobitIds.has(connection.fromComponent) && !collapsedMicrobitIds.has(connection.toComponent);
+      }),
+    [collapsedMicrobitIds, connections, detailsVisible, smartTerminalPairs]
   );
   const connectionPeerByPin = useMemo(() => {
     const map = new Map<string, string>();
 
-    connections.forEach((connection) => {
+    visibleConnections.forEach((connection) => {
       const fromKey = pinKey(connection.fromComponent, connection.fromPin);
       const toKey = pinKey(connection.toComponent, connection.toPin);
 
@@ -250,11 +337,7 @@ export function SimulatorCanvas() {
     });
 
     return map;
-  }, [connections]);
-  const visibleConnections = useMemo(
-    () => (detailsVisible ? connections : connections.filter((connection) => !isPowerConnection(connection))),
-    [connections, detailsVisible]
-  );
+  }, [visibleConnections]);
   
   // 监听连接结果并显示反馈
   useEffect(() => {
@@ -287,6 +370,11 @@ export function SimulatorCanvas() {
       const snappedX = gridEnabled ? Math.round(x / GRID_SIZE) * GRID_SIZE : x;
       const snappedY = gridEnabled ? Math.round(y / GRID_SIZE) * GRID_SIZE : y;
 
+      if (definition.id === 'smart-terminal') {
+        addSmartTerminal({ x: snappedX, y: snappedY });
+        return;
+      }
+
       const newComponent: PlacedComponent = {
         instanceId: createId(),
         definitionId: definition.id,
@@ -299,7 +387,7 @@ export function SimulatorCanvas() {
 
       addComponent(newComponent);
     },
-    [addComponent, pan, zoom, gridEnabled]
+    [addComponent, addSmartTerminal, pan, zoom, gridEnabled]
   );
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -446,7 +534,7 @@ export function SimulatorCanvas() {
   const getPinLocalLayout: GetPinLayout = useCallback(
     (component, definition, pin) => {
       const peerComponentId = connectionPeerByPin.get(pinKey(component.instanceId, pin.id));
-      const peerComponent = peerComponentId ? placedById.get(peerComponentId) : null;
+      const peerComponent = peerComponentId ? connectionPlacedById.get(peerComponentId) : null;
       const peerDefinition = peerComponent ? definitionById.get(peerComponent.definitionId) : null;
       const side = peerComponent && peerDefinition
         ? chooseDockSide(component, definition, peerComponent, peerDefinition)
@@ -457,7 +545,7 @@ export function SimulatorCanvas() {
         side,
       };
     },
-    [connectionPeerByPin, definitionById, placedById]
+    [connectionPeerByPin, connectionPlacedById, definitionById]
   );
 
   // 获取引脚的绝对位置
@@ -472,8 +560,8 @@ export function SimulatorCanvas() {
 
   // 获取连线的引脚位置
   const getConnectionPoints = (connection: Connection) => {
-    const fromComponent = placedById.get(connection.fromComponent);
-    const toComponent = placedById.get(connection.toComponent);
+    const fromComponent = connectionPlacedById.get(connection.fromComponent);
+    const toComponent = connectionPlacedById.get(connection.toComponent);
     
     if (!fromComponent || !toComponent) return null;
     
@@ -546,7 +634,7 @@ export function SimulatorCanvas() {
           type="button"
           onClick={toggleDetailsVisible}
           className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-xs font-medium text-foreground shadow-sm transition hover:bg-muted"
-          title={detailsVisible ? '隐藏 VCC/GND 引脚、电源线和手动运行细节' : '显示 VCC/GND 引脚、电源线和手动运行细节'}
+          title={detailsVisible ? '隐藏智能终端内部结构、VCC/GND 引脚、电源线和手动运行细节' : '显示智能终端内部结构、VCC/GND 引脚、电源线和手动运行细节'}
         >
           {detailsVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           {detailsVisible ? '隐藏细节' : '显示细节'}
@@ -701,7 +789,7 @@ export function SimulatorCanvas() {
         
         {/* 正在绘制的连线 */}
         {isDrawingConnection && connectionStart && tempConnectionEnd && (() => {
-          const fromComponent = placedComponents.find((c) => c.instanceId === connectionStart.componentId);
+          const fromComponent = connectionPlacedById.get(connectionStart.componentId);
           if (!fromComponent) return null;
           
           const fromDef = definitionById.get(fromComponent.definitionId);
@@ -727,7 +815,7 @@ export function SimulatorCanvas() {
       </svg>
 
       {/* 组件层 - 直接渲染组件 */}
-      {placedComponents.map((component) => {
+      {renderedComponents.map((component) => {
         const definition = definitionById.get(component.definitionId);
         if (!definition) return null;
 
@@ -843,11 +931,13 @@ function CanvasComponent({
   const visiblePins = showPowerPins ? definition.pins : definition.pins.filter((pin) => !isPowerPin(pin));
 
   // 计算基础 z-index：
-  // - 扩展板（较大底板）放在最底层，避免遮挡插入其上的 micro:bit / 传感器等
+  // - 细节模式中扩展板（较大底板）放在最底层，避免遮挡插入其上的 micro:bit / 传感器等
+  // - 默认模式中智能终端作为合并组件显示在常规组件层
   // - micro:bit、传感器、执行器、IOT 模块等贴片组件抬升一层，保证可见
   // - 选中时再次抬升到最上层
   const layerZIndex = (() => {
     if (definition.id === 'expansion-board') return 5;
+    if (definition.id === 'smart-terminal') return 12;
     if (definition.id === 'microbit') return 20;
     return 10;
   })();
@@ -1009,6 +1099,38 @@ function ComponentName({ label, tone = 'slate' }: { label: string; tone?: 'slate
 
 function ComponentVisual({ type, label, state }: { type: string; label: string; state?: PlacedComponent['state'] }) {
   switch (type) {
+    case 'smart-terminal':
+      return (
+        <div className="relative h-full w-full overflow-hidden rounded bg-emerald-900">
+          <div className="absolute inset-x-5 top-6 h-16 rounded-lg border border-emerald-300/40 bg-emerald-700/40" />
+          <div className="absolute left-8 top-10 grid grid-cols-5 gap-1">
+            {Array.from({ length: 25 }).map((_, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "h-2.5 w-2.5 rounded-[3px]",
+                  state?.ledMatrix?.[Math.floor(i / 5)]?.[i % 5]
+                    ? "bg-red-400 shadow-red-400/40 shadow-sm"
+                    : "bg-emerald-200/25"
+                )}
+              />
+            ))}
+          </div>
+          <div className="absolute right-8 top-12 flex gap-4">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-500 bg-slate-800 text-[9px] font-bold text-white">
+              A
+            </div>
+            <div className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-500 bg-slate-800 text-[9px] font-bold text-white">
+              B
+            </div>
+          </div>
+          <div className="absolute inset-x-0 top-[105px] flex items-center justify-center">
+            <ComponentName label={label} tone="green" />
+          </div>
+          <div className="absolute inset-x-8 bottom-5 h-8 rounded-md border border-emerald-300/30 bg-emerald-950/30" />
+        </div>
+      );
+
     case 'microbit':
       return (
         <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-2">
@@ -1195,19 +1317,19 @@ function PowerGuidePanel() {
           <ul className="space-y-2 text-muted-foreground text-xs mt-2">
             <li className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-1.5 flex-shrink-0"></span>
-              <span><b className="text-foreground">micro:bit</b>: 连接 <span className="text-purple-500 font-medium">USB</span> 引脚到 PC服务器</span>
+              <span><b className="text-foreground">智能终端细节</b>: 展开后可看到 micro:bit 与扩展板的内部连接</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 flex-shrink-0"></span>
-              <span><b className="text-foreground">扩展板</b>: 将 micro:bit 的 <span className="text-red-500 font-medium">3V</span>/<span className="text-gray-500 font-medium">GND</span> 连到扩展板插槽</span>
+              <span><b className="text-foreground">内部供电</b>: micro:bit 的 <span className="text-red-500 font-medium">3V</span>/<span className="text-gray-500 font-medium">GND</span> 连接到扩展板插槽</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 mt-1.5 flex-shrink-0"></span>
-              <span><b className="text-foreground">传感器</b>: 连接 <span className="text-red-500 font-medium">VCC</span> 到扩展板 3V，<span className="text-gray-500 font-medium">GND</span> 到扩展板 GND</span>
+              <span><b className="text-foreground">传感器</b>: 连接 <span className="text-red-500 font-medium">VCC</span> 到智能终端 3V，<span className="text-gray-500 font-medium">GND</span> 到智能终端 GND</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5 flex-shrink-0"></span>
-              <span><b className="text-foreground">IOT模块</b>: 连接 <span className="text-red-500 font-medium">VCC</span>/<span className="text-gray-500 font-medium">GND</span>，并保持与扩展板的通信引脚连接</span>
+              <span><b className="text-foreground">IOT模块</b>: 连接 <span className="text-red-500 font-medium">VCC</span>/<span className="text-gray-500 font-medium">GND</span>，并保持与智能终端的通信引脚连接</span>
             </li>
           </ul>
           <div className="mt-3 p-2 bg-muted/50 rounded text-xs text-muted-foreground">

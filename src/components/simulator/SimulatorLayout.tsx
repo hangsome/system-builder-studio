@@ -59,7 +59,7 @@ const PANEL_STATE_KEY = 'simulator-panel-state';
 const MANUAL_SAVE_KEY = 'simulator-manual-save';
 const OPENCLASS_CANVAS_INITIALIZED_KEY = 'openclass-classroom-canvas-initialized';
 const OPENCLASS_CANVAS_VERSION_KEY = 'openclass-classroom-canvas-version';
-const CURRENT_OPENCLASS_CANVAS_VERSION = '2026-05-14-hardware-challenge';
+const CURRENT_OPENCLASS_CANVAS_VERSION = '2026-05-16-smart-terminal-collapsed';
 
 interface SubmissionContext {
   assignmentId: number;
@@ -158,31 +158,6 @@ export function SimulatorLayout({ role, submissionContext, headerActions, initia
         // localStorage 不可用时继续按画布内容判断。
       }
       if (alreadyInitialized) {
-        return;
-      }
-
-      const loadedDefinitionIds = new Set(placedComponents.map((component) => component.definitionId));
-      const hasLoadedClassroomStarterCanvas = [
-        'microbit',
-        'expansion-board',
-        'iot-module',
-        'router',
-        'web-server',
-        'database',
-        'pc-computer',
-        'browser',
-        'mobile-client',
-      ].every((definitionId) => loadedDefinitionIds.has(definitionId)) &&
-        !loadedDefinitionIds.has('temp-humidity-sensor') &&
-        !loadedDefinitionIds.has('buzzer');
-
-      if (hasLoadedClassroomStarterCanvas) {
-        try {
-          localStorage.setItem(OPENCLASS_CANVAS_INITIALIZED_KEY, CURRENT_OPENCLASS_CANVAS_VERSION);
-          localStorage.setItem(OPENCLASS_CANVAS_VERSION_KEY, CURRENT_OPENCLASS_CANVAS_VERSION);
-        } catch {
-          // 忽略存储失败。
-        }
         return;
       }
 

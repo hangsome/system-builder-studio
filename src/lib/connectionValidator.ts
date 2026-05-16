@@ -66,10 +66,16 @@ export function validateConnection(
   );
 
   if (fromPinConnected) {
-    result.warnings.push(`${fromPin.name} 引脚已有连接`);
+    result.valid = false;
+    result.errors.push(`${fromPin.name} 引脚已被占用`);
   }
   if (toPinConnected) {
-    result.warnings.push(`${toPin.name} 引脚已有连接`);
+    result.valid = false;
+    result.errors.push(`${toPin.name} 引脚已被占用`);
+  }
+
+  if (!result.valid) {
+    return result;
   }
 
   const isSerialPin = (pin: Pin) =>
@@ -191,7 +197,7 @@ const SELF_POWERED_DEFINITION_IDS = new Set([
   'mobile-client',
 ]);
 
-// 主板自身即视为通电（micro:bit、扩展板）
+// 智能终端的内部板卡自身即视为通电（micro:bit、扩展板）
 const MAINBOARD_DEFINITION_IDS = new Set(
   componentDefinitions
     .filter((d) => d.category === 'mainboard')
@@ -330,7 +336,7 @@ export function validateSystem(
     }
   });
 
-  // 检查 IOT 模块与扩展板的通信连接
+  // 检查 IOT 模块与智能终端的通信连接
   const iotComponents = placedComponents.filter(
     c => c.definitionId === 'iot-module' || c.definitionId === 'obloq'
   );
@@ -358,10 +364,10 @@ export function validateSystem(
     const hasRxConnection = hasMatchedSerialConnection('rx', EXPANSION_SERIAL_TX_PIN);
 
     if (!hasTxConnection) {
-      issues.push('IOT模块与扩展板的通信连接不完整');
+      issues.push('IOT模块与智能终端的通信连接不完整');
     }
     if (!hasRxConnection) {
-      issues.push('IOT模块与扩展板的通信连接不完整');
+      issues.push('IOT模块与智能终端的通信连接不完整');
     }
   });
 

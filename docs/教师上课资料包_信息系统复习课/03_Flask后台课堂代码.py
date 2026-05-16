@@ -1,5 +1,5 @@
 # 存储间温度监测与预警系统 - Flask 服务端
-# GET /upload?id=1&val=温度：接收 micro:bit 上传的温度数据
+# GET /upload?id=1&val=温度：接收智能终端上传的温度数据
 # GET  /      ：浏览器或手机访问首页查看最近的温度记录
 
 from flask import Flask, request, render_template
@@ -18,7 +18,7 @@ def init_db():
 
 @app.route('/upload', methods=['GET'])
 def upload_data():
-    # 课堂约定：micro:bit 用 GET 请求上传，id 表示传感器编号，val 表示温度值。
+    # 课堂约定：智能终端用 GET 请求上传，id 表示传感器编号，val 表示温度值。
     # 这里用 request.args.get(...) 读取 URL 参数。
     temperature = request.args.get('val')
     sensor_id = request.args.get('id', 1)

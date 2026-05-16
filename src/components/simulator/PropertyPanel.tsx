@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useSimulatorStore } from '@/store/simulatorStore';
-import { componentDefinitions } from '@/data/componentDefinitions';
+import { componentDefinitions, smartTerminalDefinition } from '@/data/componentDefinitions';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
@@ -16,14 +16,22 @@ export function PropertyPanel() {
     removeComponent,
     removeConnection,
     setComponentFault,
+    detailsVisible,
   } = useSimulatorStore();
 
   const selectedComponent = placedComponents.find(
     (c) => c.instanceId === selectedComponentId
   );
 
+  const shouldShowSmartTerminal =
+    selectedComponent?.definitionId === 'expansion-board' &&
+    !detailsVisible &&
+    placedComponents.some((component) => component.definitionId === 'microbit');
+
   const definition = selectedComponent
-    ? componentDefinitions.find((d) => d.id === selectedComponent.definitionId)
+    ? shouldShowSmartTerminal
+      ? smartTerminalDefinition
+      : componentDefinitions.find((d) => d.id === selectedComponent.definitionId)
     : null;
 
   // 基于当前连接动态计算供电状态，确保面板显示与连线变化保持同步

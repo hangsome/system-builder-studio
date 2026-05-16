@@ -191,15 +191,15 @@ export function canRunSimulation(
 ): { canRun: boolean; issues: string[] } {
   const issues: string[] = [];
 
-  // 检查是否有micro:bit
+  // 检查是否有智能终端
   const hasMicrobit = placedComponents.some(c => c.definitionId === 'microbit');
   if (!hasMicrobit) {
-    issues.push('需要添加 micro:bit 主板');
+    issues.push('需要添加智能终端');
   }
 
   // 检查代码是否烧录
   if (!codeBurned) {
-    issues.push('需要先烧录代码到 micro:bit');
+    issues.push('需要先让智能终端（micro:bit）代码生效');
   }
 
   // 检查服务器是否运行

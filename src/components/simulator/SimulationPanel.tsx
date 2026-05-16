@@ -141,9 +141,9 @@ export function SimulationPanel() {
   const checkSystemStatus = () => {
     const issues: string[] = [];
     
-    // 检查是否有 micro:bit
+    // 检查是否有智能终端
     const hasMicrobit = placedComponents.some((c) => c.definitionId === 'microbit');
-    if (!hasMicrobit) issues.push('缺少 micro:bit');
+    if (!hasMicrobit) issues.push('缺少智能终端');
     
     // 检查代码是否烧录
     if (!codeBurned) issues.push('代码未烧录');

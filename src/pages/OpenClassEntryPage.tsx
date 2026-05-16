@@ -11,7 +11,7 @@ type EntryState = 'loading' | 'ready' | 'error';
 
 const OPENCLASS_CANVAS_INITIALIZED_KEY = 'openclass-classroom-canvas-initialized';
 const OPENCLASS_CANVAS_VERSION_KEY = 'openclass-classroom-canvas-version';
-const CURRENT_OPENCLASS_CANVAS_VERSION = '2026-05-14-hardware-challenge';
+const CURRENT_OPENCLASS_CANVAS_VERSION = '2026-05-16-smart-terminal-collapsed';
 
 export default function OpenClassEntryPage() {
   const navigate = useNavigate();

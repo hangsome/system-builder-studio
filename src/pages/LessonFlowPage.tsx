@@ -43,27 +43,18 @@ type QuizState = Record<string, string>;
 
 const hardwareItems: HardwareItem[] = [
   {
-    id: 'microbit',
-    name: 'micro:bit 主板',
-    role: '采集与控制的核心，运行烧录后的程序',
+    id: 'smart-terminal',
+    name: '智能终端',
+    role: '由 micro:bit 和扩展板组成，运行程序、读取传感器、控制执行器，并把关键引脚引出',
     group: '基础硬件',
     icon: HardDrive,
     required: true,
-    auto: '拖入扩展板后，主板与扩展板插槽自动连接',
-  },
-  {
-    id: 'expansion',
-    name: '扩展板',
-    role: '把 micro:bit 的引脚扩展出来，连接传感器、执行器和 IoT 模块',
-    group: '基础硬件',
-    icon: Cable,
-    required: true,
-    auto: 'P0、P1、P2、3V、GND 与 micro:bit 对应引脚自动连接',
+    auto: '默认显示为一整块智能终端；点击显示细节后可展开 micro:bit 与扩展板',
   },
   {
     id: 'sensor',
     name: '温湿度传感器',
-    role: '读取教室温度，DATA 自动接到扩展板 P1',
+    role: '读取教室温度，DATA 自动接到智能终端 P1',
     group: '基础硬件',
     icon: Thermometer,
     required: true,
@@ -72,7 +63,7 @@ const hardwareItems: HardwareItem[] = [
   {
     id: 'buzzer',
     name: '蜂鸣器',
-    role: '温度超过阈值时发出报警，IO 自动接到扩展板 P2',
+    role: '温度超过阈值时发出报警，IO 自动接到智能终端 P2',
     group: '基础硬件',
     icon: Gauge,
     required: true,
@@ -81,11 +72,11 @@ const hardwareItems: HardwareItem[] = [
   {
     id: 'iot',
     name: 'IoT 模块',
-    role: '让 micro:bit 通过 WiFi 访问服务器',
+    role: '让智能终端通过 WiFi 访问服务器',
     group: '网络与服务',
     icon: Wifi,
     required: true,
-    auto: '与扩展板保持通信连接，并接入电源',
+    auto: '与智能终端保持通信连接，并接入 WiFi',
   },
   {
     id: 'router',
@@ -117,10 +108,10 @@ const hardwareItems: HardwareItem[] = [
   {
     id: 'pc',
     name: 'PC 电脑',
-    role: '用于编写程序并通过 USB 给 micro:bit 烧录',
+    role: '用于编写程序并通过 USB 给智能终端（micro:bit）烧录',
     group: '用户端',
     icon: Monitor,
-    required: true,
+    required: false,
   },
   {
     id: 'browser',
@@ -128,7 +119,7 @@ const hardwareItems: HardwareItem[] = [
     role: '访问 Flask 首页，查看实时数据和历史数据',
     group: '用户端',
     icon: Eye,
-    required: true,
+    required: false,
   },
   {
     id: 'phone',
@@ -136,7 +127,7 @@ const hardwareItems: HardwareItem[] = [
     role: '用户通过手机接入 WiFi 后访问服务器',
     group: '用户端',
     icon: Smartphone,
-    required: true,
+    required: false,
   },
   {
     id: 'printer',
@@ -154,7 +145,7 @@ const softwareQuestions = [
     code: 'WIFI_SSID = "School_WiFi"\nSERVER_IP = "192.168.1.100"\nUPLOAD_ROUTE = "/upload"',
     answer: '配置网络和服务器地址',
     explanation:
-      'micro:bit 端必须知道 WiFi 名称、服务器 IP、端口和上传路由，才能把采集数据发到 Flask。',
+      '智能终端（micro:bit）代码必须知道 WiFi 名称、服务器 IP、端口和上传路由，才能把采集数据发到 Flask。',
   },
   {
     id: 'read',
@@ -199,7 +190,7 @@ const networkTasks = [
     id: 'sensor-pin',
     title: '问题 1：运行后传感器数据获取不了',
     symptom: '日志显示 raw = 0，浏览器没有新增温度记录。',
-    canvas: '画布上温湿度传感器 DATA 自动连接到扩展板 P1。',
+    canvas: '画布上温湿度传感器 DATA 自动连接到智能终端 P1。',
     question: '怎样修复才符合“代码与连线对应”？',
     options: ['把 pin0.read_analog() 改为 pin1.read_analog()，或把 DATA 线调整到 P0', '把服务器端口改为 80', '把 id 和 val 参数删除'],
     answer: '把 pin0.read_analog() 改为 pin1.read_analog()，或把 DATA 线调整到 P0',
@@ -210,7 +201,7 @@ const networkTasks = [
     id: 'actuator-pin',
     title: '问题 2：服务器发送指令后，执行器没有执行',
     symptom: 'Flask 返回 BUZZER_ON，但蜂鸣器没有响。',
-    canvas: '画布上蜂鸣器 IO 自动连接到扩展板 P2。',
+    canvas: '画布上蜂鸣器 IO 自动连接到智能终端 P2。',
     question: '怎样修复才符合“代码与连线对应”？',
     options: ['把 pin3.write_digital(...) 改为 pin2.write_digital(...)，或把 IO 线调整到 P3', '把数据库表名 sensorlog 改成 sensorlist', '把 WiFi 密码删除'],
     answer: '把 pin3.write_digital(...) 改为 pin2.write_digital(...)，或把 IO 线调整到 P3',
@@ -220,7 +211,7 @@ const networkTasks = [
   {
     id: 'request-method',
     title: 'HTTP 请求方式判断',
-    symptom: '一个操作是 micro:bit 上传温度；另一个操作是浏览器查看首页。',
+    symptom: '一个操作是智能终端上传温度；另一个操作是浏览器查看首页。',
     canvas: 'Flask 提供 GET /upload?id=...&val=... 和 GET / 两个路由。',
     question: '两种操作的 GET 请求有什么区别？',
     options: ['上传访问 /upload 并带 id、val；查看访问首页 /', '上传访问首页 /；查看访问 /upload', '两个都访问 /upload 且不带参数'],
@@ -234,11 +225,11 @@ const dataCases = [
   {
     id: 'no-records',
     title: '数据库没有新增记录',
-    evidence: ['浏览器页面仍能打开', 'Flask 日志没有 GET /upload?id=...&val=...', 'micro:bit 显示已经读取温度'],
+    evidence: ['浏览器页面仍能打开', 'Flask 日志没有 GET /upload?id=...&val=...', '智能终端已经读取温度'],
     answer: '网络链路或上传路由故障',
     options: ['数据库字段显示顺序错误', '网络链路或上传路由故障', '浏览器字体太小'],
     explanation:
-      '服务器首页能打开说明服务器基本可用；日志没有 GET /upload?id=...&val=...，说明 micro:bit 到 Flask 的上传请求没有到达，优先查 IoT、WiFi、路由器、IP、端口、/upload 以及 id、val 参数。',
+      '服务器首页能打开说明服务器基本可用；日志没有 GET /upload?id=...&val=...，说明智能终端到 Flask 的上传请求没有到达，优先查 IoT、WiFi、路由器、IP、端口、/upload 以及 id、val 参数。',
   },
   {
     id: 'stale-value',
@@ -256,7 +247,7 @@ const dataCases = [
     answer: '执行器引脚或执行器组件故障',
     options: ['执行器引脚或执行器组件故障', 'id 或 val 参数错误', '数据库没有初始化'],
     explanation:
-      '数据已入库、阈值判断也正确，服务器命令已经返回。故障范围收缩到 micro:bit 控制蜂鸣器的代码引脚、连线或蜂鸣器组件。',
+      '数据已入库、阈值判断也正确，服务器命令已经返回。故障范围收缩到智能终端控制蜂鸣器的代码引脚、连线或蜂鸣器组件。',
   },
   {
     id: 'page-empty',
@@ -271,13 +262,13 @@ const dataCases = [
 
 const summaryNodes = [
   ['人', '规划、搭建、使用、维护系统，是信息系统的组织者和使用者。'],
-  ['硬件', '传感器、micro:bit、扩展板、IoT、路由器、服务器、数据库、终端。'],
-  ['软件', 'micro:bit 采集与控制程序，Flask 接收、存储、查询程序。'],
+  ['硬件', '传感器、蜂鸣器、智能终端、IoT、路由器、服务器、数据库、终端。'],
+  ['软件', '智能终端（micro:bit）采集与控制程序，Flask 接收、存储、查询程序。'],
   ['网络', 'WiFi、HTTP、IP、端口、路由共同保证数据能到达服务器。'],
   ['数据', '温度值、报警状态、时间戳进入 sensorlog，支持观察和排障。'],
 ];
 
-const codePanel = `# micro:bit 端关键代码，含两个需要运行排查的引脚点
+const codePanel = `# 智能终端（micro:bit）代码，含两个需要运行排查的引脚点
 WIFI_SSID = "School_WiFi"
 SERVER_IP = "192.168.1.100"
 SERVER_PORT = 5000
@@ -365,7 +356,7 @@ export default function LessonFlowPage() {
                 用“教室温度检测系统”走完整个信息系统
               </h1>
               <p className="max-w-3xl text-base leading-7 text-slate-700">
-                教师先用空白画布根据学生回答搭建基础硬件框架；学生再进入半成品画布补充用户端、分析软件、运行排错，最后用导学案梳理五个组成部分。
+                教师先用空白画布根据学生回答搭建基础硬件框架；学生再进入半成品画布观察核心链路、分析软件、运行排错，最后用导学案梳理五个组成部分。
               </p>
             </div>
           </div>
@@ -418,7 +409,7 @@ export default function LessonFlowPage() {
                 </p>
                 <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
                   <p className="font-medium text-slate-950">问题思考</p>
-                  <p className="mt-2">如果今天真的要在学校搭建这个系统，只准备传感器、主板、服务器和数据库够不够？还缺少谁？</p>
+                  <p className="mt-2">如果今天真的要在学校搭建这个系统，只准备传感器、智能终端、服务器和数据库够不够？还缺少谁？</p>
                 </div>
                 <p>
                   引导结论：系统不会自己规划、连接、编程、维护和使用。用户、教师、学生、管理员这些“人”也是信息系统的重要组成部分。
@@ -546,7 +537,7 @@ export default function LessonFlowPage() {
               <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm leading-6">
                 <p className="font-medium text-slate-950">解析</p>
                 <p className="mt-2 text-slate-700">
-                  教师演示时可以先从空白画布拖入基础硬件：micro:bit、扩展板、传感器、蜂鸣器、IoT 模块、路由器、服务器和数据库会形成主链路。学生版半成品保留 PC、浏览器和手机由学生补充：PC 通过 USB 给 micro:bit 烧录程序；浏览器和手机通过 WiFi 访问服务器查看数据。
+                  教师演示时可以先从空白画布拖入基础硬件：智能终端、传感器、蜂鸣器、IoT 模块、路由器、服务器和数据库会形成主链路。学生版半成品默认保留智能终端、IoT 模块、路由器、服务器和数据库，传感器与蜂鸣器由学生根据情境补充；浏览器访问放在仿真浏览器中完成。
                 </p>
                 {hardwareScore.selectedWrong > 0 ? (
                   <p className="mt-2 text-amber-800">你选入了非必要组件。它可以扩展系统功能，但不是本节课“实时温度检测链路”的必需硬件。</p>
@@ -603,9 +594,9 @@ export default function LessonFlowPage() {
             <aside className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
               <h3 className="text-lg font-semibold">知识梳理</h3>
               <div className="mt-4 space-y-3 text-sm leading-6 text-slate-700">
-                <p>软件部分一般分为 micro:bit 端和 Flask 服务端。</p>
+                <p>软件部分一般分为智能终端（micro:bit）代码和 Flask 服务端代码。</p>
                 <p className="rounded-md bg-slate-50 p-3">
-                  micro:bit 端：配置 WiFi、服务器 IP、端口、上传路由，读取传感器数据，控制蜂鸣器，并通过 GET 请求上传 id 和 val。
+                  智能终端（micro:bit）代码：配置 WiFi、服务器 IP、端口、上传路由，读取传感器数据，控制蜂鸣器，并通过 GET 请求上传 id 和 val。
                 </p>
                 <p className="rounded-md bg-slate-50 p-3">
                   Flask 端：提供 GET /upload?id=...&val=... 接收数据、写入 SQLite；提供 GET / 供浏览器或手机查看数据。
@@ -689,7 +680,7 @@ export default function LessonFlowPage() {
               <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
                 <p className="font-medium text-slate-950">网络环节知识点</p>
                 <p className="mt-2">
-                  HTTP 请求需要明确服务器 IP、端口、路由和参数。数据上传走 GET /upload?id=...&val=...，页面查询走 GET /。如果日志、数据库和画布现象不一致，要沿着“传感器、主板、IoT、路由器、服务器、数据库、用户端”的顺序定位断点。
+                  HTTP 请求需要明确服务器 IP、端口、路由和参数。数据上传走 GET /upload?id=...&val=...，页面查询走 GET /。如果日志、数据库和画布现象不一致，要沿着“传感器、智能终端、IoT、路由器、服务器、数据库、用户端”的顺序定位断点。
                 </p>
               </div>
             </aside>
@@ -775,7 +766,7 @@ export default function LessonFlowPage() {
               <h3 className="text-lg font-semibold">故障注入与数据证据</h3>
               <div className="mt-4 space-y-3 text-sm leading-6 text-slate-700">
                 <p className="rounded-md bg-slate-50 p-3">手动设置传感器故障：源头没有正确数据，数据库和页面会同步异常。</p>
-                <p className="rounded-md bg-slate-50 p-3">手动设置网络故障：micro:bit 可能能读数，但 Flask 收不到 GET /upload?id=...&val=... 请求。</p>
+                <p className="rounded-md bg-slate-50 p-3">手动设置网络故障：智能终端可能能读数，但 Flask 收不到 GET /upload?id=...&val=... 请求。</p>
                 <p className="rounded-md bg-slate-50 p-3">手动设置执行器故障：数据库有 alarm = 1，服务器返回指令，但蜂鸣器不执行。</p>
                 <p className="rounded-md bg-slate-50 p-3">手动设置页面故障：数据库有记录，但用户端看不到或看错数据。</p>
               </div>

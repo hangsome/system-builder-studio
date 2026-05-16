@@ -185,8 +185,8 @@
           if (microbitFault) {
             addLog({
               type: 'error',
-              message: getComponentFaultMessage(microbitFault, 'micro:bit 故障，无法执行采集和上传程序'),
-              source: 'micro:bit',
+              message: getComponentFaultMessage(microbitFault, '智能终端故障，无法执行采集和上传程序'),
+              source: '智能终端',
             });
             return;
           }
@@ -219,7 +219,7 @@
               addLog({
                type: 'warning',
                message: `${def?.name} 未供电，无法读取数据`,
-               source: 'micro:bit',
+               source: '智能终端',
               });
               return;
             }
@@ -238,7 +238,7 @@
               addLog({
                 type: 'warning',
                 message: pinMismatchMessage,
-                source: 'micro:bit',
+                source: '智能终端',
               });
               return;
             }
@@ -248,7 +248,7 @@
               addLog({
                 type: 'warning',
                 message: uploadMethodMismatch,
-                source: 'micro:bit',
+                source: '智能终端',
               });
               return;
             }
@@ -260,7 +260,7 @@
            addLog({
              type: 'data',
              message: `读取 ${def?.name}: ${value?.toFixed(1) ?? '?'} ${sensorConfigs[sensor.definitionId]?.unit ?? ''}`,
-             source: 'micro:bit',
+             source: '智能终端',
            });
  
            const requestPath = `/upload?id=1&val=${numericValue.toFixed(1)}`;

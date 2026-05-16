@@ -9,6 +9,7 @@ import {
   LogEntry 
 } from '@/types/simulator';
 import { createId } from '@/lib/utils';
+import { validateConnection } from '@/lib/connectionValidator';
 import { componentDefinitions } from '@/data/componentDefinitions';
 import {
   classroomDatabase,
@@ -86,6 +87,7 @@ interface SimulatorStore {
   toggleGrid: () => void;
   
   addComponent: (component: PlacedComponent) => void;
+  addSmartTerminal: (position: { x: number; y: number }) => void;
   removeComponent: (instanceId: string) => void;
   updateComponentPosition: (instanceId: string, position: { x: number; y: number }) => void;
   optimizeLayout: () => void;
@@ -235,6 +237,20 @@ function syncFlaskCodeServerAddress(code: string, serverConfig: ServerConfig) {
   return nextCode;
 }
 
+const EXPANSION_POWER_PINS = ['3v-out1', '3v-out2', '3v-out3', '3v-out4'];
+const EXPANSION_GROUND_PINS = ['gnd-out1', 'gnd-out2', 'gnd-out3', 'gnd-out4'];
+const EXPANSION_SENSOR_SIGNAL_PINS = ['p1', 'p0', 'p3', 'p4', 'p5', 'p13', 'p14'];
+const EXPANSION_ACTUATOR_SIGNAL_PINS = ['p2', 'p3', 'p4', 'p5', 'p0', 'p13', 'p14'];
+const SMART_TERMINAL_MICROBIT_OFFSET = { x: 60, y: -175 };
+
+function isPinOccupied(connections: Connection[], componentId: string, pinId: string) {
+  return connections.some(
+    (connection) =>
+      (connection.fromComponent === componentId && connection.fromPin === pinId) ||
+      (connection.toComponent === componentId && connection.toPin === pinId)
+  );
+}
+
 const optimizedLayoutPositions: Record<string, { x: number; y: number }> = {
   'pc-computer': { x: 75, y: 105 },
   microbit: { x: 310, y: 85 },
@@ -372,6 +388,14 @@ export const useSimulatorStore = create<SimulatorStore>()(
                 c.toPin === fromPin)
           );
 
+        const activeConnections = () => [...state.connections, ...pendingConnections];
+
+        const hasPinConnection = (componentId: string, pinId: string) =>
+          isPinOccupied(activeConnections(), componentId, pinId);
+
+        const findAvailablePin = (componentId: string, pinIds: string[]) =>
+          pinIds.find((pinId) => !hasPinConnection(componentId, pinId));
+
         const pushAutoConnection = (
           fromComponent: string,
           fromPin: string,
@@ -380,7 +404,11 @@ export const useSimulatorStore = create<SimulatorStore>()(
           type: Connection['type']
         ) => {
           if (hasExactConnection(fromComponent, fromPin, toComponent, toPin)) {
-            return;
+            return false;
+          }
+
+          if (hasPinConnection(fromComponent, fromPin) || hasPinConnection(toComponent, toPin)) {
+            return false;
           }
 
           pendingConnections.push({
@@ -392,6 +420,8 @@ export const useSimulatorStore = create<SimulatorStore>()(
             type,
             valid: true,
           });
+
+          return true;
         };
 
         if (microbit && expansionBoard) {
@@ -402,7 +432,7 @@ export const useSimulatorStore = create<SimulatorStore>()(
           pushAutoConnection(microbit.instanceId, '3v', expansionBoard.instanceId, 'slot-3v', 'power');
           pushAutoConnection(microbit.instanceId, 'gnd', expansionBoard.instanceId, 'slot-gnd', 'ground');
           if (pendingConnections.length > beforeCount) {
-            autoMessages.push('micro:bit 已自动插入扩展板');
+            autoMessages.push('智能终端内部连接已建立');
           }
         }
 
@@ -412,8 +442,24 @@ export const useSimulatorStore = create<SimulatorStore>()(
 
           iotComponents.forEach((iot) => {
             const beforeCount = pendingConnections.length;
-            pushAutoConnection(iot.instanceId, 'vcc', expansionBoard.instanceId, '3v-out2', 'power');
-            pushAutoConnection(iot.instanceId, 'gnd', expansionBoard.instanceId, 'gnd-out2', 'ground');
+            if (hasPinConnection(iot.instanceId, 'tx') || hasPinConnection(iot.instanceId, 'rx')) {
+              return;
+            }
+
+            const powerPin = findAvailablePin(expansionBoard.instanceId, ['3v-out2', ...EXPANSION_POWER_PINS]);
+            const groundPin = findAvailablePin(expansionBoard.instanceId, ['gnd-out2', ...EXPANSION_GROUND_PINS]);
+
+            if (
+              !powerPin ||
+              !groundPin ||
+              hasPinConnection(expansionBoard.instanceId, 'p15') ||
+              hasPinConnection(expansionBoard.instanceId, 'p16')
+            ) {
+              return;
+            }
+
+            pushAutoConnection(iot.instanceId, 'vcc', expansionBoard.instanceId, powerPin, 'power');
+            pushAutoConnection(iot.instanceId, 'gnd', expansionBoard.instanceId, groundPin, 'ground');
             pushAutoConnection(iot.instanceId, 'tx', expansionBoard.instanceId, 'p15', 'serial');
             pushAutoConnection(iot.instanceId, 'rx', expansionBoard.instanceId, 'p16', 'serial');
             if (pendingConnections.length > beforeCount) {
@@ -422,18 +468,18 @@ export const useSimulatorStore = create<SimulatorStore>()(
           });
 
           if (autoConnectedIotCount === 1) {
-            autoMessages.push('IOT模块已自动连接到扩展板(P15/P16)');
+            autoMessages.push('IOT模块已自动连接到智能终端(P15/P16)');
           } else if (autoConnectedIotCount > 1) {
-            autoMessages.push(`已自动连接 ${autoConnectedIotCount} 个IOT模块到扩展板(P15/P16)`);
+            autoMessages.push(`已自动连接 ${autoConnectedIotCount} 个IOT模块到智能终端(P15/P16)`);
           }
         }
 
         if (expansionBoard) {
-          const sensorMappings: Record<string, { signalPin: string; expansionPin: string }> = {
-            'temp-humidity-sensor': { signalPin: 'data', expansionPin: 'p1' },
-            'light-sensor': { signalPin: 'ao', expansionPin: 'p1' },
-            'sound-sensor': { signalPin: 'ao', expansionPin: 'p1' },
-            'infrared-sensor': { signalPin: 'out', expansionPin: 'p1' },
+          const sensorMappings: Record<string, { signalPin: string; expansionPins: string[] }> = {
+            'temp-humidity-sensor': { signalPin: 'data', expansionPins: EXPANSION_SENSOR_SIGNAL_PINS },
+            'light-sensor': { signalPin: 'ao', expansionPins: ['p0', 'p3', 'p4', 'p5', 'p13', 'p14', 'p1'] },
+            'sound-sensor': { signalPin: 'ao', expansionPins: ['p3', 'p4', 'p5', 'p13', 'p14', 'p0', 'p1'] },
+            'infrared-sensor': { signalPin: 'out', expansionPins: ['p4', 'p5', 'p13', 'p14', 'p3', 'p0', 'p1'] },
           };
 
           const sensorComponents = newComponents.filter((candidate) => sensorMappings[candidate.definitionId]);
@@ -442,23 +488,35 @@ export const useSimulatorStore = create<SimulatorStore>()(
           sensorComponents.forEach((sensor) => {
             const mapping = sensorMappings[sensor.definitionId];
             const beforeCount = pendingConnections.length;
-            pushAutoConnection(sensor.instanceId, 'vcc', expansionBoard.instanceId, '3v-out1', 'power');
-            pushAutoConnection(sensor.instanceId, 'gnd', expansionBoard.instanceId, 'gnd-out1', 'ground');
-            pushAutoConnection(sensor.instanceId, mapping.signalPin, expansionBoard.instanceId, mapping.expansionPin, 'data');
+            if (hasPinConnection(sensor.instanceId, mapping.signalPin)) {
+              return;
+            }
+
+            const powerPin = findAvailablePin(expansionBoard.instanceId, EXPANSION_POWER_PINS);
+            const groundPin = findAvailablePin(expansionBoard.instanceId, EXPANSION_GROUND_PINS);
+            const expansionPin = findAvailablePin(expansionBoard.instanceId, mapping.expansionPins);
+
+            if (!powerPin || !groundPin || !expansionPin) {
+              return;
+            }
+
+            pushAutoConnection(sensor.instanceId, 'vcc', expansionBoard.instanceId, powerPin, 'power');
+            pushAutoConnection(sensor.instanceId, 'gnd', expansionBoard.instanceId, groundPin, 'ground');
+            pushAutoConnection(sensor.instanceId, mapping.signalPin, expansionBoard.instanceId, expansionPin, 'data');
             if (pendingConnections.length > beforeCount) {
               autoConnectedSensorCount += 1;
             }
           });
 
           if (autoConnectedSensorCount > 0) {
-            autoMessages.push(`已自动连接 ${autoConnectedSensorCount} 个传感器到扩展板(P1)`);
+            autoMessages.push(`已自动连接 ${autoConnectedSensorCount} 个传感器到智能终端空闲引脚`);
           }
 
-          const actuatorMappings: Record<string, { signalPin: string; expansionPin: string; powerPin: string; groundPin: string }> = {
-            buzzer: { signalPin: 'io', expansionPin: 'p2', powerPin: '3v-out3', groundPin: 'gnd-out3' },
-            'led-strip': { signalPin: 'din', expansionPin: 'p2', powerPin: '3v-out3', groundPin: 'gnd-out3' },
-            servo: { signalPin: 'signal', expansionPin: 'p2', powerPin: '3v-out3', groundPin: 'gnd-out3' },
-            relay: { signalPin: 'in', expansionPin: 'p2', powerPin: '3v-out3', groundPin: 'gnd-out3' },
+          const actuatorMappings: Record<string, { signalPin: string; expansionPins: string[] }> = {
+            buzzer: { signalPin: 'io', expansionPins: EXPANSION_ACTUATOR_SIGNAL_PINS },
+            'led-strip': { signalPin: 'din', expansionPins: ['p3', 'p4', 'p5', 'p13', 'p14', 'p2', 'p0'] },
+            servo: { signalPin: 'signal', expansionPins: ['p4', 'p5', 'p13', 'p14', 'p3', 'p2', 'p0'] },
+            relay: { signalPin: 'in', expansionPins: ['p5', 'p13', 'p14', 'p4', 'p3', 'p2', 'p0'] },
           };
 
           const actuatorComponents = newComponents.filter((candidate) => actuatorMappings[candidate.definitionId]);
@@ -467,16 +525,28 @@ export const useSimulatorStore = create<SimulatorStore>()(
           actuatorComponents.forEach((actuator) => {
             const mapping = actuatorMappings[actuator.definitionId];
             const beforeCount = pendingConnections.length;
-            pushAutoConnection(actuator.instanceId, 'vcc', expansionBoard.instanceId, mapping.powerPin, 'power');
-            pushAutoConnection(actuator.instanceId, 'gnd', expansionBoard.instanceId, mapping.groundPin, 'ground');
-            pushAutoConnection(actuator.instanceId, mapping.signalPin, expansionBoard.instanceId, mapping.expansionPin, 'data');
+            if (hasPinConnection(actuator.instanceId, mapping.signalPin)) {
+              return;
+            }
+
+            const powerPin = findAvailablePin(expansionBoard.instanceId, ['3v-out3', ...EXPANSION_POWER_PINS]);
+            const groundPin = findAvailablePin(expansionBoard.instanceId, ['gnd-out3', ...EXPANSION_GROUND_PINS]);
+            const expansionPin = findAvailablePin(expansionBoard.instanceId, mapping.expansionPins);
+
+            if (!powerPin || !groundPin || !expansionPin) {
+              return;
+            }
+
+            pushAutoConnection(actuator.instanceId, 'vcc', expansionBoard.instanceId, powerPin, 'power');
+            pushAutoConnection(actuator.instanceId, 'gnd', expansionBoard.instanceId, groundPin, 'ground');
+            pushAutoConnection(actuator.instanceId, mapping.signalPin, expansionBoard.instanceId, expansionPin, 'data');
             if (pendingConnections.length > beforeCount) {
               autoConnectedActuatorCount += 1;
             }
           });
 
           if (autoConnectedActuatorCount > 0) {
-            autoMessages.push(`已自动连接 ${autoConnectedActuatorCount} 个执行器到扩展板(P2)`);
+            autoMessages.push(`已自动连接 ${autoConnectedActuatorCount} 个执行器到智能终端空闲引脚`);
           }
         }
 
@@ -536,34 +606,66 @@ export const useSimulatorStore = create<SimulatorStore>()(
 
         set({ placedComponents: newComponents });
       },
+
+      addSmartTerminal: (position) => {
+        const microbit: PlacedComponent = {
+          instanceId: createId(),
+          definitionId: 'microbit',
+          position: {
+            x: position.x + SMART_TERMINAL_MICROBIT_OFFSET.x,
+            y: position.y + SMART_TERMINAL_MICROBIT_OFFSET.y,
+          },
+          state: { powered: true, active: false },
+        };
+
+        const expansionBoard: PlacedComponent = {
+          instanceId: createId(),
+          definitionId: 'expansion-board',
+          position,
+          state: { powered: true, active: false },
+        };
+
+        get().addComponent(microbit);
+        get().addComponent(expansionBoard);
+      },
       
       removeComponent: (instanceId) => {
         const state = get();
         const componentToRemove = state.placedComponents.find(c => c.instanceId === instanceId);
         
         if (!componentToRemove) return;
+
+        const smartTerminalPartner = !state.detailsVisible && componentToRemove.definitionId === 'expansion-board'
+          ? state.placedComponents.find((component) => component.definitionId === 'microbit')
+          : null;
+        const removeIds = new Set([
+          instanceId,
+          ...(smartTerminalPartner ? [smartTerminalPartner.instanceId] : []),
+        ]);
         
         const removedConnections = state.connections.filter(
-          (conn) => conn.fromComponent === instanceId || conn.toComponent === instanceId
+          (conn) => removeIds.has(conn.fromComponent) || removeIds.has(conn.toComponent)
         );
         const remainingConnections = state.connections.filter(
-          (conn) => conn.fromComponent !== instanceId && conn.toComponent !== instanceId
+          (conn) => !removeIds.has(conn.fromComponent) && !removeIds.has(conn.toComponent)
         );
         
         // 生成移除提示
         let message = '';
-        if (componentToRemove.definitionId === 'microbit') {
-          message = 'micro:bit 已移除，扩展板连接已断开';
+        if (smartTerminalPartner) {
+          message = '智能终端已移除，相关连接已断开';
+        } else if (componentToRemove.definitionId === 'microbit') {
+          message = '智能终端中的 micro:bit 已移除，内部连接已断开';
         } else if (componentToRemove.definitionId === 'expansion-board') {
-          message = '扩展板已移除，所有连接已断开';
+          message = '智能终端中的扩展板已移除，所有连接已断开';
         } else if (removedConnections.length > 0) {
           message = `组件已移除，${removedConnections.length} 条连线已自动断开`;
         }
         
         set({
-          placedComponents: state.placedComponents.filter((c) => c.instanceId !== instanceId),
+          placedComponents: state.placedComponents.filter((c) => !removeIds.has(c.instanceId)),
           connections: remainingConnections,
-          selectedComponentId: state.selectedComponentId === instanceId ? null : state.selectedComponentId,
+          selectedComponentId: state.selectedComponentId && removeIds.has(state.selectedComponentId) ? null : state.selectedComponentId,
           lastConnectionResult: message ? {
             success: true,
             message,
@@ -572,11 +674,46 @@ export const useSimulatorStore = create<SimulatorStore>()(
         });
       },
       
-      updateComponentPosition: (instanceId, position) => set((state) => ({
-        placedComponents: state.placedComponents.map((c) =>
-          c.instanceId === instanceId ? { ...c, position } : c
-        ),
-      })),
+      updateComponentPosition: (instanceId, position) => set((state) => {
+        const component = state.placedComponents.find((candidate) => candidate.instanceId === instanceId);
+        if (!component) {
+          return {};
+        }
+
+        if (!state.detailsVisible && component.definitionId === 'expansion-board') {
+          const microbit = state.placedComponents.find((candidate) => candidate.definitionId === 'microbit');
+          if (microbit) {
+            const deltaX = position.x - component.position.x;
+            const deltaY = position.y - component.position.y;
+
+            return {
+              placedComponents: state.placedComponents.map((candidate) => {
+                if (candidate.instanceId === instanceId) {
+                  return { ...candidate, position };
+                }
+
+                if (candidate.instanceId === microbit.instanceId) {
+                  return {
+                    ...candidate,
+                    position: {
+                      x: candidate.position.x + deltaX,
+                      y: candidate.position.y + deltaY,
+                    },
+                  };
+                }
+
+                return candidate;
+              }),
+            };
+          }
+        }
+
+        return {
+          placedComponents: state.placedComponents.map((c) =>
+            c.instanceId === instanceId ? { ...c, position } : c
+          ),
+        };
+      }),
 
       optimizeLayout: () => set((state) => {
         const seenByDefinition = new Map<string, number>();
@@ -680,32 +817,38 @@ export const useSimulatorStore = create<SimulatorStore>()(
           return;
         }
         
-        // 根据引脚类型判断连接类型
-        let connectionType: 'power' | 'ground' | 'data' | 'serial' = 'data';
-        let connectionLabel = '';
-        
-        // 简单判断逻辑
-        if (fromPinId.includes('vcc') || fromPinId.includes('3v') || toPinId.includes('vcc') || toPinId.includes('3v')) {
-          connectionType = 'power';
-          connectionLabel = '电源(VCC/3V)';
-        } else if (fromPinId.includes('gnd') || toPinId.includes('gnd')) {
-          connectionType = 'ground';
-          connectionLabel = '接地(GND)';
-        } else if (
-          fromPinId.includes('tx') ||
-          fromPinId.includes('rx') ||
-          toPinId.includes('tx') ||
-          toPinId.includes('rx') ||
-          fromPinId === 'p15' ||
-          fromPinId === 'p16' ||
-          toPinId === 'p15' ||
-          toPinId === 'p16'
-        ) {
-          connectionType = 'serial';
-          connectionLabel = 'IoT通信';
-        } else {
-          connectionLabel = '数据';
+        const validation = validateConnection(
+          fromComponentId,
+          fromPinId,
+          toComponentId,
+          toPinId,
+          state.placedComponents,
+          state.connections
+        );
+
+        if (!validation.valid) {
+          set({
+            isDrawingConnection: false,
+            connectionStart: null,
+            tempConnectionEnd: null,
+            lastConnectionResult: {
+              success: false,
+              message: validation.errors[0] || '连接不符合规则',
+              type: 'error',
+            },
+          });
+          return;
         }
+
+        const connectionType = validation.type;
+        const connectionLabels: Record<Connection['type'], string> = {
+          power: '电源(VCC/3V)',
+          ground: '接地(GND)',
+          data: '数据',
+          serial: 'IoT通信',
+          wireless: 'WiFi',
+        };
+        const connectionLabel = connectionLabels[connectionType];
         
         const newConnection: Connection = {
           id: createId(),

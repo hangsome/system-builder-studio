@@ -337,7 +337,7 @@ export function EnhancedCodeEditor() {
           onClick={() => setActiveEditor('microbit')}
         >
           <Puzzle className="h-3 w-3 mr-1" />
-          micro:bit
+          智能终端
         </Button>
         <Button
           variant={activeEditor === 'flask' ? 'default' : 'outline'}
@@ -386,7 +386,7 @@ export function EnhancedCodeEditor() {
         )}
       </div>
 
-      {/* micro:bit 编辑区 */}
+      {/* 智能终端（micro:bit）编辑区 */}
       {activeEditor === 'microbit' && (
         <div className="flex-1 flex">
           {showBlockEditor && codeMode === 'blocks' ? (
@@ -531,14 +531,14 @@ export function EnhancedCodeEditor() {
             /* Python 代码编辑器 */
             <div className="flex-1 flex flex-col">
               <div className="flex items-center justify-between p-2 border-b border-border">
-                <span className="text-xs text-muted-foreground">micro:bit Python</span>
+                <span className="text-xs text-muted-foreground">智能终端（micro:bit）Python</span>
               </div>
               <div className="flex-1 relative">
                 <textarea
                   value={microbitCode}
                   onChange={(e) => setMicrobitCode(e.target.value)}
                   className="absolute inset-0 w-full h-full p-2 font-mono text-xs bg-muted/30 border-0 resize-none focus:outline-none focus:ring-0"
-                  placeholder="在此编写 micro:bit Python 代码..."
+                  placeholder="在此编写智能终端（micro:bit）Python 代码..."
                   spellCheck={false}
                 />
               </div>

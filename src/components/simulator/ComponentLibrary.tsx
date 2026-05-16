@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { componentsByCategory, categoryNames } from '@/data/componentDefinitions';
+import {
+  componentsByCategory,
+  categoryNames,
+  expansionBoard,
+  microbitBoard,
+} from '@/data/componentDefinitions';
 import { ComponentDefinition } from '@/types/simulator';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import {
@@ -32,6 +37,8 @@ export function ComponentLibrary({ onDragStart }: ComponentLibraryProps) {
     Object.keys(categoryNames)
   );
   const addComponent = useSimulatorStore((state) => state.addComponent);
+  const addSmartTerminal = useSimulatorStore((state) => state.addSmartTerminal);
+  const detailsVisible = useSimulatorStore((state) => state.detailsVisible);
 
   const toggleCategory = (category: string) => {
     setExpandedCategories((prev) =>
@@ -51,6 +58,11 @@ export function ComponentLibrary({ onDragStart }: ComponentLibraryProps) {
   };
 
   const handleDoubleClick = (definition: ComponentDefinition) => {
+    if (definition.id === 'smart-terminal') {
+      addSmartTerminal({ x: 220 + Math.random() * 80, y: 240 + Math.random() * 80 });
+      return;
+    }
+
     const newComponent = {
       instanceId: createId(),
       definitionId: definition.id,
@@ -71,7 +83,13 @@ export function ComponentLibrary({ onDragStart }: ComponentLibraryProps) {
       </div>
       
       <div className="p-2 space-y-1">
-        {Object.entries(componentsByCategory).map(([category, components]) => (
+        {Object.entries(componentsByCategory).map(([category, components]) => {
+          const visibleComponents =
+            detailsVisible && category === 'mainboard'
+              ? [microbitBoard, expansionBoard]
+              : components;
+
+          return (
           <div key={category} className="rounded-md overflow-hidden">
             <button
               onClick={() => toggleCategory(category)}
@@ -85,13 +103,13 @@ export function ComponentLibrary({ onDragStart }: ComponentLibraryProps) {
               {categoryIcons[category]}
               <span>{categoryNames[category]}</span>
               <span className="ml-auto text-xs text-muted-foreground">
-                {components.length}
+                {visibleComponents.length}
               </span>
             </button>
             
             {expandedCategories.includes(category) && (
               <div className="pl-4 pr-2 pb-2 space-y-1">
-                {components.map((component) => (
+                {visibleComponents.map((component) => (
                   <div
                     key={component.id}
                     draggable
@@ -118,7 +136,8 @@ export function ComponentLibrary({ onDragStart }: ComponentLibraryProps) {
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -128,6 +147,16 @@ function ComponentIcon({ type }: { type: string }) {
   const iconClasses = "h-8 w-8 p-1.5 rounded bg-primary/10 text-primary";
   
   switch (type) {
+    case 'smart-terminal':
+      return (
+        <div className={iconClasses}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <path d="M7 9h10M7 12h10M7 15h10" />
+            <path d="M5 8h-2M5 16h-2M19 8h2M19 16h2" />
+          </svg>
+        </div>
+      );
     case 'microbit':
       return (
         <div className={iconClasses}>

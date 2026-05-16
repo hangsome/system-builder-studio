@@ -92,7 +92,7 @@ export function CodeEditor() {
           onClick={() => setActiveEditor('microbit')}
         >
           <Puzzle className="h-4 w-4 mr-1" />
-          micro:bit
+          智能终端
         </Button>
         <Button
           variant={activeEditor === 'flask' ? 'default' : 'outline'}
@@ -129,7 +129,7 @@ export function CodeEditor() {
         )}
       </div>
 
-      {/* micro:bit 编辑区 */}
+      {/* 智能终端（micro:bit）编辑区 */}
       {activeEditor === 'microbit' && (
         <div className="flex-1 flex">
           {codeMode === 'blocks' ? (
@@ -206,7 +206,7 @@ export function CodeEditor() {
           ) : (
             <div className="flex-1 flex flex-col p-2">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-xs text-muted-foreground">micro:bit Python 代码</span>
+                <span className="text-xs text-muted-foreground">智能终端（micro:bit）Python 代码</span>
                 <Button size="sm" variant="outline" onClick={() => setCodeMode('blocks')}>
                   切换到积木
                 </Button>
@@ -215,7 +215,7 @@ export function CodeEditor() {
                 value={microbitCode}
                 onChange={(e) => setMicrobitCode(e.target.value)}
                 className="flex-1 font-mono text-sm resize-none"
-                placeholder="在此编写 micro:bit Python 代码..."
+                placeholder="在此编写智能终端（micro:bit）Python 代码..."
               />
             </div>
           )}

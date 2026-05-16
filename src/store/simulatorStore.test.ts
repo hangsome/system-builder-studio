@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSimulatorStore } from '@/store/simulatorStore';
+import { loadScenario } from '@/data/scenarios';
 import type { PlacedComponent } from '@/types/simulator';
 
 const microbit: PlacedComponent = {
@@ -26,10 +27,22 @@ const tempSensor: PlacedComponent = {
   position: { x: 120, y: 0 },
 };
 
+const lightSensor: PlacedComponent = {
+  instanceId: 'light-1',
+  definitionId: 'light-sensor',
+  position: { x: 120, y: 80 },
+};
+
 const buzzer: PlacedComponent = {
   instanceId: 'buzzer-1',
   definitionId: 'buzzer',
   position: { x: 160, y: 0 },
+};
+
+const ledStrip: PlacedComponent = {
+  instanceId: 'led-1',
+  definitionId: 'led-strip',
+  position: { x: 160, y: 80 },
 };
 
 const router: PlacedComponent = {
@@ -84,6 +97,24 @@ describe('simulatorStore', () => {
     state = useSimulatorStore.getState();
     expect(state.connections).toHaveLength(1);
     expect(state.lastConnectionResult?.success).toBe(false);
+  });
+
+  it('rejects a manual connection when either pin is already occupied', () => {
+    const store = useSimulatorStore.getState();
+
+    store.addComponent(microbit);
+    store.addComponent(tempSensor);
+    store.addComponent(lightSensor);
+
+    store.startConnection('microbit-1', 'p0');
+    store.completeConnection('temp-1', 'data');
+    store.startConnection('microbit-1', 'p0');
+    store.completeConnection('light-1', 'ao');
+
+    const state = useSimulatorStore.getState();
+    expect(state.connections).toHaveLength(1);
+    expect(state.lastConnectionResult?.success).toBe(false);
+    expect(state.lastConnectionResult?.message).toContain('已被占用');
   });
 
   it('resetSimulator clears components and connections', () => {
@@ -146,6 +177,69 @@ describe('simulatorStore', () => {
     expect(hasConnection('rx', 'p16')).toBe(true);
   });
 
+  it('adds a smart terminal as a microbit and expansion board pair', () => {
+    const store = useSimulatorStore.getState();
+
+    store.addSmartTerminal({ x: 250, y: 260 });
+
+    const state = useSimulatorStore.getState();
+    const microbit = state.placedComponents.find((component) => component.definitionId === 'microbit');
+    const expansion = state.placedComponents.find((component) => component.definitionId === 'expansion-board');
+
+    expect(microbit?.position).toEqual({ x: 310, y: 85 });
+    expect(expansion?.position).toEqual({ x: 250, y: 260 });
+    expect(
+      state.connections.some(
+        (connection) =>
+          connection.fromComponent === microbit?.instanceId &&
+          connection.fromPin === 'p1' &&
+          connection.toComponent === expansion?.instanceId &&
+          connection.toPin === 'slot-p1',
+      ),
+    ).toBe(true);
+  });
+
+  it('moves a collapsed smart terminal as one grouped component', () => {
+    const store = useSimulatorStore.getState();
+
+    store.addComponent(microbit);
+    store.addComponent(expansionBoard);
+    store.updateComponentPosition('expansion-1', { x: 120, y: 140 });
+
+    const state = useSimulatorStore.getState();
+    expect(state.placedComponents.find((component) => component.instanceId === 'expansion-1')?.position).toEqual({
+      x: 120,
+      y: 140,
+    });
+    expect(state.placedComponents.find((component) => component.instanceId === 'microbit-1')?.position).toEqual({
+      x: 100,
+      y: 140,
+    });
+  });
+
+  it('loads the classroom starter canvas as the optimized core chain only', () => {
+    const scenario = loadScenario('classroom-temperature');
+    expect(scenario).toBeTruthy();
+
+    useSimulatorStore.getState().loadScenario(scenario!);
+    const state = useSimulatorStore.getState();
+    const definitionIds = state.placedComponents.map((component) => component.definitionId);
+
+    expect(definitionIds).toEqual([
+      'microbit',
+      'expansion-board',
+      'iot-module',
+      'router',
+      'web-server',
+      'database',
+    ]);
+    expect(state.placedComponents.find((component) => component.definitionId === 'expansion-board')?.position).toEqual({
+      x: 250,
+      y: 260,
+    });
+    expect(state.detailsVisible).toBe(false);
+  });
+
   it('auto connects classroom sensor and actuator to the planned pins', () => {
     const store = useSimulatorStore.getState();
 
@@ -165,6 +259,42 @@ describe('simulatorStore', () => {
 
     expect(hasConnection('temp-1', 'data', 'p1')).toBe(true);
     expect(hasConnection('buzzer-1', 'io', 'p2')).toBe(true);
+  });
+
+  it('auto connects extra sensors and actuators to different free expansion pins', () => {
+    const store = useSimulatorStore.getState();
+
+    store.addComponent(expansionBoard);
+    store.addComponent(tempSensor);
+    store.addComponent(lightSensor);
+    store.addComponent(buzzer);
+    store.addComponent(ledStrip);
+
+    const state = useSimulatorStore.getState();
+    const expansionPins = state.connections
+      .filter((connection) => connection.toComponent === 'expansion-1')
+      .map((connection) => connection.toPin);
+    const uniqueExpansionPins = new Set(expansionPins);
+
+    expect(uniqueExpansionPins.size).toBe(expansionPins.length);
+    expect(
+      state.connections.some(
+        (connection) =>
+          connection.fromComponent === 'light-1' &&
+          connection.fromPin === 'ao' &&
+          connection.toComponent === 'expansion-1' &&
+          connection.toPin !== 'p1',
+      ),
+    ).toBe(true);
+    expect(
+      state.connections.some(
+        (connection) =>
+          connection.fromComponent === 'led-1' &&
+          connection.fromPin === 'din' &&
+          connection.toComponent === 'expansion-1' &&
+          connection.toPin !== 'p2',
+      ),
+    ).toBe(true);
   });
 
   it('auto connects IoT, router, server, and database classroom chain', () => {
@@ -189,5 +319,39 @@ describe('simulatorStore', () => {
     expect(hasConnection('iot-1', 'wifi', 'router-1', 'wifi')).toBe(true);
     expect(hasConnection('router-1', 'lan', 'server-1', 'network')).toBe(true);
     expect(hasConnection('server-1', 'db', 'database-1', 'connection')).toBe(true);
+  });
+
+  it('auto connects the WiFi link when router and IoT are added in either order', () => {
+    let store = useSimulatorStore.getState();
+
+    store.addComponent(iotModule);
+    store.addComponent(router);
+
+    let state = useSimulatorStore.getState();
+    expect(
+      state.connections.some(
+        (connection) =>
+          connection.fromComponent === 'iot-1' &&
+          connection.fromPin === 'wifi' &&
+          connection.toComponent === 'router-1' &&
+          connection.toPin === 'wifi',
+      ),
+    ).toBe(true);
+
+    useSimulatorStore.getState().resetSimulator();
+    store = useSimulatorStore.getState();
+    store.addComponent(router);
+    store.addComponent(iotModule);
+
+    state = useSimulatorStore.getState();
+    expect(
+      state.connections.some(
+        (connection) =>
+          connection.fromComponent === 'iot-1' &&
+          connection.fromPin === 'wifi' &&
+          connection.toComponent === 'router-1' &&
+          connection.toPin === 'wifi',
+      ),
+    ).toBe(true);
   });
 });

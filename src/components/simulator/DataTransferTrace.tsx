@@ -170,13 +170,13 @@ export function DataTransferTrace({
     },
     {
       id: 'serial',
-      title: 'micro:bit / IoT 通信',
+      title: '智能终端 / IoT 通信',
       subtitle: codeBurned ? '代码已烧录' : '等待烧录',
       detail: maskedDetail(
         faults.microbit,
         serialConnected
-          ? 'micro:bit 读取采样值，并把数据交给 IoT 模块。'
-          : '需要保持 micro:bit、扩展板与 IoT 模块之间的通信链路可用。'
+          ? '智能终端读取采样值，并把数据交给 IoT 模块。'
+          : '需要保持智能终端与 IoT 模块之间的通信链路可用。'
       ),
       status: !codeBurned || !serialConnected || faults.microbit ? 'blocked' : isRunning ? 'active' : 'ready',
       icon: Cpu,

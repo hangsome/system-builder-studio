@@ -1,7 +1,7 @@
 // 连接验证面板 - 显示连接状态和错误
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { validateSystem, getConnectionColor } from '@/lib/connectionValidator';
-import { componentDefinitions } from '@/data/componentDefinitions';
+import { componentDefinitions, smartTerminalDefinition } from '@/data/componentDefinitions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -14,6 +14,15 @@ import {
   Zap,
   ZapOff 
 } from 'lucide-react';
+import { useMemo } from 'react';
+
+const isSmartTerminalInternalConnection = (
+  connection: { fromComponent: string; toComponent: string },
+  microbitIds: Set<string>,
+  expansionIds: Set<string>
+) =>
+  (microbitIds.has(connection.fromComponent) && expansionIds.has(connection.toComponent)) ||
+  (expansionIds.has(connection.fromComponent) && microbitIds.has(connection.toComponent));
 
 export function ConnectionValidationPanel() {
   const { 
@@ -24,9 +33,30 @@ export function ConnectionValidationPanel() {
   } = useSimulatorStore();
 
   const validation = validateSystem(placedComponents, connections);
+  const smartTerminalIds = useMemo(() => {
+    const microbitIds = new Set(
+      placedComponents
+        .filter((component) => component.definitionId === 'microbit')
+        .map((component) => component.instanceId)
+    );
+    const expansionIds = new Set(
+      placedComponents
+        .filter((component) => component.definitionId === 'expansion-board')
+        .map((component) => component.instanceId)
+    );
+
+    return { microbitIds, expansionIds };
+  }, [placedComponents]);
   const visibleConnections = detailsVisible
     ? connections
-    : connections.filter((connection) => connection.type !== 'power' && connection.type !== 'ground');
+    : connections.filter(
+        (connection) =>
+          connection.type !== 'power' &&
+          connection.type !== 'ground' &&
+          !isSmartTerminalInternalConnection(connection, smartTerminalIds.microbitIds, smartTerminalIds.expansionIds) &&
+          !smartTerminalIds.microbitIds.has(connection.fromComponent) &&
+          !smartTerminalIds.microbitIds.has(connection.toComponent)
+      );
   const visibleIssues = detailsVisible
     ? validation.issues
     : validation.issues.filter((issue) => !/电源|接地|VCC|3V|GND/.test(issue));
@@ -124,8 +154,16 @@ export function ConnectionValidationPanel() {
               {visibleConnections.map((conn) => {
                 const fromComponent = placedComponents.find(c => c.instanceId === conn.fromComponent);
                 const toComponent = placedComponents.find(c => c.instanceId === conn.toComponent);
-                const fromDef = fromComponent ? componentDefinitions.find(d => d.id === fromComponent.definitionId) : null;
-                const toDef = toComponent ? componentDefinitions.find(d => d.id === toComponent.definitionId) : null;
+                const fromDef = fromComponent
+                  ? (!detailsVisible && fromComponent.definitionId === 'expansion-board'
+                    ? smartTerminalDefinition
+                    : componentDefinitions.find(d => d.id === fromComponent.definitionId))
+                  : null;
+                const toDef = toComponent
+                  ? (!detailsVisible && toComponent.definitionId === 'expansion-board'
+                    ? smartTerminalDefinition
+                    : componentDefinitions.find(d => d.id === toComponent.definitionId))
+                  : null;
 
                 return (
                   <div

@@ -69,7 +69,7 @@ export function getSensorPinMismatchMessage(
   if (!connectedPin || readPins.has(connectedPin)) return null;
 
   const expectedPins = Array.from(readPins).map((pin) => pin.toUpperCase()).join(' / ');
-  return `代码读取 ${expectedPins}，但传感器信号线接在 ${connectedPin.toUpperCase()}，micro:bit 无法读到该传感器数据`;
+  return `代码读取 ${expectedPins}，但传感器信号线接在 ${connectedPin.toUpperCase()}，智能终端无法读到该传感器数据`;
 }
 
 export function getActuatorExpansionPin(
@@ -123,7 +123,7 @@ export function getUploadMethodMismatchMessage(code: string) {
   if (callsGetUpload && hasIdParam && hasValParam) return null;
 
   if (/http_post\s*\(/i.test(code) && hasUploadRoute) {
-    return '课堂设定 micro:bit 上传数据应使用 GET /upload?id=传感器编号&val=温度值，但当前代码仍在使用 POST /upload';
+    return '课堂设定智能终端上传数据应使用 GET /upload?id=传感器编号&val=温度值，但当前代码仍在使用 POST /upload';
   }
 
   if (callsGetUpload) {

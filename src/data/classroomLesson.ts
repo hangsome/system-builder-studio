@@ -2,7 +2,7 @@ import type { DatabaseState, RouterConfig, ServerConfig } from '@/types/simulato
 
 export const CLASSROOM_TEMPERATURE_THRESHOLD = 30;
 
-export const classroomStarterMicrobitCode = `# 教室温度检测系统 - micro:bit 端
+export const classroomStarterMicrobitCode = `# 教室温度检测系统 - 智能终端（micro:bit）代码
 # 本段代码用于软件分析与运行测试。先读懂数据采集、阈值判断和网络上传流程。
 
 from microbit import *
@@ -38,7 +38,7 @@ while True:
 `;
 
 export const classroomFlaskCode = `# 教室温度检测系统 - Flask 服务端
-# GET /upload?id=1&val=温度：接收 micro:bit 上传的温度数据
+# GET /upload?id=1&val=温度：接收智能终端上传的温度数据
 # GET /                  ：浏览器或手机访问首页查看最近的温度记录
 
 from flask import Flask, request, render_template
@@ -55,7 +55,7 @@ def init_db():
 
 @app.route('/upload', methods=['GET'])
 def upload_data():
-    # micro:bit 使用 GET /upload?id=1&val=温度 上传采集结果。
+    # 智能终端使用 GET /upload?id=1&val=温度 上传采集结果。
     # 这里用 request.args.get(...) 读取 URL 查询参数 id 和 val。
     temperature = request.args.get('val')
     sensor_id = request.args.get('id', 1)
