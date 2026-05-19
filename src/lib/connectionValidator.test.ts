@@ -63,7 +63,7 @@ describe("validateConnection", () => {
     expect(result.type).toBe("serial");
   });
 
-  it("warns when pins are already connected", () => {
+  it("rejects when pins are already connected", () => {
     const existing: Connection[] = [
       {
         id: "conn-1",
@@ -85,6 +85,7 @@ describe("validateConnection", () => {
       existing,
     );
 
-    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]).toContain("已被占用");
   });
 });

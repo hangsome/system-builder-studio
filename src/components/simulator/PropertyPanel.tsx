@@ -1,9 +1,12 @@
+import { useMemo } from 'react';
 import { useSimulatorStore } from '@/store/simulatorStore';
-import { componentDefinitions } from '@/data/componentDefinitions';
+import { componentDefinitions, smartTerminalDefinition } from '@/data/componentDefinitions';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { Trash2, Settings, Zap, ZapOff } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Trash2, Settings, Zap, ZapOff } from 'lucide-react';
+import { getFaultPreset } from '@/lib/faultModel';
+import { validateSystem } from '@/lib/connectionValidator';
 
 export function PropertyPanel() {
   const {
@@ -12,15 +15,38 @@ export function PropertyPanel() {
     connections,
     removeComponent,
     removeConnection,
+    setComponentFault,
+    detailsVisible,
   } = useSimulatorStore();
 
   const selectedComponent = placedComponents.find(
     (c) => c.instanceId === selectedComponentId
   );
-  
+
+  const shouldShowSmartTerminal =
+    selectedComponent?.definitionId === 'expansion-board' &&
+    !detailsVisible &&
+    placedComponents.some((component) => component.definitionId === 'microbit');
+
   const definition = selectedComponent
-    ? componentDefinitions.find((d) => d.id === selectedComponent.definitionId)
+    ? shouldShowSmartTerminal
+      ? smartTerminalDefinition
+      : componentDefinitions.find((d) => d.id === selectedComponent.definitionId)
     : null;
+
+  // 基于当前连接动态计算供电状态，确保面板显示与连线变化保持同步
+  const powerStatus = useMemo(
+    () => validateSystem(placedComponents, connections).powerStatus,
+    [placedComponents, connections]
+  );
+  const isComponentPowered = selectedComponent
+    ? powerStatus.get(selectedComponent.instanceId) ?? false
+    : false;
+
+  const faultPreset = selectedComponent && definition
+    ? getFaultPreset(selectedComponent.definitionId, definition.category, definition.name)
+    : null;
+  const isFaulty = selectedComponent?.state?.fault === true;
 
   const componentConnections = connections.filter(
     (c) =>
@@ -71,16 +97,16 @@ export function PropertyPanel() {
           
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">电源</span>
-            <span className={`flex items-center gap-1 text-sm ${selectedComponent.state?.powered ? 'text-green-500' : 'text-red-500'}`}>
-              {selectedComponent.state?.powered ? (
+            <span className={`flex items-center gap-1 text-sm ${isComponentPowered ? 'text-green-500' : 'text-red-500'}`}>
+              {isComponentPowered ? (
                 <>
                   <Zap className="h-4 w-4" />
-                  已供电
+                  正常
                 </>
               ) : (
                 <>
                   <ZapOff className="h-4 w-4" />
-                  未供电
+                  需检查
                 </>
               )}
             </span>
@@ -92,6 +118,40 @@ export function PropertyPanel() {
               ({Math.round(selectedComponent.position.x)}, {Math.round(selectedComponent.position.y)})
             </span>
           </div>
+
+          {faultPreset && (
+            <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+              <div className="flex items-start gap-2">
+                {isFaulty ? (
+                  <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive" />
+                ) : (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-600" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium">{isFaulty ? '课堂故障已启用' : '课堂故障未启用'}</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    {isFaulty ? selectedComponent.state?.faultMessage : faultPreset.message}
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant={isFaulty ? 'destructive' : 'outline'}
+                size="sm"
+                className="w-full"
+                onClick={() =>
+                  setComponentFault(
+                    selectedComponent.instanceId,
+                    !isFaulty,
+                    faultPreset.faultType,
+                    faultPreset.message
+                  )
+                }
+              >
+                {isFaulty ? '解除故障' : '设置为故障'}
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* 引脚信息 */}

@@ -1,6 +1,7 @@
 // 增强的代码编辑器 - 阶段三功能
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useSimulatorStore } from '@/store/simulatorStore';
+import { classroomStarterMicrobitCode } from '@/data/classroomLesson';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -137,16 +138,16 @@ const blockLibrary: CodeBlock[] = [
       { name: 'password', type: 'text', default: '12345678' }
     ]
   },
-  { 
-    id: 'http_post', 
+  {
+    id: 'http_get_upload',
     type: 'network', 
     category: 'network', 
-    label: 'HTTP POST 到 {url} 数据 {data}', 
-    code: 'obloq.http_post("{url}", {data})', 
+    label: 'HTTP GET 上传 id {id} val {val}',
+    code: 'obloq.http_get("http://192.168.1.100:5000/upload?id={id}&val=" + str({val}))',
     color: 'bg-green-500',
     inputs: [
-      { name: 'url', type: 'text', default: 'http://192.168.1.100:5000/upload' },
-      { name: 'data', type: 'text', default: '{"temperature": temp}' }
+      { name: 'id', type: 'number', default: '1' },
+      { name: 'val', type: 'text', default: 'temp' }
     ]
   },
   { 
@@ -156,7 +157,7 @@ const blockLibrary: CodeBlock[] = [
     label: 'HTTP GET {url}', 
     code: 'obloq.http_get("{url}")', 
     color: 'bg-green-500',
-    inputs: [{ name: 'url', type: 'text', default: 'http://192.168.1.100:5000/query' }]
+    inputs: [{ name: 'url', type: 'text', default: 'http://192.168.1.100:5000/' }]
   },
 
   // 显示
@@ -231,12 +232,22 @@ export function EnhancedCodeEditor() {
     burnCode, 
     codeBurned,
     updateServerConfig,
-    serverConfig
+    serverConfig,
+    detailsVisible
   } = useSimulatorStore();
   
   const [activeEditor, setActiveEditor] = useState<'microbit' | 'flask'>('microbit');
   const [programBlocks, setProgramBlocks] = useState<BlockInstance[]>([]);
   const [activeCategory, setActiveCategory] = useState('events');
+  const showBlockEditor = false;
+
+  useEffect(() => {
+    if (activeEditor !== 'microbit') return;
+    if (typeof microbitCode === 'string' && microbitCode.trim().length > 0) return;
+
+    setMicrobitCode(classroomStarterMicrobitCode);
+    setCodeMode('python');
+  }, [activeEditor, microbitCode, setMicrobitCode, setCodeMode]);
 
   // 添加积木到程序
   const addBlock = useCallback((block: CodeBlock) => {
@@ -304,7 +315,7 @@ export function EnhancedCodeEditor() {
 
   // 烧录代码
   const handleBurn = () => {
-    if (codeMode === 'blocks') {
+    if (showBlockEditor && codeMode === 'blocks') {
       generateCode();
     }
     burnCode();
@@ -326,7 +337,7 @@ export function EnhancedCodeEditor() {
           onClick={() => setActiveEditor('microbit')}
         >
           <Puzzle className="h-3 w-3 mr-1" />
-          micro:bit
+          智能终端
         </Button>
         <Button
           variant={activeEditor === 'flask' ? 'default' : 'outline'}
@@ -340,7 +351,7 @@ export function EnhancedCodeEditor() {
         
         <div className="flex-1" />
         
-        {activeEditor === 'microbit' && (
+        {detailsVisible && activeEditor === 'microbit' && (
           <Button
             size="sm"
             onClick={handleBurn}
@@ -362,7 +373,7 @@ export function EnhancedCodeEditor() {
           </Button>
         )}
         
-        {activeEditor === 'flask' && (
+        {detailsVisible && activeEditor === 'flask' && (
           <Button
             size="sm"
             className="w-full text-xs"
@@ -375,10 +386,10 @@ export function EnhancedCodeEditor() {
         )}
       </div>
 
-      {/* micro:bit 编辑区 */}
+      {/* 智能终端（micro:bit）编辑区 */}
       {activeEditor === 'microbit' && (
         <div className="flex-1 flex">
-          {codeMode === 'blocks' ? (
+          {showBlockEditor && codeMode === 'blocks' ? (
             <>
               {/* 积木库 */}
               <div className="w-44 border-r border-border flex flex-col">
@@ -520,17 +531,14 @@ export function EnhancedCodeEditor() {
             /* Python 代码编辑器 */
             <div className="flex-1 flex flex-col">
               <div className="flex items-center justify-between p-2 border-b border-border">
-                <span className="text-xs text-muted-foreground">micro:bit Python</span>
-                <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => setCodeMode('blocks')}>
-                  积木模式
-                </Button>
+                <span className="text-xs text-muted-foreground">智能终端（micro:bit）Python</span>
               </div>
               <div className="flex-1 relative">
                 <textarea
                   value={microbitCode}
                   onChange={(e) => setMicrobitCode(e.target.value)}
                   className="absolute inset-0 w-full h-full p-2 font-mono text-xs bg-muted/30 border-0 resize-none focus:outline-none focus:ring-0"
-                  placeholder="在此编写 micro:bit Python 代码..."
+                  placeholder="在此编写智能终端（micro:bit）Python 代码..."
                   spellCheck={false}
                 />
               </div>

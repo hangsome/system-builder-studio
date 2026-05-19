@@ -1,5 +1,36 @@
 import { ComponentDefinition } from '@/types/simulator';
 
+// 课堂默认呈现的智能终端：底层仍由 micro:bit 与扩展板组成，默认只展示合并视图
+export const smartTerminalDefinition: ComponentDefinition = {
+  id: 'smart-terminal',
+  type: 'smart-terminal',
+  category: 'mainboard',
+  name: '智能终端',
+  description: '课堂中 micro:bit 与扩展板的合并视图，负责运行程序、引出引脚并连接外部模块',
+  width: 280,
+  height: 200,
+  pins: [
+    { id: 'p0', name: 'P0', type: 'analog', position: { x: 0, y: 40 } },
+    { id: 'p1', name: 'P1', type: 'analog', position: { x: 0, y: 60 } },
+    { id: 'p2', name: 'P2', type: 'analog', position: { x: 0, y: 80 } },
+    { id: 'p3', name: 'P3', type: 'digital', position: { x: 0, y: 100 } },
+    { id: 'p4', name: 'P4', type: 'digital', position: { x: 0, y: 120 } },
+    { id: 'p5', name: 'P5', type: 'digital', position: { x: 0, y: 140 } },
+    { id: 'p13', name: 'P13', type: 'digital', position: { x: 280, y: 40 } },
+    { id: 'p14', name: 'P14', type: 'digital', position: { x: 280, y: 60 } },
+    { id: 'p15', name: 'P15(RX)', type: 'serial_rx', position: { x: 280, y: 80 } },
+    { id: 'p16', name: 'P16(TX)', type: 'serial_tx', position: { x: 280, y: 100 } },
+    { id: '3v-out1', name: '3V', type: 'power', position: { x: 30, y: 200 } },
+    { id: '3v-out2', name: '3V', type: 'power', position: { x: 55, y: 200 } },
+    { id: '3v-out3', name: '3V', type: 'power', position: { x: 80, y: 200 } },
+    { id: '3v-out4', name: '3V', type: 'power', position: { x: 105, y: 200 } },
+    { id: 'gnd-out1', name: 'GND', type: 'ground', position: { x: 140, y: 200 } },
+    { id: 'gnd-out2', name: 'GND', type: 'ground', position: { x: 165, y: 200 } },
+    { id: 'gnd-out3', name: 'GND', type: 'ground', position: { x: 190, y: 200 } },
+    { id: 'gnd-out4', name: 'GND', type: 'ground', position: { x: 215, y: 200 } },
+  ],
+};
+
 // micro:bit 主板
 export const microbitBoard: ComponentDefinition = {
   id: 'microbit',
@@ -25,7 +56,7 @@ export const expansionBoard: ComponentDefinition = {
   type: 'expansion-board',
   category: 'mainboard',
   name: '扩展板',
-  description: '完整的micro:bit扩展板，提供P0-P20引脚、3V和GND（含P15/P16串口）',
+  description: '完整的micro:bit扩展板，提供P0-P20引脚、3V和GND（含IoT通信引脚）',
   width: 280,
   height: 200,
   pins: [
@@ -293,6 +324,20 @@ export const browser: ComponentDefinition = {
   ],
 };
 
+// 手机 / 移动终端
+export const mobileClient: ComponentDefinition = {
+  id: 'mobile-client',
+  type: 'mobile-client',
+  category: 'server',
+  name: '手机 / 移动终端',
+  description: '用户通过手机浏览器访问 Flask 服务器，查看教室温度实时数据',
+  width: 70,
+  height: 100,
+  pins: [
+    { id: 'http', name: 'HTTP', type: 'data', position: { x: 35, y: 100 } },
+  ],
+};
+
 // 所有组件定义
 export const componentDefinitions: ComponentDefinition[] = [
   microbitBoard,
@@ -312,22 +357,22 @@ export const componentDefinitions: ComponentDefinition[] = [
   webServer,
   database,
   browser,
+  mobileClient,
 ];
 
 // 按类别分组
 export const componentsByCategory = {
-  mainboard: [microbitBoard, expansionBoard],
+  mainboard: [smartTerminalDefinition],
   sensor: [tempHumiditySensor, lightSensor, infraredSensor, soundSensor],
   actuator: [ledStrip, buzzer, servo, relay],
   network: [iotModule, router],
-  server: [pcComputer, webServer, database, browser],
+  server: [pcComputer, webServer, database, browser, mobileClient],
 };
 
 export const categoryNames: Record<string, string> = {
-  mainboard: '主板',
+  mainboard: '智能终端',
   sensor: '传感器',
   actuator: '执行器',
   network: '网络设备',
-  server: '服务器端',
+  server: '服务与用户端',
 };
-

@@ -2,15 +2,20 @@ import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
+  BarChart3,
   BookOpenCheck,
+  CalendarClock,
   CheckCircle2,
   ClipboardList,
   Eye,
   FileText,
   GraduationCap,
+  ListChecks,
   Loader2,
+  Percent,
   RefreshCw,
   Send,
+  UserCheck,
   Users,
   XCircle,
 } from 'lucide-react';
@@ -40,9 +45,10 @@ import {
   overrideSubmissionScoreApi,
   removeStudentFromClassApi,
 } from '@/api/eduApi';
+import { normalizeScoreDimensions } from '@/lib/scoreDimensions';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
-import { AssignmentInfo, ClassInfo, ScenarioInfo, StudentInfo, SubmissionInfo } from '@/types/edu';
+import { AssignmentInfo, ClassInfo, ScenarioInfo, ScoreDimension, StudentInfo, SubmissionInfo } from '@/types/edu';
 
 interface ScoreOverrideDraft {
   finalTotal: string;
@@ -63,8 +69,60 @@ interface MetricCardProps {
   muted?: boolean;
 }
 
+interface ClassroomCheckResult {
+  id: string;
+  label: string;
+  dimensionId: string;
+  dimensionLabel: string;
+  ok: boolean;
+  score: number;
+  max: number;
+}
+
+interface ClassroomBatch {
+  id: string;
+  label: string;
+  startTime: number;
+  endTime: number;
+  submissions: SubmissionInfo[];
+  attemptCount: number;
+  studentCount: number;
+}
+
+interface StudentReportRow {
+  submission: SubmissionInfo;
+  studentKey: string;
+  studentName: string;
+  checks: ClassroomCheckResult[];
+  correctCount: number;
+  totalCount: number;
+  percent: number;
+  wrongChecks: ClassroomCheckResult[];
+}
+
+interface QuestionReportRow {
+  id: string;
+  label: string;
+  dimensionLabel: string;
+  correct: number;
+  wrong: number;
+  total: number;
+  percent: number;
+  wrongStudents: string[];
+}
+
+const CLASSROOM_BATCH_MINUTES = 45;
+const CLASSROOM_BATCH_MS = CLASSROOM_BATCH_MINUTES * 60 * 1000;
+
 const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
   year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+const TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
   month: '2-digit',
   day: '2-digit',
   hour: '2-digit',
@@ -83,6 +141,187 @@ function formatDateTime(value?: string | null) {
 function formatScore(value: number | null) {
   if (value === null || Number.isNaN(value)) return '-';
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function formatPercent(value: number) {
+  if (!Number.isFinite(value)) return '0%';
+  return `${Math.round(value)}%`;
+}
+
+function getSubmissionTime(submission: SubmissionInfo) {
+  const time = new Date(submission.submitted_at).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function getStudentKey(submission: SubmissionInfo) {
+  return String(submission.student_id ?? submission.submitted_student_name ?? submission.username ?? submission.id);
+}
+
+function getStudentName(submission: SubmissionInfo) {
+  return (
+    submission.submitted_student_name ||
+    submission.display_name ||
+    submission.username ||
+    `学生 #${submission.student_id ?? submission.id}`
+  );
+}
+
+function slugifyCheckLabel(value: string) {
+  return value
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[=,，()（）/]/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 48);
+}
+
+function extractChecksFromDimension(dimension: ScoreDimension): ClassroomCheckResult[] {
+  if (Array.isArray(dimension.checks) && dimension.checks.length > 0) {
+    return dimension.checks.map((check, index) => ({
+      id: `${dimension.id}:${check.id || index}`,
+      label: check.label || check.id || `问题 ${index + 1}`,
+      dimensionId: dimension.id,
+      dimensionLabel: dimension.label,
+      ok: Boolean(check.ok),
+      score: Number(check.score || 0),
+      max: Number(check.max ?? check.score ?? 0),
+    }));
+  }
+
+  return dimension.reason
+    .split(',')
+    .map((part, index) => {
+      const match = part.trim().match(/^(.*?)=(yes|no|partial)$/i);
+      if (!match) return null;
+
+      const label = match[1].trim();
+      return {
+        id: `${dimension.id}:${slugifyCheckLabel(label) || index}`,
+        label,
+        dimensionId: dimension.id,
+        dimensionLabel: dimension.label,
+        ok: match[2].toLowerCase() === 'yes',
+        score: 0,
+        max: 0,
+      } satisfies ClassroomCheckResult;
+    })
+    .filter((item): item is ClassroomCheckResult => Boolean(item));
+}
+
+function getSubmissionChecks(submission: SubmissionInfo) {
+  return normalizeScoreDimensions(submission).flatMap(extractChecksFromDimension);
+}
+
+function getLatestSubmissionsByStudent(submissions: SubmissionInfo[]) {
+  const byStudent = new Map<string, SubmissionInfo>();
+
+  submissions.forEach((submission) => {
+    const key = getStudentKey(submission);
+    const current = byStudent.get(key);
+    if (!current || getSubmissionTime(submission) > getSubmissionTime(current)) {
+      byStudent.set(key, submission);
+    }
+  });
+
+  return Array.from(byStudent.values()).sort((left, right) => getSubmissionTime(right) - getSubmissionTime(left));
+}
+
+function createClassroomBatches(submissions: SubmissionInfo[]): ClassroomBatch[] {
+  const sorted = [...submissions]
+    .filter((submission) => getSubmissionTime(submission) > 0)
+    .sort((left, right) => getSubmissionTime(left) - getSubmissionTime(right));
+
+  const batches: Omit<ClassroomBatch, 'label' | 'attemptCount' | 'studentCount'>[] = [];
+
+  sorted.forEach((submission) => {
+    const time = getSubmissionTime(submission);
+    const current = batches[batches.length - 1];
+
+    if (!current || time - current.startTime > CLASSROOM_BATCH_MS) {
+      batches.push({
+        id: '',
+        startTime: time,
+        endTime: time,
+        submissions: [submission],
+      });
+      return;
+    }
+
+    current.endTime = Math.max(current.endTime, time);
+    current.submissions.push(submission);
+  });
+
+  return batches
+    .map((batch) => {
+      const start = TIME_FORMATTER.format(new Date(batch.startTime));
+      const end = TIME_FORMATTER.format(new Date(batch.endTime));
+      const latest = getLatestSubmissionsByStudent(batch.submissions);
+
+      return {
+        ...batch,
+        id: `${batch.startTime}-${batch.endTime}`,
+        label: `${start} - ${end}`,
+        attemptCount: batch.submissions.length,
+        studentCount: latest.length,
+      };
+    })
+    .reverse();
+}
+
+function createStudentReportRows(submissions: SubmissionInfo[]): StudentReportRow[] {
+  return getLatestSubmissionsByStudent(submissions).map((submission) => {
+    const checks = getSubmissionChecks(submission);
+    const correctCount = checks.filter((check) => check.ok).length;
+    const totalCount = checks.length;
+    const wrongChecks = checks.filter((check) => !check.ok);
+
+    return {
+      submission,
+      studentKey: getStudentKey(submission),
+      studentName: getStudentName(submission),
+      checks,
+      correctCount,
+      totalCount,
+      percent: totalCount > 0 ? (correctCount / totalCount) * 100 : 0,
+      wrongChecks,
+    };
+  });
+}
+
+function createQuestionReportRows(studentRows: StudentReportRow[]): QuestionReportRow[] {
+  const byQuestion = new Map<string, QuestionReportRow>();
+
+  studentRows.forEach((student) => {
+    student.checks.forEach((check) => {
+      const current =
+        byQuestion.get(check.id) ||
+        {
+          id: check.id,
+          label: check.label,
+          dimensionLabel: check.dimensionLabel,
+          correct: 0,
+          wrong: 0,
+          total: 0,
+          percent: 0,
+          wrongStudents: [],
+        };
+
+      current.total += 1;
+      if (check.ok) {
+        current.correct += 1;
+      } else {
+        current.wrong += 1;
+        current.wrongStudents.push(student.studentName);
+      }
+      current.percent = current.total > 0 ? (current.correct / current.total) * 100 : 0;
+      byQuestion.set(check.id, current);
+    });
+  });
+
+  return Array.from(byQuestion.values()).sort((left, right) => {
+    if (left.dimensionLabel !== right.dimensionLabel) return left.dimensionLabel.localeCompare(right.dimensionLabel);
+    return left.label.localeCompare(right.label);
+  });
 }
 
 function getAssignmentStatus(assignment: AssignmentInfo) {
@@ -161,7 +400,7 @@ function TableLoadingRows({ columns, rows = 3 }: { columns: number; rows?: numbe
 }
 
 function ScoreDimensionBars({ submission }: { submission: SubmissionInfo }) {
-  const dimensions = submission.auto_score?.dimensions || [];
+  const dimensions = normalizeScoreDimensions(submission);
   if (dimensions.length === 0) return null;
 
   return (
@@ -198,6 +437,7 @@ export default function TeacherDashboardPage() {
 
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
+  const [selectedBatchId, setSelectedBatchId] = useState<string>('');
 
   const [loadingBase, setLoadingBase] = useState(false);
   const [loadingClassDetail, setLoadingClassDetail] = useState(false);
@@ -258,6 +498,34 @@ export default function TeacherDashboardPage() {
     if (scores.length === 0) return null;
     return scores.reduce((sum, score) => sum + score, 0) / scores.length;
   }, [submissions]);
+
+  const classroomBatches = useMemo(() => createClassroomBatches(submissions), [submissions]);
+  const selectedBatch = useMemo(
+    () => classroomBatches.find((batch) => batch.id === selectedBatchId) || classroomBatches[0] || null,
+    [classroomBatches, selectedBatchId]
+  );
+  const batchStudentRows = useMemo(
+    () => createStudentReportRows(selectedBatch?.submissions || []),
+    [selectedBatch]
+  );
+  const questionReportRows = useMemo(
+    () => createQuestionReportRows(batchStudentRows),
+    [batchStudentRows]
+  );
+  const batchAverageScore = useMemo(() => {
+    if (batchStudentRows.length === 0) return null;
+    const scores = batchStudentRows
+      .map((row) => Number(row.submission.final_total))
+      .filter((score) => Number.isFinite(score));
+    if (scores.length === 0) return null;
+    return scores.reduce((sum, score) => sum + score, 0) / scores.length;
+  }, [batchStudentRows]);
+  const batchAverageCorrectRate = useMemo(() => {
+    if (batchStudentRows.length === 0) return 0;
+    const rates = batchStudentRows.filter((row) => row.totalCount > 0).map((row) => row.percent);
+    if (rates.length === 0) return 0;
+    return rates.reduce((sum, rate) => sum + rate, 0) / rates.length;
+  }, [batchStudentRows]);
 
   const csvDataRows = useMemo(() => {
     const rows = csvText.split(/\r?\n/).filter((line) => line.trim().length > 0);
@@ -383,6 +651,17 @@ export default function TeacherDashboardPage() {
     void loadAssignmentSubmissions(selectedAssignmentId);
   }, [loadAssignmentSubmissions, selectedAssignmentId]);
 
+  useEffect(() => {
+    if (classroomBatches.length === 0) {
+      setSelectedBatchId('');
+      return;
+    }
+
+    setSelectedBatchId((current) =>
+      current && classroomBatches.some((batch) => batch.id === current) ? current : classroomBatches[0].id
+    );
+  }, [classroomBatches]);
+
   const handleCreateClass = async (event: FormEvent) => {
     event.preventDefault();
     if (!token || !classForm.name.trim()) return;
@@ -431,6 +710,7 @@ export default function TeacherDashboardPage() {
     setSelectedAssignmentId(null);
     setSubmissions([]);
     setSubmissionsError(null);
+    setSelectedBatchId('');
     setScoreDrafts({});
   };
 
@@ -533,6 +813,7 @@ export default function TeacherDashboardPage() {
 
     if (assignmentId !== selectedAssignmentId) {
       setSelectedAssignmentId(assignmentId);
+      setSelectedBatchId('');
       return;
     }
 
@@ -548,9 +829,11 @@ export default function TeacherDashboardPage() {
         title="教师工作台"
         subtitle="班级、学生、作业与评分"
         actions={
-          <Button variant="outline" size="sm" asChild>
-            <Link to="/teacher/studio">打开教师画布</Link>
-          </Button>
+          <>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/teacher/studio">打开教师画布</Link>
+            </Button>
+          </>
         }
       />
 
@@ -702,7 +985,7 @@ export default function TeacherDashboardPage() {
                     id="class-name"
                     value={classForm.name}
                     onChange={(event) => setClassForm((state) => ({ ...state, name: event.target.value }))}
-                    placeholder="例如：高一(2)班"
+                    placeholder="例如：高一1班"
                     required
                   />
                 </div>
@@ -1029,14 +1312,34 @@ export default function TeacherDashboardPage() {
                 </div>
 
                 {selectedAssignment ? (
-                  <div className="flex flex-col gap-3 rounded-md border bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
+                  <div className="grid gap-3 rounded-md border bg-muted/20 p-3 lg:grid-cols-[minmax(0,1fr)_280px_auto] lg:items-end">
+                    <div className="min-w-0 space-y-1">
                       <p className="truncate text-sm font-medium">{selectedAssignment.title}</p>
                       <p className="text-xs text-muted-foreground">
                         场景 {scenarioNameById.get(selectedAssignment.scenario_id) || selectedAssignment.scenario_id}
                         {' · '}
                         截止 {formatDateTime(selectedAssignment.due_at)}
                       </p>
+                      <p className="text-xs text-muted-foreground">
+                        按 {CLASSROOM_BATCH_MINUTES} 分钟自动分批，便于一节课结束后查看本节课堂报告。
+                      </p>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="classroom-batch">课堂批次</Label>
+                      <select
+                        id="classroom-batch"
+                        className="h-10 w-full rounded-md border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                        value={selectedBatch?.id || ''}
+                        onChange={(event) => setSelectedBatchId(event.target.value)}
+                        disabled={classroomBatches.length === 0}
+                      >
+                        {classroomBatches.length === 0 ? <option value="">暂无课堂批次</option> : null}
+                        {classroomBatches.map((batch, index) => (
+                          <option key={batch.id} value={batch.id}>
+                            {index === 0 ? '最近一批：' : ''}{batch.label}（{batch.studentCount}人/{batch.attemptCount}次）
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <Button
                       type="button"
@@ -1055,6 +1358,92 @@ export default function TeacherDashboardPage() {
                   </div>
                 ) : null}
 
+                {selectedBatch ? (
+                  <div className="grid gap-3 xl:grid-cols-[0.95fr_1.35fr]">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <MetricCard
+                        title="本批学生"
+                        value={selectedBatch.studentCount}
+                        hint={`${selectedBatch.label}，共 ${selectedBatch.attemptCount} 次提交`}
+                        icon={<UserCheck className="h-4 w-4" />}
+                        muted={selectedBatch.studentCount === 0}
+                      />
+                      <MetricCard
+                        title="平均分"
+                        value={formatScore(batchAverageScore)}
+                        hint="按每个学生本批最新一次提交计算"
+                        icon={<BarChart3 className="h-4 w-4" />}
+                        muted={batchAverageScore === null}
+                      />
+                      <MetricCard
+                        title="平均正确率"
+                        value={formatPercent(batchAverageCorrectRate)}
+                        hint="基于可识别的自动检测问题"
+                        icon={<Percent className="h-4 w-4" />}
+                        muted={questionReportRows.length === 0}
+                      />
+                      <MetricCard
+                        title="检测问题"
+                        value={questionReportRows.length}
+                        hint="包含代码、运行、用户端等关键点"
+                        icon={<ListChecks className="h-4 w-4" />}
+                        muted={questionReportRows.length === 0}
+                      />
+                    </div>
+
+                    <div className="rounded-md border bg-background p-3">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">课堂报告分析</p>
+                          <p className="text-xs text-muted-foreground">
+                            逐项展示正确率，错误名单用于课中讲评。
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="shrink-0">
+                          <CalendarClock className="mr-1 h-3 w-3" />
+                          {selectedBatch.label}
+                        </Badge>
+                      </div>
+
+                      <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1">
+                        {questionReportRows.map((question) => (
+                          <div key={question.id} className="grid gap-2 rounded-md border bg-muted/20 p-3">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium">{question.label}</p>
+                                <p className="text-xs text-muted-foreground">{question.dimensionLabel}</p>
+                              </div>
+                              <Badge variant={question.percent >= 80 ? 'secondary' : question.percent >= 50 ? 'outline' : 'destructive'}>
+                                {formatPercent(question.percent)}
+                              </Badge>
+                            </div>
+                            <Progress value={question.percent} className="h-2" />
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                              <span>正确 {question.correct}/{question.total}</span>
+                              <span>错误 {question.wrong}</span>
+                              {question.wrongStudents.length > 0 ? (
+                                <span className="text-destructive">
+                                  需关注：{question.wrongStudents.slice(0, 5).join('、')}
+                                  {question.wrongStudents.length > 5 ? ` 等 ${question.wrongStudents.length} 人` : ''}
+                                </span>
+                              ) : (
+                                <span className="text-emerald-700">本批全部正确</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+
+                        {questionReportRows.length === 0 ? (
+                          <EmptyState
+                            title="暂无可视化检测项"
+                            description="新提交会记录结构化检测结果；旧提交会尽量从自动评分说明中解析。"
+                          />
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 {submissionsError ? (
                   <Alert variant="destructive">
                     <AlertTriangle className="h-4 w-4" />
@@ -1068,28 +1457,75 @@ export default function TeacherDashboardPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>学生</TableHead>
+                        <TableHead>本批作答</TableHead>
                         <TableHead>评分轨迹</TableHead>
                         <TableHead>提交画布</TableHead>
                         <TableHead className="min-w-[240px]">覆写评分</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {loadingSubmissions ? <TableLoadingRows columns={4} rows={3} /> : null}
+                      {loadingSubmissions ? <TableLoadingRows columns={5} rows={3} /> : null}
                       {!loadingSubmissions
-                        ? submissions.map((submission) => {
+                        ? batchStudentRows.map((studentRow) => {
+                            const submission = studentRow.submission;
                             const draft = getScoreDraft(submission, scoreDrafts);
-                            const studentName = submission.display_name || submission.username || `学生 #${submission.student_id}`;
                             return (
                               <TableRow key={submission.id}>
                                 <TableCell className="align-top">
                                   <div className="space-y-1">
-                                    <p className="font-medium">{studentName}</p>
+                                    <p className="font-medium">{studentRow.studentName}</p>
                                     <p className="text-xs text-muted-foreground">
                                       提交 #{submission.id} · 第 {submission.attempt_no} 次
                                     </p>
                                     <p className="text-xs text-muted-foreground">
                                       {formatDateTime(submission.submitted_at)}
                                     </p>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="min-w-[260px] align-top">
+                                  <div className="grid gap-2">
+                                    <div className="flex items-center justify-between gap-2 text-xs">
+                                      <span className="text-muted-foreground">
+                                        正确 {studentRow.correctCount}/{studentRow.totalCount}
+                                      </span>
+                                      <Badge
+                                        variant={
+                                          studentRow.percent >= 80
+                                            ? 'secondary'
+                                            : studentRow.percent >= 50
+                                              ? 'outline'
+                                              : 'destructive'
+                                        }
+                                      >
+                                        {formatPercent(studentRow.percent)}
+                                      </Badge>
+                                    </div>
+                                    <Progress value={studentRow.percent} className="h-2" />
+                                    <div className="flex flex-wrap gap-1">
+                                      {studentRow.checks.slice(0, 6).map((check) => (
+                                        <Badge
+                                          key={check.id}
+                                          variant={check.ok ? 'secondary' : 'destructive'}
+                                          className="max-w-[220px] truncate"
+                                          title={check.label}
+                                        >
+                                          {check.ok ? '对' : '错'}：{check.label}
+                                        </Badge>
+                                      ))}
+                                      {studentRow.checks.length > 6 ? (
+                                        <Badge variant="outline">还有 {studentRow.checks.length - 6} 项</Badge>
+                                      ) : null}
+                                    </div>
+                                    {studentRow.wrongChecks.length > 0 ? (
+                                      <p className="text-xs text-destructive">
+                                        错误项：{studentRow.wrongChecks.slice(0, 3).map((check) => check.label).join('、')}
+                                        {studentRow.wrongChecks.length > 3 ? ` 等 ${studentRow.wrongChecks.length} 项` : ''}
+                                      </p>
+                                    ) : studentRow.totalCount > 0 ? (
+                                      <p className="text-xs text-emerald-700">本批检测项全部正确</p>
+                                    ) : (
+                                      <p className="text-xs text-muted-foreground">暂无可识别检测项</p>
+                                    )}
                                   </div>
                                 </TableCell>
                                 <TableCell className="min-w-[260px] align-top">
@@ -1161,7 +1597,7 @@ export default function TeacherDashboardPage() {
 
                       {submissions.length === 0 && !loadingSubmissions ? (
                         <TableRow>
-                          <TableCell colSpan={4}>
+                          <TableCell colSpan={5}>
                             <EmptyState
                               title={selectedAssignmentId ? '暂无提交' : '请选择作业'}
                               description={selectedAssignmentId ? '学生提交后会显示评分轨迹和画布入口。' : '选择上方作业后查看提交。'}
@@ -1179,6 +1615,13 @@ export default function TeacherDashboardPage() {
                                 ) : null
                               }
                             />
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                      {submissions.length > 0 && batchStudentRows.length === 0 && !loadingSubmissions ? (
+                        <TableRow>
+                          <TableCell colSpan={5}>
+                            <EmptyState title="当前批次暂无学生详情" description="请选择有提交记录的课堂批次。" />
                           </TableCell>
                         </TableRow>
                       ) : null}

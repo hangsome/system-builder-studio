@@ -1,0 +1,1269 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>食堂温度监测与预警系统：信息系统复习课</title>
+  <style>
+    :root {
+      --bg: #f3f6fa;
+      --paper: #ffffff;
+      --ink: #172033;
+      --muted: #5d6b7d;
+      --line: #d7e0eb;
+      --accent: #246b86;
+      --accent-dark: #184f64;
+      --accent-weak: #e6f2f6;
+      --warn: #8a5a12;
+      --warn-weak: #fff6e8;
+      --ok: #23684b;
+      --ok-weak: #eef8f2;
+      --danger: #9a392f;
+      --danger-weak: #fff0ee;
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(36, 107, 134, 0.12), transparent 28rem),
+        radial-gradient(circle at 92% 12%, rgba(35, 104, 75, 0.08), transparent 26rem),
+        linear-gradient(180deg, #f9fbfd 0%, var(--bg) 100%);
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+      line-height: 1.7;
+    }
+
+    a, button, input, textarea, select { font: inherit; }
+
+    .page {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 24px 0 56px;
+    }
+
+    header {
+      display: grid;
+      gap: 16px;
+      margin-bottom: 16px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .title-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: end;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 4.2vw, 50px);
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+    }
+
+    .subtitle {
+      margin: 10px 0 0;
+      max-width: 80ch;
+      color: var(--muted);
+      font-size: 17px;
+    }
+
+    .student-link, .submit-btn, .tab-btn {
+      border: 0;
+      cursor: pointer;
+      transition: transform .18s ease, background .18s ease, border-color .18s ease;
+    }
+
+    .student-link:active, .submit-btn:active, .tab-btn:active {
+      transform: translateY(1px);
+    }
+
+    .student-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 10px 16px;
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      color: #fff;
+      background: var(--accent);
+      text-decoration: none;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .student-link:hover { background: var(--accent-dark); }
+
+    .identity {
+      display: grid;
+      grid-template-columns: minmax(150px, 220px) minmax(180px, 260px);
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: #26374a;
+      font-weight: 700;
+    }
+
+    label small {
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    input[type="text"], textarea, select {
+      width: 100%;
+      min-height: 40px;
+      border: 1px solid #b8c6d5;
+      border-radius: 10px;
+      padding: 8px 10px;
+      color: var(--ink);
+      background: #fff;
+    }
+
+    textarea {
+      min-height: 82px;
+      resize: vertical;
+    }
+
+    input:focus, textarea:focus, select:focus, button:focus-visible, a:focus-visible {
+      outline: 3px solid rgba(36, 107, 134, 0.18);
+      outline-offset: 2px;
+      border-color: var(--accent);
+    }
+
+    .notice {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.86);
+      padding: 11px 13px;
+    }
+
+    .notice strong { color: var(--accent-dark); }
+    .notice p { margin: 2px 0 0; color: var(--muted); }
+
+    .tabs {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin: 12px 0 18px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 28px rgba(23, 32, 51, 0.06);
+    }
+
+    .tab-btn {
+      min-height: 42px;
+      border-radius: 999px;
+      color: #435164;
+      background: transparent;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .tab-btn.active {
+      color: #fff;
+      background: var(--accent);
+      box-shadow: 0 8px 18px rgba(36, 107, 134, 0.22);
+    }
+
+    main { display: grid; }
+
+    .tab-panel {
+      display: none;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 14px 34px rgba(23, 32, 51, 0.06);
+      overflow: hidden;
+    }
+
+    .tab-panel.active {
+      display: block;
+      animation: panelIn .22s ease both;
+    }
+
+    @keyframes panelIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .section-body { padding: 24px; }
+
+    h2, h3 {
+      margin: 0 0 10px;
+      line-height: 1.25;
+    }
+
+    h2 { font-size: clamp(24px, 3vw, 34px); }
+    h3 { font-size: 18px; }
+    p, li { color: var(--muted); }
+
+    .lead {
+      max-width: 88ch;
+      font-size: 18px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .task-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      background: #fff;
+    }
+
+    .scenario-card {
+      border-color: #c7d9e1;
+      background: linear-gradient(135deg, #ffffff 0%, var(--accent-weak) 100%);
+    }
+
+    .choice-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .choice {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 36px;
+      padding: 7px 10px;
+      border: 1px solid #c8d4e0;
+      border-radius: 999px;
+      background: #fff;
+      color: #344458;
+      font-weight: 600;
+    }
+
+    pre {
+      overflow: auto;
+      margin: 0;
+      padding: 14px;
+      border-radius: 12px;
+      color: #102032;
+      background: #f5f8fb;
+      border: 1px solid #dce5ef;
+      font-family: Consolas, "JetBrains Mono", "Courier New", monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th { background: #edf4f8; color: #253a4d; }
+    code { font-family: Consolas, "Courier New", monospace; }
+
+    .method-demo {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .method-box {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .method-box strong {
+      display: block;
+      color: var(--accent-dark);
+    }
+
+    .module-match-board {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(180px, .8fr) minmax(84px, 120px) minmax(260px, 1.2fr);
+      gap: 14px;
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #f9fbfd;
+    }
+
+    .match-column {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+
+    .match-column-title {
+      margin: 0 0 2px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+
+    .match-node {
+      width: 100%;
+      min-height: 48px;
+      border: 1px solid #c8d4e0;
+      border-radius: 12px;
+      padding: 9px 11px;
+      color: #253a4d;
+      background: #fff;
+      text-align: left;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform .16s ease, border-color .16s ease, background .16s ease;
+    }
+
+    .match-node:hover {
+      transform: translateY(-1px);
+      border-color: var(--accent);
+    }
+
+    .match-node.active {
+      color: #173047;
+      border-color: var(--accent-dark);
+      background: #dff3fb;
+      box-shadow: inset 0 0 0 2px rgba(35, 122, 150, .18);
+    }
+
+    .match-node.connected {
+      border-color: #9fb9c8;
+      background: #f2f8fb;
+    }
+
+    .match-node small {
+      display: block;
+      margin-top: 2px;
+      color: inherit;
+      font-weight: 500;
+      opacity: .72;
+    }
+
+    .match-lines {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .match-lines line {
+      stroke: var(--accent);
+      stroke-width: 3;
+      stroke-linecap: round;
+    }
+
+    .match-hint {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      color: var(--accent-dark);
+      font-size: 13px;
+      font-weight: 800;
+      text-align: center;
+      transition: opacity .16s ease, visibility .16s ease;
+    }
+
+    .match-hint.is-hidden {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .match-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .match-pill {
+      border: 1px solid #d5e1ea;
+      border-radius: 999px;
+      padding: 5px 9px;
+      color: var(--muted);
+      background: #fff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .code-study {
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(280px, .92fr);
+      gap: 14px;
+      align-items: start;
+      margin-top: 14px;
+    }
+
+    .question-stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .question-stack label {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    .section-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .submit-btn {
+      min-height: 42px;
+      padding: 9px 16px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 800;
+    }
+
+    .submit-btn:hover { background: var(--accent-dark); }
+    .submit-btn:disabled { cursor: not-allowed; opacity: .65; }
+
+    .status {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--danger); }
+
+
+
+    .single-select {
+      position: relative;
+      z-index: 1;
+      display: block;
+      margin-top: 8px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .score-grid {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .rating-item {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .rating-title {
+      display: block;
+      margin-bottom: 10px;
+      color: #26374a;
+      font-weight: 800;
+    }
+
+    .rating-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .self-check {
+      display: grid;
+      gap: 10px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .self-check label {
+      display: block;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: #fff;
+      font-weight: 500;
+      color: #344458;
+    }
+
+    @media (max-width: 860px) {
+      .title-row, .identity, .grid.two, .method-demo, .module-match-board, .code-study { grid-template-columns: 1fr; }
+      .match-hint, .match-lines { display: none; }
+      .tabs {
+        position: static;
+        grid-template-columns: 1fr;
+        border-radius: 18px;
+      }
+      .student-link { width: 100%; }
+    }
+  </style>
+</head>
+
+  <div class="page">
+    <header>
+      <div class="title-row">
+        <div>
+          <h1>食堂温度监测与预警系统复习活动</h1>
+          <p class="subtitle">某中学食堂发生了一次食物险遭变质的风险：一天半夜，制冷设备发生故障，储物间食材温度异常升高，幸好食堂负责人及时发现，差点影响全校早餐供应。</p>
+        </div>
+        <a class="student-link" id="studentCanvasLink" target="_blank" rel="noreferrer">打开学生半成品画布</a>
+      </div>
+
+      <div class="identity">
+        <label>
+          班级
+          <input id="className" type="text" placeholder="例如：高一1班">
+        </label>
+        <label>
+          姓名
+          <input id="studentName" type="text" placeholder="请填写真实姓名">
+        </label>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="课堂活动导航">
+      <button class="tab-btn active" data-tab="intro" type="button">情境导入</button>
+      <button class="tab-btn" data-tab="hardware" type="button">硬件搭建</button>
+      <button class="tab-btn" data-tab="software" type="button">软件分析</button>
+      <button class="tab-btn" data-tab="debug" type="button">运行排错</button>
+      <button class="tab-btn" data-tab="summary" type="button">自我评价</button>
+    </nav>
+
+    <main>
+      <section class="tab-panel active" data-section="intro">
+        <div class="section-body">
+          <h2>情境导入</h2>
+          <div class="task-card scenario-card">
+            <p class="lead">某中学食堂发生了一次食物险遭变质的风险：一天半夜，制冷设备发生故障，储物间食材温度异常升高，幸好食堂负责人及时发现，差点影响全校早餐供应。</p>
+            <p>请同学们设计并模拟搭建一套“食堂温度监测与预警系统”：系统要能自动感知储物间温度变化；当温度超过安全阈值时，要能在现场发出声音提醒，并通过物联网模块把异常信息发送给值班人员；值班人员用手机访问服务器页面查看实时温度和历史记录。</p>
+            <p>请根据情境一步步判断：要感知“温度变化”，应选择哪类传感器？要发出“声音提醒”，应选择哪类执行器？程序要写在哪里，浏览器应该访问哪个地址，数据最后保存到哪里；如果运行时没有数据或蜂鸣器不响，又应该从哪一环开始排查。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-section="hardware">
+        <div class="section-body">
+          <h2>硬件搭建与连接观察</h2>
+          <p>半成品画布已经给出智能终端、IoT 模块、网络、服务器和数据库。本环节请先从食堂储物间情境判断：要感知温度变化应选择哪种传感器；要发出声音提醒应选择哪种执行器。再观察它们自动连到了智能终端的哪个引脚。</p>
+
+          <div class="grid two">
+            <div class="task-card">
+              <h3>课堂任务</h3>
+              <ol>
+                <li>打开学生半成品画布。</li>
+                <li>从传感器组件中选择适合“食堂储物间温度监测”的传感器并放到画布。</li>
+                <li>从执行器组件中选择适合“现场声音提醒”的执行器并放到画布。</li>
+                <li>沿着连线观察传感器 DATA、执行器 IO 分别接到智能终端哪个引脚。</li>
+                <li>判断用户通过浏览器或手机查看数据时，这个系统更接近哪种架构。</li>
+              </ol>
+            </div>
+
+            <div class="task-card">
+              <h3>课堂记录</h3>
+              <label>你选择的传感器是：
+                <span class="choice-row" data-name="sensorChoice" data-options="温湿度传感器,光线传感器,声音传感器,红外传感器"></span>
+              </label>
+              <label>你选择的执行器是：
+                <span class="choice-row" data-name="actuatorChoice" data-options="蜂鸣器,LED灯带,舵机,继电器"></span>
+              </label>
+              <label>传感器 DATA 接到哪个引脚？
+                <span class="choice-row" data-name="sensorDataPin"></span>
+              </label>
+              <label>蜂鸣器 IO 接到哪个引脚？
+                <span class="choice-row" data-name="buzzerIoPin"></span>
+              </label>
+              <label>这个食堂温度监测系统是哪种架构？
+                <span class="choice-row" data-name="systemArchitecture" data-options="C/S,B/S"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="task-card" style="margin-top:14px">
+            <h3>模块功能匹配</h3>
+            <p>硬件搭建完成后，先点击左侧模块，再点击右侧功能完成连线。注意：“判断是否超过阈值”在智能终端和 Flask 服务器中都会出现，可以连两条线。</p>
+            <div class="module-match-board" id="moduleMatchBoard">
+              <svg class="match-lines" id="moduleMatchLines" aria-hidden="true"></svg>
+              <div class="match-column">
+                <p class="match-column-title">模块</p>
+                <button class="match-node" type="button" data-match-module="智能终端">智能终端<small>运行 micro:bit 程序</small></button>
+                <button class="match-node" type="button" data-match-module="IoT模块">IoT 模块<small>负责无线通信</small></button>
+                <button class="match-node" type="button" data-match-module="Flask服务器">Flask 服务器<small>接收、判断、渲染</small></button>
+                <button class="match-node" type="button" data-match-module="浏览器 / 手机">浏览器 / 手机<small>值班人员查看</small></button>
+              </div>
+              <div class="match-hint">点击模块<br>连接功能</div>
+              <div class="match-column">
+                <p class="match-column-title">功能</p>
+                <button class="match-node" type="button" data-match-function="moduleReadTemp">读取温度数据<small>传感器数值进入程序</small></button>
+                <button class="match-node" type="button" data-match-function="moduleThreshold" data-multiple="true">判断是否超过阈值<small>这里需要两条线</small></button>
+                <button class="match-node" type="button" data-match-function="moduleBuzzer">控制蜂鸣器报警<small>向执行器输出控制信号</small></button>
+                <button class="match-node" type="button" data-match-function="moduleWifiHttp">接入无线网络<small>让设备进入 WiFi 通信环境</small></button>
+                <button class="match-node" type="button" data-match-function="moduleReceiveUpload">接收 /upload?id=...&amp;val=... 请求<small>服务器接收上传</small></button>
+                <button class="match-node" type="button" data-match-function="moduleRenderPage">查询并渲染网页<small>生成查看页面</small></button>
+                <button class="match-node" type="button" data-match-function="moduleViewRealtime">查看实时温度和历史记录<small>值班人员使用</small></button>
+              </div>
+              <input type="hidden" data-field="moduleReadTemp">
+              <input type="hidden" data-field="moduleThreshold">
+              <input type="hidden" data-field="moduleBuzzer">
+              <input type="hidden" data-field="moduleWifiHttp">
+              <input type="hidden" data-field="moduleReceiveUpload">
+              <input type="hidden" data-field="moduleRenderPage">
+              <input type="hidden" data-field="moduleViewRealtime">
+            </div>
+            <div class="match-summary" id="moduleMatchSummary"></div>
+          </div>
+
+          <div class="section-actions">
+            <span class="status" data-status="hardware">未提交</span>
+            <button class="submit-btn" data-submit="hardware" type="button">提交硬件活动作答</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-section="software">
+        <div class="section-body">
+          <h2>软件分析：智能终端代码与服务器端代码</h2>
+          <p>本环节重点通过左侧完整代码寻找证据，再完成右侧问题。智能终端负责采集、判断、控制和上传；Flask 服务端负责接收请求、保存数据并提供页面。</p>
+
+          <div class="code-study">
+            <div class="task-card">
+              <h3>智能终端（micro:bit）代码</h3>
+              <pre>from microbit import *
+import obloq
+
+# 这些参数决定智能终端连接哪一个 WiFi、把数据发到哪一台服务器。
+WIFI_SSID = "School_WiFi"
+WIFI_PASSWORD = "12345678"
+SERVER_IP = "192.168.1.100"
+SERVER_PORT = 5000
+UPLOAD_ROUTE = "/upload"
+TEMP_THRESHOLD = 30
+
+# 先连接无线网络，后面才能通过 IoT 模块发送 HTTP 请求。
+obloq.setup(WIFI_SSID, WIFI_PASSWORD)
+
+while True:
+    # 画布中温湿度传感器 DATA 接 P1，所以这里用 pin1 读取模拟量。
+    raw = pin1.read_analog()
+    temp = round(raw / 10, 1)
+    display.scroll(str(temp))
+
+    # 温度超过阈值时，向 P2 输出 1；否则输出 0。
+    # 画布中蜂鸣器 IO 接 P2，所以这里用 pin2 控制执行器。
+    if temp &gt; TEMP_THRESHOLD:
+        pin2.write_digital(1)
+    else:
+        pin2.write_digital(0)
+
+    # 拼出上传地址：服务器地址 + 上传路由 + 问号后的 id 和 val 参数。
+    # 这条 URL 是智能终端上传数据用的，不是浏览器查看页面用的。
+    url = "http://" + SERVER_IP + ":" + str(SERVER_PORT) + UPLOAD_ROUTE
+    url = url + "?id=1&amp;val=" + str(temp)
+    obloq.http_get(url)
+
+    # 每 5 秒采集和上传一次，避免请求过快。
+    sleep(5000)</pre>
+            </div>
+
+            <div class="task-card question-stack">
+              <h3>阅读代码后填写</h3>
+              <label>WiFi 名称是：
+                <input data-field="microbitWifiSsid" type="text" placeholder="">
+              </label>
+              <label>路由器密码是：
+                <input data-field="microbitWifiPassword" type="text" placeholder="">
+              </label>
+              <label>服务器 IP 是：
+                <input data-field="microbitServerIp" type="text" placeholder="">
+              </label>
+              <label>服务器端口是：
+                <input data-field="microbitServerPort" type="text" placeholder="">
+              </label>
+              <label>上传路由是：
+                <input data-field="uploadRoute" type="text" placeholder="">
+              </label>
+              <label>GET 上传时必须带哪两个参数？（可多选）
+                <span class="choice-row" data-name="microbitGetParams" data-type="checkbox" data-options="id,val,ssid,password,pin"></span>
+              </label>
+              <label>温度阈值变量是：
+                <input data-field="microbitThreshold" type="text" placeholder="">
+              </label>
+              <label>读取温度使用的引脚是：
+                <span class="choice-row" data-name="microbitReadPin" data-options="P0,P1,P2,P3"></span>
+              </label>
+              <label>控制蜂鸣器使用的引脚是：
+                <span class="choice-row" data-name="microbitBuzzerPin" data-options="P0,P1,P2,P3"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="code-study">
+            <div class="task-card">
+              <h3>Flask 服务端完整代码</h3>
+              <pre>from flask import Flask, request, render_template
+import sqlite3
+from datetime import datetime
+
+app = Flask(__name__)
+TEMP_THRESHOLD = 30
+
+# /upload 是智能终端上传数据的入口，请求方法是 GET。
+# 例如：/upload?id=1&amp;val=32.5
+@app.route('/upload', methods=['GET'])
+def upload_data():
+    # request.args 读取的是 URL 问号后面的参数。
+    # val 表示温度值，id 表示传感器编号。
+    temperature = request.args.get('val')
+    sensor_id = request.args.get('id', 1)
+    if temperature is None:
+        return "缺少 val", 400
+
+    # 把字符串温度转成数字，再判断是否超过阈值。
+    temperature = float(temperature)
+    alarm = 1 if temperature &gt; TEMP_THRESHOLD else 0
+
+    # 把本次温度、报警状态和时间写入 SQLite 数据库。
+    conn = sqlite3.connect('sensor.db')
+    cursor = conn.cursor()
+    cursor.execute(
+        'INSERT INTO sensorlog (sensor_id, value, alarm, timestamp) VALUES (?, ?, ?, ?)',
+        (sensor_id, temperature, alarm, datetime.now())
+    )
+    conn.commit()
+    conn.close()
+
+    command = "BUZZER_ON" if alarm else "BUZZER_OFF"
+    return "success:" + command
+
+# / 是浏览器或手机查看页面的入口。
+# 用户访问首页时，服务器从数据库读取最近 10 条记录并渲染网页。
+@app.route('/', methods=['GET'])
+def index():
+    conn = sqlite3.connect('sensor.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, sensor_id, value, alarm, timestamp FROM sensorlog ORDER BY id DESC LIMIT 10')
+    rows = cursor.fetchall()
+    conn.close()
+    return render_template('index.html', records=rows)
+
+if __name__ == '__main__':
+    app.run(host='192.168.1.100', port=5000)</pre>
+            </div>
+
+            <div class="task-card question-stack">
+              <h3>阅读代码后填写</h3>
+              <label>服务器端接收智能终端上传数据的路由是：
+                <input data-field="flaskUploadRoute" type="text" placeholder="">
+              </label>
+              <label>这个上传接口使用的请求方法是：
+                <span class="choice-row" data-name="flaskUploadMethod" data-options="GET,POST,PUT,DELETE"></span>
+              </label>
+              <label><code>request.args.get('id')</code> 读取的是：
+                <input data-field="flaskIdParam" type="text" placeholder="">
+              </label>
+              <label><code>request.args.get('val')</code> 读取的是：
+                <input data-field="flaskValParam" type="text" placeholder="">
+              </label>
+              <label>浏览器访问首页的路由是：
+                <input data-field="viewRoute" type="text" placeholder="">
+              </label>
+              <label>模拟浏览器地址栏应填写完整 URL：
+                <input data-field="softwareBrowserUrl" type="text" placeholder="">
+              </label>
+            </div>
+          </div>
+
+          <div class="task-card" style="margin-top:14px">
+            <h3>观察请求方向</h3>
+            <div class="method-demo">
+              <div class="method-box">
+                <strong>上传新数据</strong>
+                <p>观察通信日志：智能终端通过 GET 请求把 id 和 val 参数发给 Flask，服务器处理后保存为温度记录。</p>
+              </div>
+              <div class="method-box">
+                <strong>查看已有数据</strong>
+                <p>在模拟浏览器输入页面地址，服务器读取数据库已有记录并渲染页面给用户查看。</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-actions">
+            <span class="status" data-status="software">未提交</span>
+            <button class="submit-btn" data-submit="software" type="button">提交软件分析</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-section="debug">
+        <div class="section-body">
+          <h2>运行排错：先看画布，再看代码</h2>
+          <p>运行后如果数据不通，先核对画布上的实际连接，再判断代码中的引脚是否对应。代码和连线可以任选一边修改，但最终必须对应；浏览器访问地址回到软件分析环节的首页路由证据中核对。</p>
+
+          <div class="grid two">
+            <div class="task-card">
+              <h3>排错步骤</h3>
+              <ol>
+                <li>回到画布，确认传感器 DATA 和蜂鸣器 IO 的实际引脚。</li>
+                <li>检查 <code>read_analog()</code> 读取的是哪个引脚，<code>write_digital()</code> 控制的是哪个引脚。</li>
+                <li>只改一个变量：要么改代码引脚，要么改画布连线，改完重新运行验证。</li>
+                <li>如果页面访问异常，回到软件分析中填写的浏览器首页地址，再观察页面和数据库记录。</li>
+              </ol>
+            </div>
+
+            <div class="task-card">
+              <h3>排错记录</h3>
+              <label>运行排错时，传感器 DATA 实际接到：
+                <span class="choice-row" data-name="debugSensorPin"></span>
+              </label>
+              <label>运行排错时，蜂鸣器 IO 实际接到：
+                <span class="choice-row" data-name="debugBuzzerPin"></span>
+              </label>
+              <label>当温度高于阈值后，执行器是否正常执行？
+                <span class="choice-row" data-name="debugActuatorResponse" data-options="能正常执行,不能正常执行（需排查蜂鸣器IO或执行器）,无法判断"></span>
+              </label>
+              <label>如果仍然不能访问，我会优先检查哪些原因？（可多选）
+                <span class="choice-row" data-name="debugCauses" data-type="checkbox" data-options="传感器或蜂鸣器未添加,代码引脚与画布不一致,Flask服务器未启动,浏览器URL写错,数据库故障,网络链路故障,执行器故障"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="task-card" style="margin-top:14px">
+            <h3>课后思考</h3>
+            <label>如果数据库已经有温度记录，但浏览器页面仍看不到数据，你会继续检查哪些环节？
+              <textarea data-field="afterClassQuestion" placeholder="课后再思考，不要求课堂马上完成"></textarea>
+            </label>
+          </div>
+
+          <div class="section-actions">
+            <span class="status" data-status="debug">未提交</span>
+            <button class="submit-btn" data-submit="debug" type="button">提交运行排错</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-section="summary">
+        <div class="section-body">
+          <h2>自我评价</h2>
+          <p>完成画布提交前，用 1 到 5 分给自己打分：1 分表示还需要老师带着做，5 分表示能独立说清楚。</p>
+
+          <div class="score-grid">
+            <div class="rating-item">
+              <span class="rating-title">一、能从代码中判断传感器读取的引脚口是哪个引脚口</span>
+              <span class="rating-row" data-name="scorePins" data-options="1,2,3,4,5"></span>
+            </div>
+            <div class="rating-item">
+              <span class="rating-title">二、能从代码中判断是哪个引脚向执行器发送指令数据</span>
+              <span class="rating-row" data-name="scoreMicrobitParams" data-options="1,2,3,4,5"></span>
+            </div>
+            <div class="rating-item">
+              <span class="rating-title">三、能根据 Flask 代码写出查询数据或上传数据的 URL 地址</span>
+              <span class="rating-row" data-name="scoreUrl" data-options="1,2,3,4,5"></span>
+            </div>
+            <div class="rating-item">
+              <span class="rating-title">四、能根据系统故障情况推导出可能的原因</span>
+              <span class="rating-row" data-name="scoreFault" data-options="1,2,3,4,5"></span>
+            </div>
+          </div>
+
+          <label>我还需要复习的问题：
+            <textarea data-field="needReview" placeholder="可以写：引脚、URL、数据库、故障排查等"></textarea>
+          </label>
+
+          <div class="section-actions">
+            <span class="status" data-status="summary">未提交</span>
+            <button class="submit-btn" data-submit="summary" type="button">提交自我评价</button>
+          </div>
+
+          <div class="task-card question-stack" style="margin-top:14px">
+            <h3>能力拓展：回到画布自主探索</h3>
+            <p>完成自评后，选择一个新功能设想，回到画布中尝试添加合适的传感器或执行器。这个环节不计入基础评分，重点看你能不能根据新需求自己选硬件、找连线、想清楚数据流。</p>
+            <label>如果要让系统同时监测“是否有人进入存储间”，你会考虑添加什么传感器？为什么？
+              <textarea data-field="extensionSensorIdea" placeholder="例如：需要感知人的进入、门的开关或光线变化，可以选择相应传感器，并说明理由。"></textarea>
+            </label>
+            <label>如果要让异常提醒更明显，除了蜂鸣器，还可以添加什么执行器？它应该由哪个模块控制？
+              <textarea data-field="extensionActuatorIdea" placeholder="例如：灯光、显示屏、风扇等，说明它负责什么动作，以及可能连接到哪个引脚。"></textarea>
+            </label>
+            <label>请在画布中任选一个拓展功能试一试，记录你的尝试结果或遇到的问题：
+              <textarea data-field="extensionCanvasTry" placeholder="可以写：我添加了什么设备、接到了哪里、运行时看到了什么现象、还没解决的问题是什么。"></textarea>
+            </label>
+            <button class="submit-btn" data-submit="summary" type="button">提交拓展发现</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    const SERVER_BASE = 'http://159.75.213.93/system-builder';
+    const DEFAULT_ACTIVITY_API_BASE = 'http://159.75.213.93/activity-submit';
+    const API_BASE =
+      new URLSearchParams(location.search).get('api') ||
+      localStorage.getItem('classroom-activity-api-base') ||
+      (location.protocol.startsWith('http') && !['localhost', '127.0.0.1'].includes(location.hostname)
+        ? `${location.origin}/activity-submit`
+        : DEFAULT_ACTIVITY_API_BASE);
+    const STORAGE_KEY = 'classroom-activity-session-answers-v1';
+    const LEGACY_STORAGE_KEYS = [
+      'classroom-activity-answers-v2',
+      'classroom-activity-answers-v1',
+      'classroom-activity-active-tab',
+    ];
+    const PIN_OPTIONS = ['P0', 'P1', 'P2', 'P3'];
+
+    document.getElementById('studentCanvasLink').href = `${SERVER_BASE}/openclass`;
+
+    function createPinChoices() {
+      document.querySelectorAll('[data-name]').forEach((wrap) => {
+        const name = wrap.dataset.name;
+        const type = wrap.dataset.type === 'checkbox' ? 'checkbox' : 'radio';
+        const options = wrap.dataset.options
+          ? wrap.dataset.options.split(',').map((item) => item.trim()).filter(Boolean)
+          : PIN_OPTIONS;
+        if (type === 'checkbox' || wrap.classList.contains('rating-row')) {
+          wrap.innerHTML = options.map((option) => `
+            <label class="choice">
+              <input type="${type}" name="${type === 'radio' ? name : `${name}[]`}" value="${option}" data-field="${name}">
+              ${option}
+            </label>
+          `).join('');
+          return;
+        }
+        wrap.innerHTML = `
+          <select class="single-select" data-field="${name}">
+            <option value="">请选择</option>
+            ${options.map((option) => `<option value="${option}">${option}</option>`).join('')}
+          </select>
+        `;
+      });
+    }
+
+    function stabilizeSelectDropdowns() {
+      document.querySelectorAll('.single-select').forEach((select) => {
+        ['pointerdown', 'mousedown', 'touchstart', 'click'].forEach((eventName) => {
+          select.addEventListener(eventName, (event) => event.stopPropagation());
+        });
+      });
+    }
+
+    const MODULE_MATCH_FUNCTION_LABELS = {
+      moduleReadTemp: '读取温度数据',
+      moduleThreshold: '判断是否超过阈值',
+      moduleBuzzer: '控制蜂鸣器报警',
+      moduleWifiHttp: '接入无线网络',
+      moduleReceiveUpload: '接收上传请求',
+      moduleRenderPage: '查询并渲染网页',
+      moduleViewRealtime: '查看实时温度和历史记录',
+    };
+    const MODULE_MATCH_FIELDS = Object.keys(MODULE_MATCH_FUNCTION_LABELS);
+    const MODULE_MATCH_EXPECTED_CONNECTION_COUNT = 8;
+
+    let activeMatchModule = '';
+    let moduleMatchStarted = false;
+
+    function splitMatchValue(value) {
+      return String(value || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    function getMatchInput(field) {
+      return document.querySelector(`input[type="hidden"][data-field="${field}"]`);
+    }
+
+    function setMatchValue(field, modules) {
+      const input = getMatchInput(field);
+      if (!input) return;
+      input.value = modules.join(',');
+    }
+
+    function clearModuleMatchAnswers() {
+      MODULE_MATCH_FIELDS.forEach((field) => setMatchValue(field, []));
+      activeMatchModule = '';
+      moduleMatchStarted = false;
+    }
+
+    function refreshModuleMatch() {
+      const board = document.getElementById('moduleMatchBoard');
+      const svg = document.getElementById('moduleMatchLines');
+      const summary = document.getElementById('moduleMatchSummary');
+      if (!board || !svg || !summary) return;
+
+      board.querySelectorAll('[data-match-module]').forEach((button) => {
+        const moduleName = button.dataset.matchModule;
+        const used = Array.from(board.querySelectorAll('input[type="hidden"][data-field]'))
+          .some((input) => splitMatchValue(input.value).includes(moduleName));
+        button.classList.toggle('active', activeMatchModule === moduleName);
+        button.classList.toggle('connected', used);
+      });
+
+      board.querySelectorAll('[data-match-function]').forEach((button) => {
+        const input = getMatchInput(button.dataset.matchFunction);
+        button.classList.toggle('connected', splitMatchValue(input?.value).length > 0);
+      });
+
+      const boardRect = board.getBoundingClientRect();
+      svg.setAttribute('viewBox', `0 0 ${boardRect.width} ${boardRect.height}`);
+      svg.innerHTML = '';
+
+      let connectedCount = 0;
+      Object.keys(MODULE_MATCH_FUNCTION_LABELS).forEach((field) => {
+        const input = getMatchInput(field);
+        const modules = splitMatchValue(input?.value);
+        connectedCount += modules.length;
+        const functionNode = board.querySelector(`[data-match-function="${field}"]`);
+        modules.forEach((moduleName) => {
+          const moduleNode = board.querySelector(`[data-match-module="${moduleName}"]`);
+          if (!moduleNode || !functionNode) return;
+          const moduleRect = moduleNode.getBoundingClientRect();
+          const functionRect = functionNode.getBoundingClientRect();
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', String(moduleRect.right - boardRect.left));
+          line.setAttribute('y1', String(moduleRect.top + moduleRect.height / 2 - boardRect.top));
+          line.setAttribute('x2', String(functionRect.left - boardRect.left));
+          line.setAttribute('y2', String(functionRect.top + functionRect.height / 2 - boardRect.top));
+          svg.appendChild(line);
+        });
+      });
+      summary.innerHTML = `
+        <span class="match-pill">已完成 ${connectedCount}/${MODULE_MATCH_EXPECTED_CONNECTION_COUNT} 条连线</span>
+        <span class="match-pill">先选左侧模块，再点右侧功能</span>
+      `;
+
+      board.querySelector('.match-hint')?.classList.toggle('is-hidden', moduleMatchStarted || connectedCount > 0);
+    }
+
+    function setupModuleMatching() {
+      const board = document.getElementById('moduleMatchBoard');
+      if (!board) return;
+
+      board.querySelectorAll('[data-match-module]').forEach((button) => {
+        button.addEventListener('click', () => {
+          moduleMatchStarted = true;
+          activeMatchModule = activeMatchModule === button.dataset.matchModule ? '' : button.dataset.matchModule;
+          refreshModuleMatch();
+        });
+      });
+
+      board.querySelectorAll('[data-match-function]').forEach((button) => {
+        button.addEventListener('click', () => {
+          if (!activeMatchModule) return;
+          const field = button.dataset.matchFunction;
+          const input = getMatchInput(field);
+          const current = splitMatchValue(input?.value);
+          const allowsMultiple = button.dataset.multiple === 'true';
+          const alreadyLinked = current.includes(activeMatchModule);
+          let next;
+          if (alreadyLinked) {
+            next = current.filter((item) => item !== activeMatchModule);
+          } else if (!allowsMultiple && current.length > 0) {
+            activeMatchModule = '';
+            refreshModuleMatch();
+            return;
+          } else {
+            next = allowsMultiple ? [...current, activeMatchModule] : [activeMatchModule];
+          }
+          setMatchValue(field, next);
+          activeMatchModule = '';
+          saveAll();
+          refreshModuleMatch();
+        });
+      });
+
+      window.addEventListener('resize', refreshModuleMatch);
+      refreshModuleMatch();
+    }
+
+    function clearPersistentAnswerCache() {
+      try {
+        LEGACY_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+      } catch {}
+    }
+
+    function getSaved() {
+      try {
+        const raw = sessionStorage.getItem(STORAGE_KEY) || '{}';
+        return JSON.parse(raw);
+      } catch {
+        return {};
+      }
+    }
+
+    function saveAll() {
+      const data = collectAll();
+      try {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch {}
+    }
+
+    function collectFields(root) {
+      const answers = {};
+      root.querySelectorAll('[data-field]').forEach((el) => {
+        const key = el.dataset.field;
+        if (!key) return;
+        if (el.type === 'radio') {
+          if (el.checked) answers[key] = el.value;
+          else if (!(key in answers)) answers[key] = '';
+        } else if (el.type === 'checkbox') {
+          if (!Array.isArray(answers[key])) answers[key] = [];
+          if (el.checked) answers[key].push(el.value || true);
+        } else {
+          answers[key] = el.value;
+        }
+      });
+      return answers;
+    }
+
+    function collectAll() {
+      return {
+        className: document.getElementById('className').value.trim(),
+        studentName: document.getElementById('studentName').value.trim(),
+        answers: collectFields(document),
+      };
+    }
+
+    function restoreSaved() {
+      const saved = getSaved();
+      if (saved.className) document.getElementById('className').value = saved.className;
+      if (saved.studentName) document.getElementById('studentName').value = saved.studentName;
+      const answers = saved.answers || {};
+      document.querySelectorAll('[data-field]').forEach((el) => {
+        const key = el.dataset.field;
+        if (MODULE_MATCH_FIELDS.includes(key)) return;
+        if (!(key in answers)) return;
+        if (el.type === 'radio') el.checked = el.value === answers[key];
+        else if (el.type === 'checkbox') {
+          el.checked = Array.isArray(answers[key])
+            ? answers[key].includes(el.value)
+            : Boolean(answers[key]);
+        } else el.value = answers[key];
+      });
+    }
+
+    function collectSection(section) {
+      const node = document.querySelector(`[data-section="${section}"]`);
+      const all = collectAll();
+      const answers = collectFields(node);
+      return { className: all.className, studentName: all.studentName, section, answers };
+    }
+
+    function getClientId() {
+      const key = 'classroom-activity-client-id';
+      let value = localStorage.getItem(key);
+      if (!value) {
+        value = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+        localStorage.setItem(key, value);
+      }
+      return value;
+    }
+
+    function activateTab(key) {
+      document.querySelectorAll('[data-tab]').forEach((button) => {
+        button.classList.toggle('active', button.dataset.tab === key);
+      });
+      document.querySelectorAll('.tab-panel').forEach((panel) => {
+        panel.classList.toggle('active', panel.dataset.section === key);
+      });
+    }
+
+    async function submitSection(section) {
+      const status = document.querySelector(`[data-status="${section}"]`);
+      const button = document.querySelector(`[data-submit="${section}"]`);
+      const payload = collectSection(section);
+      if (!payload.className || !payload.studentName) {
+        status.textContent = '请先填写班级和姓名';
+        status.className = 'status err';
+        return;
+      }
+
+      button.disabled = true;
+      status.textContent = '提交中...';
+      status.className = 'status';
+      try {
+        const response = await fetch(`${API_BASE.replace(/\/$/, '')}/api/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...payload,
+            clientId: getClientId(),
+            pageUrl: location.href,
+            submittedAt: new Date().toISOString(),
+          }),
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || `HTTP ${response.status}`);
+        }
+        status.textContent = '已提交，老师可查看';
+        status.className = 'status ok';
+      } catch (error) {
+        status.textContent = '提交失败：请确认课堂提交服务已启动';
+        status.className = 'status err';
+        console.error(error);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    createPinChoices();
+    stabilizeSelectDropdowns();
+    clearPersistentAnswerCache();
+    restoreSaved();
+    clearModuleMatchAnswers();
+    setupModuleMatching();
+    activateTab('intro');
+
+    document.addEventListener('input', saveAll);
+    document.addEventListener('change', saveAll);
+    document.querySelectorAll('[data-submit]').forEach((button) => {
+      button.addEventListener('click', () => submitSection(button.dataset.submit));
+    });
+    document.querySelectorAll('[data-tab]').forEach((button) => {
+      button.addEventListener('click', () => activateTab(button.dataset.tab));
+    });
+  </script>
+</body>
+</html>

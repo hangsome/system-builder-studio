@@ -5,15 +5,17 @@ import {
   CheckCircle2,
   Cpu,
   Database,
+  Lightbulb,
   Monitor,
   Radio,
   Server,
   Wifi,
   type LucideIcon,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { LogEntry } from '@/types/simulator';
 import { cn } from '@/lib/utils';
+import type { TraceFaultKey } from '@/lib/faultModel';
 
 export interface DataTransferSensor {
   id: string;
@@ -45,6 +47,7 @@ interface DataTransferTraceProps {
   serverAddress: string;
   databaseRecordCount: number;
   logs?: LogEntry[];
+  faults?: Partial<Record<TraceFaultKey, string>>;
 }
 
 const statusText: Record<TraceStatus, string> = {
@@ -101,8 +104,16 @@ export function DataTransferTrace({
   serverAddress,
   databaseRecordCount,
   logs,
+  faults = {},
 }: DataTransferTraceProps) {
   const [selectedStageId, setSelectedStageId] = useState('sensor');
+  const [hintRevealed, setHintRevealed] = useState(false);
+
+  // 故障注入组合改变时，提示次数自动重置（教师重新设置故障后学生可以再申请一次）
+  const faultsKey = useMemo(() => JSON.stringify(faults), [faults]);
+  useEffect(() => {
+    setHintRevealed(false);
+  }, [faultsKey]);
 
   const poweredSensors = useMemo(
     () => sensors.filter((sensor) => sensor.powered !== false),
@@ -111,9 +122,40 @@ export function DataTransferTrace({
   const primarySensor = poweredSensors[0] ?? sensors[0];
   const latestStageId = getLatestStageId(logs);
   const hasSensor = sensors.length > 0;
-  const hasPoweredSensor = poweredSensors.length > 0;
+  const hasPoweredSensor = poweredSensors.length > 0 && !faults.sensor;
   const hasRouteTarget = Boolean(routerSsid.trim()) && serverRunning;
-  const activeFlow = isRunning && codeBurned && hasPoweredSensor && serialConnected && networkConnected && serverRunning;
+  const activeFlow =
+    isRunning &&
+    codeBurned &&
+    hasPoweredSensor &&
+    !faults.microbit &&
+    serialConnected &&
+    networkConnected &&
+    !faults.network &&
+    serverRunning &&
+    !faults.server &&
+    !faults.database &&
+    !faults.browser;
+
+  // 每个 stage 对应的注入故障消息（仅教师设置 fault 后才非空）
+  const stageInjectedFault: Record<string, string | undefined> = {
+    sensor: faults.sensor,
+    serial: faults.microbit,
+    wifi: faults.network,
+    api: faults.server,
+    database: faults.database || faults.browser,
+  };
+  const hasInjectedFault = Object.values(stageInjectedFault).some(Boolean);
+  const maskFaultDetail = hasInjectedFault && !hintRevealed;
+
+  const maskedDetail = (injected: string | undefined, normal: string) => {
+    if (injected) {
+      return maskFaultDetail
+        ? '此段链路存在故障。请先回到画布、代码或数据库自查；如确实无法定位，可使用一次"故障提示"。'
+        : injected;
+    }
+    return normal;
+  };
 
   const stages: TraceStage[] = [
     {
@@ -121,49 +163,61 @@ export function DataTransferTrace({
       title: '传感器 / 采集',
       subtitle: hasSensor ? `${poweredSensors.length}/${sensors.length} 路可读` : '未放置传感器',
       detail: hasSensor
-        ? `当前样本: ${primarySensor?.name ?? '传感器'} = ${formatSensorValue(primarySensor)}`
+        ? maskedDetail(faults.sensor, `当前样本: ${primarySensor?.name ?? '传感器'} = ${formatSensorValue(primarySensor)}`)
         : '先在画布中放置传感器，仿真才有可采集的数据源。',
-      status: !hasSensor ? 'blocked' : isRunning && hasPoweredSensor ? 'active' : hasPoweredSensor ? 'ready' : 'blocked',
+      status: !hasSensor || faults.sensor ? 'blocked' : isRunning && hasPoweredSensor ? 'active' : hasPoweredSensor ? 'ready' : 'blocked',
       icon: Activity,
     },
     {
       id: 'serial',
-      title: 'micro:bit / 串口',
+      title: '智能终端 / IoT 通信',
       subtitle: codeBurned ? '代码已烧录' : '等待烧录',
-      detail: serialConnected
-        ? 'micro:bit 读取采样值，并通过 TX/RX 串口把数据交给 IoT 模块。'
-        : '需要保持 IoT TX/RX 与扩展板 P15/P16 的串口链路可用。',
-      status: !codeBurned || !serialConnected ? 'blocked' : isRunning ? 'active' : 'ready',
+      detail: maskedDetail(
+        faults.microbit,
+        serialConnected
+          ? '智能终端读取采样值，并把数据交给 IoT 模块。'
+          : '需要保持智能终端与 IoT 模块之间的通信链路可用。'
+      ),
+      status: !codeBurned || !serialConnected || faults.microbit ? 'blocked' : isRunning ? 'active' : 'ready',
       icon: Cpu,
     },
     {
       id: 'wifi',
       title: 'IoT / WiFi',
       subtitle: networkConnected ? routerSsid || 'WiFi 已连接' : '未连接 WiFi',
-      detail: networkConnected
-        ? `IoT 模块已接入 ${routerSsid || '无线网络'}，准备发起 HTTP 请求。`
-        : 'IoT 模块需要供电、串口连接，并配置可用 SSID 后才能进入无线链路。',
-      status: !networkConnected ? 'blocked' : isRunning ? 'active' : 'ready',
+      detail: maskedDetail(
+        faults.network,
+        networkConnected
+          ? `IoT 模块已接入 ${routerSsid || '无线网络'}，准备发起 HTTP 请求。`
+          : 'IoT 模块需要供电、通信连接，并配置可用 SSID 后才能进入无线链路。'
+      ),
+      status: !networkConnected || faults.network ? 'blocked' : isRunning ? 'active' : 'ready',
       icon: Wifi,
     },
     {
       id: 'api',
       title: 'Flask / API',
       subtitle: serverRunning ? serverAddress : '服务未启动',
-      detail: serverRunning
-        ? `请求路径: GET http://${serverAddress}/upload?temperature=${formatSensorValue(primarySensor).replace(/\s/g, '')}`
-        : '启动 Flask 服务后，IoT 模块的 HTTP 请求才有接收端。',
-      status: !serverRunning ? 'blocked' : activeFlow || latestStageId === 'api' ? 'active' : 'ready',
+      detail: maskedDetail(
+        faults.server,
+        serverRunning
+          ? `请求路径: GET http://${serverAddress}/upload?id=1&val=温度值，id 和 val 在 URL 参数中`
+          : '启动 Flask 服务后，IoT 模块的 HTTP 请求才有接收端。'
+      ),
+      status: !serverRunning || faults.server ? 'blocked' : activeFlow || latestStageId === 'api' ? 'active' : 'ready',
       icon: Server,
     },
     {
       id: 'database',
       title: '数据库 / 浏览器',
       subtitle: `sensorlog ${databaseRecordCount} 条`,
-      detail: hasRouteTarget
-        ? 'Flask 写入 SQLite 后，浏览器查询接口可以读取最新记录。'
-        : '数据库展示依赖 Flask API 写入和浏览器查询链路。',
-      status: activeFlow || latestStageId === 'database' ? 'active' : databaseRecordCount > 0 ? 'ready' : 'idle',
+      detail: maskedDetail(
+        faults.database || faults.browser,
+        hasRouteTarget
+          ? 'Flask 写入 SQLite 后，浏览器查询接口可以读取最新记录。'
+          : '数据库展示依赖 Flask API 写入和浏览器查询链路。'
+      ),
+      status: faults.database || faults.browser ? 'blocked' : activeFlow || latestStageId === 'database' ? 'active' : databaseRecordCount > 0 ? 'ready' : 'idle',
       icon: Database,
     },
   ];
@@ -181,9 +235,28 @@ export function DataTransferTrace({
             {activeFlow ? '端到端传输中' : isRunning ? '仿真运行中' : '等待运行'}
           </span>
         </div>
-        <div className="hidden items-center gap-1 text-[10px] text-muted-foreground sm:flex">
-          <Monitor className="h-3 w-3" />
-          <span>浏览器读取 SQLite 查询结果</span>
+        <div className="flex items-center gap-2 text-[10px]">
+          {hasInjectedFault ? (
+            <button
+              type="button"
+              disabled={hintRevealed}
+              onClick={() => setHintRevealed(true)}
+              className={cn(
+                'inline-flex items-center gap-1 rounded-md border px-2 py-1 transition-colors',
+                hintRevealed
+                  ? 'cursor-not-allowed border-muted-foreground/20 bg-muted/40 text-muted-foreground/70'
+                  : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200'
+              )}
+              title={hintRevealed ? '本轮故障的提示已使用，请结合画布与代码自查' : '只能使用一次：公开各段链路的具体故障描述'}
+            >
+              <Lightbulb className="h-3 w-3" />
+              {hintRevealed ? '故障提示已使用' : '申请故障提示（仅一次）'}
+            </button>
+          ) : null}
+          <div className="hidden items-center gap-1 text-muted-foreground sm:flex">
+            <Monitor className="h-3 w-3" />
+            <span>浏览器读取 SQLite 查询结果</span>
+          </div>
         </div>
       </div>
 
@@ -231,7 +304,7 @@ export function DataTransferTrace({
             <span>当前数据包</span>
           </div>
           <div className="truncate font-mono text-muted-foreground">
-            {primarySensor?.name ?? 'sensor'} → temperature={packetPreview} → GET /upload → sensorlog
+            {primarySensor?.name ?? 'sensor'} -&gt; id=1&val={packetPreview} -&gt; GET /upload -&gt; sensorlog
           </div>
         </div>
 

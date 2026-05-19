@@ -1,4 +1,4 @@
-﻿import { ReactNode, useState, useEffect } from 'react';
+﻿import { ReactNode, useState, useEffect, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { useSimulatorStore } from '@/store/simulatorStore';
@@ -29,6 +29,8 @@ import {
   Package,
   Settings,
   Lock,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { Globe } from 'lucide-react';
 import { ComponentLibrary } from './ComponentLibrary';
@@ -41,6 +43,7 @@ import { ConnectionValidationPanel } from './ConnectionValidationPanel';
 import { BrowserSimulator } from './BrowserSimulator';
 import { scenarios, loadScenario } from '@/data/scenarios';
 import { useSimulationRunner } from '@/hooks/useSimulationRunner';
+import { canRunSimulation } from '@/lib/simulationEngine';
 import { cn } from '@/lib/utils';
 import { UserRole } from '@/types/edu';
 import { TeachingSubmissionPanel } from './TeachingSubmissionPanel';
@@ -54,6 +57,9 @@ import {
 
 const PANEL_STATE_KEY = 'simulator-panel-state';
 const MANUAL_SAVE_KEY = 'simulator-manual-save';
+const OPENCLASS_CANVAS_INITIALIZED_KEY = 'openclass-classroom-canvas-initialized';
+const OPENCLASS_CANVAS_VERSION_KEY = 'openclass-classroom-canvas-version';
+const CURRENT_OPENCLASS_CANVAS_VERSION = '2026-05-16-smart-terminal-collapsed';
 
 interface SubmissionContext {
   assignmentId: number;
@@ -65,12 +71,14 @@ interface SimulatorLayoutProps {
   role?: UserRole;
   submissionContext?: SubmissionContext;
   headerActions?: ReactNode;
+  initialScenarioId?: string;
 }
 
 interface PanelState {
   leftCollapsed: boolean;
   rightCollapsed: boolean;
   bottomCollapsed: boolean;
+  bottomLarge: boolean;
 }
 
 function loadPanelState(): PanelState {
@@ -82,7 +90,7 @@ function loadPanelState(): PanelState {
   } catch (e) {
     console.error('Failed to load panel state:', e);
   }
-  return { leftCollapsed: false, rightCollapsed: false, bottomCollapsed: false };
+  return { leftCollapsed: false, rightCollapsed: false, bottomCollapsed: false, bottomLarge: false };
 }
 
 function savePanelState(state: PanelState) {
@@ -93,24 +101,31 @@ function savePanelState(state: PanelState) {
   }
 }
 
-export function SimulatorLayout({ role, submissionContext, headerActions }: SimulatorLayoutProps) {
+export function SimulatorLayout({ role, submissionContext, headerActions, initialScenarioId }: SimulatorLayoutProps) {
   useSimulationRunner();
 
   const { licenseState, featureAccess } = useLicense();
   const upgradePrompt = useUpgradePrompt();
 
-  const [activeTab, setActiveTab] = useState('hardware');
+  const [activeTab, setActiveTab] = useState(role === 'student' ? 'code' : 'hardware');
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(() => loadPanelState().leftCollapsed);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => loadPanelState().rightCollapsed);
-  const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(() => loadPanelState().bottomCollapsed);
+  const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(() =>
+    role === 'student' ? false : loadPanelState().bottomCollapsed
+  );
+  const [bottomPanelLarge, setBottomPanelLarge] = useState(() =>
+    role === 'student' ? false : Boolean(loadPanelState().bottomLarge)
+  );
+  const bottomPanelSizeLabel = activeTab === 'browser' ? '浏览器' : '代码区';
 
   useEffect(() => {
     savePanelState({
       leftCollapsed: leftPanelCollapsed,
       rightCollapsed: rightPanelCollapsed,
       bottomCollapsed: bottomPanelCollapsed,
+      bottomLarge: bottomPanelLarge,
     });
-  }, [leftPanelCollapsed, rightPanelCollapsed, bottomPanelCollapsed]);
+  }, [leftPanelCollapsed, rightPanelCollapsed, bottomPanelCollapsed, bottomPanelLarge]);
 
   const {
     isRunning,
@@ -119,15 +134,51 @@ export function SimulatorLayout({ role, submissionContext, headerActions }: Simu
     toggleGrid,
     resetSimulator,
     loadScenario: loadScenarioToStore,
+    placedComponents,
+    connections,
+    codeBurned,
+    serverConfig,
+    addLog,
+    clearLogs,
   } = useSimulatorStore();
 
   const canLoadPresetScenarios = role === 'teacher' || role === 'admin' || !role;
+  const classroomScenarioId = initialScenarioId || 'classroom-temperature';
+  const studentScenarioInitializedRef = useRef(false);
 
   useEffect(() => {
     if (role === 'student') {
-      resetSimulator();
+      if (studentScenarioInitializedRef.current) {
+        return;
+      }
+      studentScenarioInitializedRef.current = true;
+
+      let alreadyInitialized = false;
+      try {
+        alreadyInitialized =
+          localStorage.getItem(OPENCLASS_CANVAS_VERSION_KEY) === CURRENT_OPENCLASS_CANVAS_VERSION ||
+          localStorage.getItem(OPENCLASS_CANVAS_INITIALIZED_KEY) === CURRENT_OPENCLASS_CANVAS_VERSION;
+      } catch {
+        // localStorage 不可用时继续按画布内容判断。
+      }
+      if (alreadyInitialized) {
+        return;
+      }
+
+      const scenario = loadScenario(classroomScenarioId);
+      if (scenario) {
+        loadScenarioToStore(scenario);
+      } else {
+        resetSimulator();
+      }
+      try {
+        localStorage.setItem(OPENCLASS_CANVAS_INITIALIZED_KEY, CURRENT_OPENCLASS_CANVAS_VERSION);
+        localStorage.setItem(OPENCLASS_CANVAS_VERSION_KEY, CURRENT_OPENCLASS_CANVAS_VERSION);
+      } catch {
+        // 忽略存储失败。
+      }
     }
-  }, [role, resetSimulator]);
+  }, [role, classroomScenarioId, placedComponents, loadScenarioToStore, resetSimulator]);
 
   const handleScenarioChange = (scenarioId: string) => {
     if (!canLoadPresetScenarios && scenarioId !== 'blank') {
@@ -154,8 +205,47 @@ export function SimulatorLayout({ role, submissionContext, headerActions }: Simu
     }
   };
 
+  const handleReset = () => {
+    if (role === 'student') {
+      const confirmed = window.confirm('确定要重置为课堂半成品画布吗？当前修改会被清空。');
+      if (!confirmed) return;
+
+      const scenario = loadScenario(classroomScenarioId);
+      if (scenario) {
+        loadScenarioToStore(scenario);
+        try {
+          localStorage.setItem(OPENCLASS_CANVAS_INITIALIZED_KEY, CURRENT_OPENCLASS_CANVAS_VERSION);
+          localStorage.setItem(OPENCLASS_CANVAS_VERSION_KEY, CURRENT_OPENCLASS_CANVAS_VERSION);
+        } catch {
+          // 忽略存储失败。
+        }
+        toast.success('已恢复课堂半成品画布');
+        return;
+      }
+    }
+
+    resetSimulator();
+  };
+
   const handleRun = () => {
-    setRunning(!isRunning);
+    if (isRunning) {
+      setRunning(false);
+      addLog({ type: 'info', message: '仿真已停止', source: 'System' });
+      return;
+    }
+
+    const systemCheck = canRunSimulation(placedComponents, connections, codeBurned, serverConfig.running);
+    if (!systemCheck.canRun) {
+      systemCheck.issues.forEach((issue) => {
+        addLog({ type: 'warning', message: issue, source: 'System' });
+      });
+      toast.warning(`暂不能运行：${systemCheck.issues[0] || '请先完成运行准备'}`);
+      return;
+    }
+
+    clearLogs();
+    setRunning(true);
+    addLog({ type: 'info', message: '仿真开始运行', source: 'System' });
   };
 
   const handleSave = () => {
@@ -193,7 +283,7 @@ export function SimulatorLayout({ role, submissionContext, headerActions }: Simu
         <header className="h-14 border-b border-border flex items-center justify-between px-4 bg-card">
           <div className="flex items-center gap-4">
             <h1 className="text-lg font-semibold text-foreground flex items-center gap-2">
-              <span className="text-2xl">📐</span>
+              <Package className="h-5 w-5 text-primary" />
               信息系统搭建模拟器
               {licenseState && (
                 <span
@@ -229,7 +319,7 @@ export function SimulatorLayout({ role, submissionContext, headerActions }: Simu
                 </SelectContent>
               </Select>
             ) : (
-              <div className="text-xs px-3 py-2 rounded-md border bg-muted/50">学生模式：仅允许空白画布</div>
+              <div className="text-xs px-3 py-2 rounded-md border bg-muted/50">学生模式：课堂半成品画布</div>
             )}
 
             {submissionContext ? (
@@ -297,7 +387,7 @@ export function SimulatorLayout({ role, submissionContext, headerActions }: Simu
               {!featureAccess.canSave && <Lock className="h-3 w-3 ml-1 text-muted-foreground" />}
             </Button>
 
-            <Button variant="outline" size="sm" onClick={resetSimulator}>
+            <Button variant="outline" size="sm" onClick={handleReset}>
               <RotateCcw className="h-4 w-4 mr-1" />
               重置
             </Button>
@@ -348,10 +438,19 @@ export function SimulatorLayout({ role, submissionContext, headerActions }: Simu
             <div
               className={cn(
                 'border-t border-border flex-shrink-0 transition-all duration-300',
-                bottomPanelCollapsed ? 'h-10' : 'h-72'
+                bottomPanelCollapsed ? 'h-10' : bottomPanelLarge ? 'h-[54vh]' : 'h-72'
               )}
             >
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+              <Tabs
+                value={activeTab}
+                onValueChange={(value) => {
+                  setActiveTab(value);
+                  if (value === 'browser') {
+                    setBottomPanelLarge(true);
+                  }
+                }}
+                className="h-full flex flex-col"
+              >
                 <div className="flex items-center justify-between px-4 pt-2">
                   <TabsList className="self-start">
                     <TabsTrigger value="hardware" className="gap-1.5">
@@ -376,22 +475,36 @@ export function SimulatorLayout({ role, submissionContext, headerActions }: Simu
                     </TabsTrigger>
                   </TabsList>
 
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setBottomPanelCollapsed(!bottomPanelCollapsed)}
-                    className="h-6 w-6 p-0"
-                  >
-                    {bottomPanelCollapsed ? (
-                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="18 15 12 9 6 15" />
-                      </svg>
-                    ) : (
-                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="6 9 12 15 18 9" />
-                      </svg>
+                  <div className="flex items-center gap-1">
+                    {!bottomPanelCollapsed && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setBottomPanelLarge(!bottomPanelLarge)}
+                        className="h-7 gap-1 px-2 text-xs"
+                      >
+                        {bottomPanelLarge ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                        {bottomPanelLarge ? `标准${bottomPanelSizeLabel}` : `放大${bottomPanelSizeLabel}`}
+                      </Button>
                     )}
-                  </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setBottomPanelCollapsed(!bottomPanelCollapsed)}
+                      className="h-6 w-6 p-0"
+                      aria-label={bottomPanelCollapsed ? '展开底部面板' : '收起底部面板'}
+                    >
+                      {bottomPanelCollapsed ? (
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="18 15 12 9 6 15" />
+                        </svg>
+                      ) : (
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      )}
+                    </Button>
+                  </div>
                 </div>
 
                 {!bottomPanelCollapsed && (

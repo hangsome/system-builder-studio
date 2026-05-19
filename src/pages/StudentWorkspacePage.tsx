@@ -45,6 +45,7 @@ export default function StudentWorkspacePage() {
     <div className="min-h-screen bg-background">
       <SimulatorLayout
         role="student"
+        initialScenarioId={assignment?.scenario_id || 'classroom-temperature'}
         submissionContext={{
           assignmentId,
           assignmentTitle: assignment?.title,

@@ -57,11 +57,25 @@ export interface ScoreDimension {
   score: number;
   max: number;
   reason: string;
+  checks?: ScoreCheck[];
+}
+
+export type ScoreDimensionMap = Record<
+  string,
+  Partial<ScoreDimension> & Pick<ScoreDimension, 'score' | 'max' | 'reason'>
+>;
+
+export interface ScoreCheck {
+  id: string;
+  label: string;
+  ok: boolean;
+  score?: number;
+  max?: number;
 }
 
 export interface AutoScore {
   rubricVersion: string;
-  dimensions: ScoreDimension[];
+  dimensions: ScoreDimension[] | ScoreDimensionMap;
   total: number;
   reasons: string[];
 }
@@ -78,6 +92,8 @@ export interface SubmissionInfo {
   graded_at?: string | null;
   username?: string;
   display_name?: string;
+  submitted_student_name?: string;
+  submitted_seat_no?: string;
   title?: string;
   scenario_id?: string;
   class_name?: string;

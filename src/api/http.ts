@@ -1,4 +1,7 @@
-const rawBase = String(import.meta.env.VITE_API_BASE_URL || '/api').trim();
+const viteBase = String(import.meta.env.BASE_URL || '/');
+const normalizedViteBase = viteBase.endsWith('/') ? viteBase.slice(0, -1) : viteBase;
+const defaultApiBase = normalizedViteBase ? `${normalizedViteBase}/api` : '/api';
+const rawBase = String(import.meta.env.VITE_API_BASE_URL || defaultApiBase).trim();
 const API_BASE_URL = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
 
 function joinUrl(path: string) {
@@ -72,4 +75,3 @@ export async function httpJson<T>(
 
   return (jsonPayload ?? ({} as T)) as T;
 }
-

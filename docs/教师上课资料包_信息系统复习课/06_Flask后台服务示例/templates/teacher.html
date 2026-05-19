@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="5">
+  <title>教师后台：课堂数据查看</title>
+  <style>
+    body { margin: 0; font-family: "Microsoft YaHei", system-ui, sans-serif; background: #f4f7fa; color: #172033; }
+    main { max-width: 1200px; margin: 0 auto; padding: 34px 22px; }
+    h1 { margin: 0; font-size: 32px; }
+    p { color: #5e6c7d; line-height: 1.75; }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 22px 0; }
+    .metric, .panel { background: white; border: 1px solid #d7e0ea; border-radius: 16px; padding: 18px; box-shadow: 0 12px 30px rgba(15,23,42,.06); }
+    .metric span { display: block; color: #64748b; font-size: 14px; }
+    .metric strong { display: block; margin-top: 8px; font-size: 30px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 11px 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+    th { color: #475569; background: #f8fafc; }
+    .alarm { color: #9a392f; font-weight: 700; }
+    .ok { color: #2f6b4f; font-weight: 700; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 0; }
+    .student { margin-top: 14px; }
+    .section-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .section { border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #f8fafc; min-height: 130px; }
+    .section h3 { margin: 0 0 8px; font-size: 16px; }
+    .progress { color: #1f536b; font-weight: 700; }
+    code { white-space: pre-wrap; word-break: break-word; }
+    button, a { min-height: 36px; padding: 7px 12px; border-radius: 9px; border: 1px solid #2f6f8f; background: #2f6f8f; color: white; text-decoration: none; font: inherit; cursor: pointer; }
+    a.secondary, button.secondary { background: white; color: #1f536b; border-color: #b8ccd8; }
+    @media (max-width: 900px) { .metrics, .section-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+
+
+<main>
+  <h1>教师后台：课堂数据查看</h1>
+  <p>本页每 5 秒自动刷新。可同时查看智能终端上传的温度记录，以及“老师上课带学生用_活动页面.html”的学生分环节提交。</p>
+
+  <section class="metrics">
+    <div class="metric"><span>温度记录数</span><strong>{{ total }}</strong></div>
+    <div class="metric"><span>报警记录数</span><strong>{{ alarm_count }}</strong></div>
+    <div class="metric"><span>最新温度</span><strong>{% if latest %}{{ latest.value }}℃{% else %}-{% endif %}</strong></div>
+    <div class="metric"><span>活动提交数</span><strong>{{ activity_total }}</strong></div>
+  </section>
+
+  <section class="panel">
+    <h2>学生活动提交</h2>
+    <p>学生可访问 <code>/activity</code>，或打开活动页并添加 <code>?api=http://教师电脑IP:5000</code>，提交后会显示在这里。</p>
+    <div class="actions">
+      <a href="/activity" target="_blank" rel="noopener">打开学生活动页</a>
+      <form method="post" action="/teacher/reset-activity" onsubmit="return confirm('确认清空学生提交数据？');">
+        <button class="secondary" type="submit">清空活动提交</button>
+      </form>
+    </div>
+
+    {% for student_key, student in activity_students.items() %}
+      <section class="student">
+        <h3>{{ student.class_name }}｜{{ student.student_name }}</h3>
+        <p class="progress">已提交 {{ student.sections|length }} / {{ activity_section_labels|length }} 个活动进度</p>
+        <div class="section-grid">
+          {% for section, label in activity_section_labels.items() %}
+            <div class="section">
+              <h3>{{ label }}</h3>
+              {% if section in student.sections %}
+                <p>提交时间：{{ student.sections[section].submitted_at }}</p>
+                <details open>
+                  <summary>查看答案</summary>
+                  <code>{{ student.sections[section].answers_pretty }}</code>
+                </details>
+              {% else %}
+                <p>未提交</p>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </section>
+    {% else %}
+      <p>暂无学生提交。请确认活动页提交服务地址指向本机 Flask，例如 <code>?api=http://127.0.0.1:5000</code>。</p>
+    {% endfor %}
+  </section>
+
+  <section class="panel">
+    <h2>最近 50 条 sensorlog 记录</h2>
+    <table>
+      <thead><tr><th>ID</th><th>传感器</th><th>温度</th><th>报警</th><th>时间</th></tr></thead>
+      <tbody>
+      {% for row in records %}
+        <tr>
+          <td>{{ row.id }}</td>
+          <td>{{ row.sensor_id }}</td>
+          <td>{{ row.value }}℃</td>
+          <td class="{{ 'alarm' if row.alarm else 'ok' }}">{{ '是' if row.alarm else '否' }}</td>
+          <td>{{ row.timestamp }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5">暂无数据。</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="actions">
+      <a class="secondary" href="/">打开学生查询页</a>
+      <form method="post" action="/teacher/reset" onsubmit="return confirm('确认清空本地演示数据？');">
+        <button class="secondary" type="submit">清空演示数据</button>
+      </form>
+    </div>
+  </section>
+</main>
+</body>
+</html>

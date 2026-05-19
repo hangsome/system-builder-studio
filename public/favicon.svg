@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="水滴图标">
+  <defs>
+    <linearGradient id="dropFill" x1="20" y1="8" x2="46" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7dd3fc"/>
+      <stop offset="0.52" stop-color="#0ea5e9"/>
+      <stop offset="1" stop-color="#0369a1"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#eff6ff"/>
+  <path
+    d="M32 6c-7.9 9.5-17 21.2-17 34.1C15 51 22.5 58 32 58s17-7 17-17.9C49 27.2 39.9 15.5 32 6Z"
+    fill="url(#dropFill)"
+  />
+  <path
+    d="M24.4 39.8c0 5.5 3.8 9.6 9.2 10.2"
+    fill="none"
+    stroke="#bae6fd"
+    stroke-width="4"
+    stroke-linecap="round"
+    opacity="0.86"
+  />
+  <path
+    d="M25.7 24.7c2.5-4.4 5.3-8.1 6.3-9.4"
+    fill="none"
+    stroke="#f0f9ff"
+    stroke-width="3"
+    stroke-linecap="round"
+    opacity="0.72"
+  />
+</svg>

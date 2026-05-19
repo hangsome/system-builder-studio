@@ -1,76 +1,62 @@
-import { describe, expect, it } from "vitest";
-import {
-  simulateFlaskRoute,
-  type SimulatedHttpRequest,
-} from "@/lib/simulationEngine";
-import type { DatabaseState, ServerConfig } from "@/types/simulator";
+import { describe, expect, it } from 'vitest';
+import { classroomDatabase, classroomServerConfig } from '@/data/classroomLesson';
+import { simulateFlaskRoute } from '@/lib/simulationEngine';
 
-const baseDatabase: DatabaseState = {
-  tables: [],
-  records: {
-    sensorlog: [],
-  },
-};
+function cloneDatabase() {
+  return JSON.parse(JSON.stringify(classroomDatabase));
+}
 
-const serverConfig: ServerConfig = {
-  ip: "192.168.1.100",
-  port: 5000,
-  running: true,
-  routes: [
-    { path: "/upload", method: "POST", handler: "upload_data" },
-    { path: "/query", method: "GET", handler: "query_data" },
-  ],
-  logs: [],
-};
-
-describe("simulateFlaskRoute", () => {
-  it("handles upload_data by appending to the database", () => {
-    const request: SimulatedHttpRequest = {
-      method: "POST",
-      path: "/upload",
-      body: { temperature: 23.5 },
-      timestamp: new Date(),
-    };
-
-    const result = simulateFlaskRoute(request, serverConfig, baseDatabase);
-
-    expect(result.response.status).toBe(200);
-    expect(result.updatedDatabase?.records.sensorlog.length).toBe(1);
-  });
-
-  it("returns recent records for query_data", () => {
-    const uploadRequest: SimulatedHttpRequest = {
-      method: "POST",
-      path: "/upload",
-      body: { temperature: 25 },
-      timestamp: new Date(),
-    };
-    const uploadResult = simulateFlaskRoute(uploadRequest, serverConfig, baseDatabase);
-
-    const queryRequest: SimulatedHttpRequest = {
-      method: "GET",
-      path: "/query",
-      timestamp: new Date(),
-    };
-    const queryResult = simulateFlaskRoute(
-      queryRequest,
-      serverConfig,
-      uploadResult.updatedDatabase ?? baseDatabase,
+describe('simulateFlaskRoute classroom HTTP methods', () => {
+  it('accepts GET /upload with id and val and writes a sensorlog record', () => {
+    const result = simulateFlaskRoute(
+      {
+        method: 'GET',
+        path: '/upload?id=2&val=31.2',
+        timestamp: new Date(),
+      },
+      classroomServerConfig,
+      cloneDatabase()
     );
 
-    expect(queryResult.response.status).toBe(200);
-    expect(Array.isArray(queryResult.response.body)).toBe(true);
+    expect(result.response.status).toBe(200);
+    expect(result.response.body).toMatchObject({ command: 'BUZZER_ON' });
+    expect(result.updatedDatabase?.records.sensorlog).toHaveLength(1);
+    expect(result.updatedDatabase?.records.sensorlog[0]).toMatchObject({ sensor_id: 2, value: 31.2 });
   });
 
-  it("returns 404 for unknown routes", () => {
-    const request: SimulatedHttpRequest = {
-      method: "GET",
-      path: "/missing",
-      timestamp: new Date(),
-    };
-
-    const result = simulateFlaskRoute(request, serverConfig, baseDatabase);
+  it('rejects POST /upload when the route is configured as GET', () => {
+    const result = simulateFlaskRoute(
+      {
+        method: 'POST',
+        path: '/upload',
+        body: { id: 1, val: 31.2 },
+        timestamp: new Date(),
+      },
+      classroomServerConfig,
+      cloneDatabase()
+    );
 
     expect(result.response.status).toBe(404);
+  });
+
+  it('serves GET / with render_template-style data without changing the database', () => {
+    const database = cloneDatabase();
+    const result = simulateFlaskRoute(
+      {
+        method: 'GET',
+        path: '/',
+        timestamp: new Date(),
+      },
+      classroomServerConfig,
+      database
+    );
+
+    expect(result.response.status).toBe(200);
+    expect(result.response.body).toMatchObject({
+      template: 'index.html',
+      render: 'render_template',
+      records: [],
+    });
+    expect(result.updatedDatabase).toBeUndefined();
   });
 });

@@ -37,6 +37,7 @@ export function SimulationPanel() {
     database,
     updateDatabase,
     codeBurned,
+    detailsVisible,
   } = useSimulatorStore(
     useShallow((state) => ({
       isRunning: state.isRunning,
@@ -53,6 +54,7 @@ export function SimulationPanel() {
       database: state.database,
       updateDatabase: state.updateDatabase,
       codeBurned: state.codeBurned,
+      detailsVisible: state.detailsVisible,
     }))
   );
 
@@ -139,9 +141,9 @@ export function SimulationPanel() {
   const checkSystemStatus = () => {
     const issues: string[] = [];
     
-    // 检查是否有 micro:bit
+    // 检查是否有智能终端
     const hasMicrobit = placedComponents.some((c) => c.definitionId === 'microbit');
-    if (!hasMicrobit) issues.push('缺少 micro:bit');
+    if (!hasMicrobit) issues.push('缺少智能终端');
     
     // 检查代码是否烧录
     if (!codeBurned) issues.push('代码未烧录');
@@ -221,7 +223,7 @@ export function SimulationPanel() {
                 value={routerConfig.password}
                 onChange={(e) => updateRouterConfig({ password: e.target.value })}
                 className="h-8 text-xs"
-                type="password"
+                type="text"
               />
             </div>
           </div>
@@ -233,33 +235,35 @@ export function SimulationPanel() {
             服务器配置
           </h4>
           <div className="space-y-2">
-            <div className="flex gap-2">
-              <div className="flex-1">
+            <div className="grid grid-cols-[minmax(0,1fr)_4.5rem] gap-2">
+              <div>
                 <Label className="text-xs">IP地址</Label>
                 <Input
                   value={serverConfig.ip}
                   onChange={(e) => updateServerConfig({ ip: e.target.value })}
-                  className="h-8 text-xs"
+                  className="h-8 min-w-0 text-xs font-mono"
                 />
               </div>
-              <div className="w-20">
+              <div>
                 <Label className="text-xs">端口</Label>
                 <Input
                   value={serverConfig.port}
                   onChange={(e) => updateServerConfig({ port: parseInt(e.target.value) || 5000 })}
-                  className="h-8 text-xs"
+                  className="h-8 min-w-0 text-center text-xs font-mono"
                   type="number"
                 />
               </div>
             </div>
-            <Button
-              size="sm"
-              variant={serverConfig.running ? 'destructive' : 'default'}
-              className="w-full"
-              onClick={() => updateServerConfig({ running: !serverConfig.running })}
-            >
-              {serverConfig.running ? '停止服务器' : '启动服务器'}
-            </Button>
+            {detailsVisible && (
+              <Button
+                size="sm"
+                variant={serverConfig.running ? 'destructive' : 'default'}
+                className="w-full"
+                onClick={() => updateServerConfig({ running: !serverConfig.running })}
+              >
+                {serverConfig.running ? '停止服务器' : '启动服务器'}
+              </Button>
+            )}
           </div>
         </div>
       </div>

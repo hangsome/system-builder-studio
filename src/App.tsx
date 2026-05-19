@@ -23,6 +23,8 @@ const TeacherStudioPage = lazy(() => import("./pages/TeacherStudioPage"));
 const TeacherSubmissionCanvasPage = lazy(() => import("./pages/TeacherSubmissionCanvasPage"));
 const StudentDashboardPage = lazy(() => import("./pages/StudentDashboardPage"));
 const StudentWorkspacePage = lazy(() => import("./pages/StudentWorkspacePage"));
+const OpenClassEntryPage = lazy(() => import("./pages/OpenClassEntryPage"));
+const TeacherBlankCanvasEntryPage = lazy(() => import("./pages/TeacherBlankCanvasEntryPage"));
 
 function RouteFallback() {
   return (
@@ -36,19 +38,26 @@ function RouteFallback() {
 
 const App = () => {
   const teachingEnabled = isTeachingEnabled();
+  const routerBasename = import.meta.env.BASE_URL === '/'
+    ? undefined
+    : import.meta.env.BASE_URL.replace(/\/$/, '');
 
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter basename={routerBasename}>
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               {teachingEnabled ? (
                 <>
                   <Route path="/" element={<RoleHomeRedirect />} />
                   <Route path="/login" element={<LoginPage />} />
+                  <Route path="/teacher-demo-blank" element={<TeacherBlankCanvasEntryPage />} />
+                  <Route path="/demo-blank" element={<TeacherBlankCanvasEntryPage />} />
+                  <Route path="/openclass" element={<OpenClassEntryPage />} />
+                  <Route path="/open-class" element={<OpenClassEntryPage />} />
                   <Route path="/403" element={<ForbiddenPage />} />
                   <Route path="/simulator" element={<Index />} />
                   <Route
@@ -112,6 +121,10 @@ const App = () => {
                       </LicenseGuard>
                     }
                   />
+                  <Route path="/teacher-demo-blank" element={<TeacherBlankCanvasEntryPage />} />
+                  <Route path="/demo-blank" element={<TeacherBlankCanvasEntryPage />} />
+                  <Route path="/openclass" element={<OpenClassEntryPage />} />
+                  <Route path="/open-class" element={<OpenClassEntryPage />} />
                   <Route path="/activation" element={<Activation />} />
                   <Route path="/admin" element={<Admin />} />
                 </>
