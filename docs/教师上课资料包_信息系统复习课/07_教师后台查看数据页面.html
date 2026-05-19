@@ -199,13 +199,17 @@
   <section class="hero">
     <div class="card">
       <h1>教师后台查看数据页面</h1>
-      <p>本页说明教师课中如何查看两类数据：一类是服务器系统中的学生提交画布和自动评分；另一类是 Flask 后台服务中的温度数据库记录。</p>
-      <p>正式公开课建议主要使用服务器教师后台；本地 Flask 教师页用于备课演示或解释“后台如何从数据库读取数据”。</p>
+      <p>本页说明教师课中如何查看三类数据：课堂活动页的分环节作答、服务器系统中的学生提交画布和自动评分，以及 Flask 后台服务中的温度数据库记录。</p>
+      <p>正式公开课建议优先使用课堂活动提交后台和学生画布提交后台；本地 Flask 教师页用于备课演示或解释“后台如何从数据库读取数据”。</p>
     </div>
     <div class="card links">
-      <a class="button" href="http://159.75.213.93/system-builder/teacher" target="_blank" rel="noopener">
-        打开服务器教师后台
-        <span>学生提交与评分</span>
+      <a class="button" href="http://159.75.213.93/activity-submit/teacher" target="_blank" rel="noopener">
+        打开课堂活动提交后台
+        <span>活动页作答与参考评分</span>
+      </a>
+      <a class="button secondary" href="http://159.75.213.93/system-builder/teacher" target="_blank" rel="noopener">
+        打开学生画布提交后台
+        <span>画布、代码与自动评分</span>
       </a>
       <a class="button secondary" href="http://127.0.0.1:5000/teacher" target="_blank" rel="noopener">
         打开本地 Flask 教师页
@@ -220,11 +224,45 @@
 
   <section class="grid">
     <article class="card">
-      <h2>一、服务器教师后台看学生提交</h2>
+      <h2>一、课堂活动提交后台看活动作答</h2>
       <div class="step">
         <div class="num">1</div>
         <div>
-          <h3>登录教师后台</h3>
+          <h3>登录课堂活动提交后台</h3>
+          <p>打开 <code>http://159.75.213.93/activity-submit/teacher</code>，输入课堂活动查看密码进入。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <div>
+          <h3>查看活动进度</h3>
+          <p>学生在活动页提交后，后台会按姓名显示硬件搭建、软件分析、运行排错和自我评价四个环节的完成情况。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <div>
+          <h3>核对作答和参考评分</h3>
+          <p>展开每个环节，查看学生原始作答、评分点和系统参考得分。</p>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>课堂证据</th><th>后台看什么</th></tr></thead>
+        <tbody>
+          <tr><td>硬件搭建</td><td>传感器、执行器、引脚和模块功能匹配是否正确。</td></tr>
+          <tr><td>软件分析</td><td>WiFi、服务器 IP、端口、上传路由和查看路由是否填写正确。</td></tr>
+          <tr><td>运行排错</td><td>是否能从故障现象推导引脚、服务器、URL 或网络链路问题。</td></tr>
+          <tr><td>自我评价</td><td>学生是否能判断自己还需要复习的环节。</td></tr>
+        </tbody>
+      </table>
+    </article>
+
+    <article class="card">
+      <h2>二、学生画布提交后台看画布证据</h2>
+      <div class="step">
+        <div class="num">1</div>
+        <div>
+          <h3>登录学生画布提交后台</h3>
           <p>打开 <code>http://159.75.213.93/system-builder/teacher</code>，使用教师账号进入。</p>
         </div>
       </div>
@@ -246,7 +284,7 @@
         <thead><tr><th>课堂证据</th><th>后台看什么</th></tr></thead>
         <tbody>
           <tr><td>硬件任务</td><td>PC、浏览器、手机是否补全，数据链路是否完整。</td></tr>
-          <tr><td>软件任务</td><td>GET /upload?id=...&val=...、GET /、URL、服务器 IP 和端口是否正确。</td></tr>
+          <tr><td>软件任务</td><td>GET /upload?id=...&amp;val=...、GET /、URL、服务器 IP 和端口是否正确。</td></tr>
           <tr><td>排错任务</td><td>代码引脚是否与画布 DATA / IO 实际连线对应。</td></tr>
           <tr><td>数据任务</td><td>sensorlog 是否新增，超阈值是否触发蜂鸣器响应。</td></tr>
         </tbody>
@@ -254,7 +292,7 @@
     </article>
 
     <article class="card">
-      <h2>二、Flask 教师页看温度数据库</h2>
+      <h2>三、Flask 教师页看温度数据库</h2>
       <div class="step">
         <div class="num">1</div>
         <div>
@@ -300,7 +338,7 @@
 
   <section class="notice">
     <strong>课堂使用建议：</strong>
-    正式上课时，教师后台主要看学生画布提交情况；Flask 本地教师页主要作为“后台如何读取数据库并渲染页面”的代码讲解材料。不要让学生同时打开太多后台页面，避免分散注意力。
+    正式上课时，课堂活动提交后台用于快速看每个环节的作答进度，学生画布提交后台用于核对画布、代码和运行证据；Flask 本地教师页主要作为“后台如何读取数据库并渲染页面”的代码讲解材料。不要让学生同时打开太多后台页面，避免分散注意力。
   </section>
 </main>
 </body>
