@@ -7,8 +7,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { simulateFlaskRoute } from '@/lib/simulationEngine';
 import { findFaultyComponent, getComponentFaultMessage } from '@/lib/faultModel';
-import { CLASSROOM_TEMPERATURE_THRESHOLD } from '@/data/classroomLesson';
 import { getActuatorPinMismatchMessage } from '@/lib/simulationDiagnostics';
+import { getClassroomTemperatureThreshold } from '@/lib/classroomThreshold';
 import { useShallow } from 'zustand/react/shallow';
 
 export const BrowserSimulator: React.FC = () => {
@@ -125,7 +125,7 @@ export const BrowserSimulator: React.FC = () => {
       }
 
       const result = simulateFlaskRoute(
-        { method: 'GET', path, body: {}, timestamp: new Date() },
+        { method: 'GET', path, body: {}, timestamp: new Date(), microbitCode },
         serverConfig,
         database
       );
@@ -173,6 +173,7 @@ export const BrowserSimulator: React.FC = () => {
     serverFault,
     setBrowserPageRecords,
     setBrowserResponse,
+    microbitCode,
   ]);
 
   useEffect(() => {
@@ -191,11 +192,12 @@ export const BrowserSimulator: React.FC = () => {
   const recentLogs = sensorLogs.slice(0, 5);
   const latestRecord = sensorLogs[0];
   const latestTemperature = latestRecord?.value;
+  const temperatureThreshold = getClassroomTemperatureThreshold(microbitCode);
   const lastUpdateLabel = browserLastUpdate ? new Date(browserLastUpdate).toLocaleTimeString() : '未查询';
   const isOverheated =
     !browserFault &&
     typeof latestTemperature === 'number' &&
-    latestTemperature > CLASSROOM_TEMPERATURE_THRESHOLD;
+    latestTemperature > temperatureThreshold;
   const actuatorBlocked = Boolean(isOverheated && (actuatorFault || actuatorMismatchMessage));
   const statusText = browserFault
     ? '浏览器故障'
@@ -277,7 +279,7 @@ export const BrowserSimulator: React.FC = () => {
                 ? actuatorFault
                   ? getComponentFaultMessage(actuatorFault, '执行器故障，无法响应服务器指令')
                   : actuatorMismatchMessage
-                : `当前温度 ${latestTemperature?.toFixed(1)}°C 超过阈值 ${CLASSROOM_TEMPERATURE_THRESHOLD}°C，蜂鸣器已触发报警。`}
+                : `当前温度 ${latestTemperature?.toFixed(1)}°C 超过阈值 ${temperatureThreshold}°C，蜂鸣器已触发报警。`}
             </AlertDescription>
           </Alert>
         )}

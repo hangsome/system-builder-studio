@@ -107,11 +107,15 @@ export function SimulatorLayout({ role, submissionContext, headerActions, initia
   const { licenseState, featureAccess } = useLicense();
   const upgradePrompt = useUpgradePrompt();
 
-  const [activeTab, setActiveTab] = useState('hardware');
+  const [activeTab, setActiveTab] = useState(role === 'student' ? 'code' : 'hardware');
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(() => loadPanelState().leftCollapsed);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => loadPanelState().rightCollapsed);
-  const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(() => loadPanelState().bottomCollapsed);
-  const [bottomPanelLarge, setBottomPanelLarge] = useState(() => Boolean(loadPanelState().bottomLarge));
+  const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(() =>
+    role === 'student' ? false : loadPanelState().bottomCollapsed
+  );
+  const [bottomPanelLarge, setBottomPanelLarge] = useState(() =>
+    role === 'student' ? false : Boolean(loadPanelState().bottomLarge)
+  );
   const bottomPanelSizeLabel = activeTab === 'browser' ? '浏览器' : '代码区';
 
   useEffect(() => {

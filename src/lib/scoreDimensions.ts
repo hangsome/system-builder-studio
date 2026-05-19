@@ -11,5 +11,6 @@ export function normalizeScoreDimensions(submission: SubmissionInfo): ScoreDimen
     score: Number(dimension.score || 0),
     max: Number(dimension.max || 0),
     reason: dimension.reason || '',
+    checks: Array.isArray(dimension.checks) ? dimension.checks : undefined,
   }));
 }

@@ -28,7 +28,7 @@ export default defineConfig(({ mode }) => {
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'robots.txt'],
+      includeAssets: ['favicon.svg', 'robots.txt'],
       manifest: {
         name: '信息系统搭建模拟器',
         short_name: '模拟器',
@@ -41,9 +41,9 @@ export default defineConfig(({ mode }) => {
         scope: base,
         icons: [
           {
-            src: `${base}favicon.ico`,
-            sizes: '64x64',
-            type: 'image/x-icon',
+            src: `${base}favicon.svg`,
+            sizes: 'any',
+            type: 'image/svg+xml',
           },
         ],
       },

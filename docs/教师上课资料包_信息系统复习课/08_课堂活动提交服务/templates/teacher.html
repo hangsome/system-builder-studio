@@ -225,7 +225,8 @@
     }
   </style>
 </head>
-<body>
+
+
 <main>
   <header>
     <div>
@@ -241,8 +242,8 @@
   </header>
 
   <div class="summary">
-    <div class="metric"><span>提交总数</span><strong>{{ summary.total_submissions }}</strong></div>
-    <div class="metric"><span>学生数</span><strong>{{ summary.total_students }}</strong></div>
+    <div class="metric"><span>学生记录</span><strong>{{ summary.total_students }}</strong></div>
+    <div class="metric"><span>平均进度</span><strong>{{ summary.average_progress }}%</strong></div>
     <div class="metric"><span>全部完成</span><strong>{{ summary.completed_students }}</strong></div>
     <div class="metric"><span>平均得分率</span><strong>{{ summary.average_score }}%</strong></div>
   </div>
@@ -319,16 +320,17 @@
   {% endif %}
 
   <section class="recent-panel">
-    <h2>最近提交记录</h2>
-    <p>这里只展示提交概览，完整答案仍需点开详情查看。</p>
+    <h2>最近学生进度</h2>
+    <p>每名学生只显示一条，按最近更新时间排序。</p>
     <details>
-      <summary>展开最近 30 条提交概览</summary>
+      <summary>展开最近 30 名学生进度</summary>
       <div class="recent-grid">
-        {% for row in recent_submissions %}
+        {% for student in recent_students %}
           <div class="recent-item">
-            <strong>{{ row.class_name }}　{{ row.student_name }}</strong>
-            <p>{{ row.section_label }}：{{ row.score.score }} / {{ row.score.max_score }}</p>
-            <p>{{ row.submitted_at }}</p>
+            <strong>{{ student.class_name }}　{{ student.student_name }}</strong>
+            <p>作答进度：{{ student.submitted_count }} / {{ section_labels|length }}（{{ student.completion_percent }}%）</p>
+            <p>参考得分：{{ student.total_score }} / {{ student.max_total_score }}（{{ student.score_percent }}%）</p>
+            {% if student.updated_at %}<p>最近更新：{{ student.updated_at }}</p>{% endif %}
           </div>
         {% else %}
           <p>暂无提交记录。</p>

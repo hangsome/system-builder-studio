@@ -1,7 +1,7 @@
 // 仿真引擎 - 阶段五核心功能
 import { PlacedComponent, Connection, DatabaseState, ServerConfig, LogEntry } from '@/types/simulator';
 import { validateSystem } from './connectionValidator';
-import { CLASSROOM_TEMPERATURE_THRESHOLD } from '@/data/classroomLesson';
+import { getClassroomTemperatureThreshold } from './classroomThreshold';
 
 export interface SimulationState {
   sensorValues: Record<string, number>;
@@ -73,6 +73,7 @@ export interface SimulatedHttpRequest {
   path: string;
   body?: Record<string, unknown>;
   timestamp: Date;
+  microbitCode?: string;
 }
 
 export interface SimulatedHttpResponse {
@@ -121,12 +122,14 @@ export function simulateFlaskRoute(
         };
       }
 
+      const threshold = getClassroomTemperatureThreshold(request.microbitCode);
+
       // 添加到数据库
       const newRecord = {
         id: (database.records['sensorlog']?.length || 0) + 1,
         sensor_id: sensorId,
         value: temperature,
-        alarm: temperature > CLASSROOM_TEMPERATURE_THRESHOLD ? 1 : 0,
+        alarm: temperature > threshold ? 1 : 0,
         timestamp: new Date().toISOString(),
       };
 

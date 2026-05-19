@@ -2,7 +2,7 @@ import type { DatabaseState, RouterConfig, ServerConfig } from '@/types/simulato
 
 export const CLASSROOM_TEMPERATURE_THRESHOLD = 30;
 
-export const classroomStarterMicrobitCode = `# 教室温度检测系统 - 智能终端（micro:bit）代码
+export const classroomStarterMicrobitCode = `# 食堂温度监测与预警系统 - 智能终端（micro:bit）代码
 # 本段代码用于软件分析与运行测试。先读懂数据采集、阈值判断和网络上传流程。
 
 from microbit import *
@@ -20,15 +20,15 @@ obloq.setup(WIFI_SSID, WIFI_PASSWORD)
 
 while True:
     # 读取温度采集
-    raw = pin1.read_analog()
+    raw = pin0.read_analog()
     temp = round(raw / 10, 1)
     display.scroll(str(temp))
 
     # 超过阈值时控制蜂鸣器报警
     if temp > TEMP_THRESHOLD:
-        pin2.write_digital(1)
+        pin3.write_digital(1)
     else:
-        pin2.write_digital(0)
+        pin3.write_digital(0)
 
     # 上传采集数据：GET 请求带两个参数，id 表示传感器编号，val 表示温度值
     url = "http://" + SERVER_IP + ":" + str(SERVER_PORT) + UPLOAD_ROUTE + "?id=1&val=" + str(temp)
@@ -37,7 +37,7 @@ while True:
     sleep(5000)
 `;
 
-export const classroomFlaskCode = `# 教室温度检测系统 - Flask 服务端
+export const classroomFlaskCode = `# 食堂温度监测与预警系统 - Flask 服务端
 # GET /upload?id=1&val=温度：接收智能终端上传的温度数据
 # GET /                  ：浏览器或手机访问首页查看最近的温度记录
 
@@ -118,7 +118,7 @@ export const classroomDatabase: DatabaseState = {
   ],
   records: {
     sensorlist: [
-      { id: 1, name: '教室温度传感器', type: 'temperature', location: '教室前排' },
+      { id: 1, name: '储物间温度传感器', type: 'temperature', location: '食堂储物间' },
     ],
     sensorlog: [],
   },

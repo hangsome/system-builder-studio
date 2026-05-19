@@ -23,7 +23,6 @@ const TeacherStudioPage = lazy(() => import("./pages/TeacherStudioPage"));
 const TeacherSubmissionCanvasPage = lazy(() => import("./pages/TeacherSubmissionCanvasPage"));
 const StudentDashboardPage = lazy(() => import("./pages/StudentDashboardPage"));
 const StudentWorkspacePage = lazy(() => import("./pages/StudentWorkspacePage"));
-const LessonFlowPage = lazy(() => import("./pages/LessonFlowPage"));
 const OpenClassEntryPage = lazy(() => import("./pages/OpenClassEntryPage"));
 const TeacherBlankCanvasEntryPage = lazy(() => import("./pages/TeacherBlankCanvasEntryPage"));
 
@@ -55,7 +54,6 @@ const App = () => {
                 <>
                   <Route path="/" element={<RoleHomeRedirect />} />
                   <Route path="/login" element={<LoginPage />} />
-                  <Route path="/lesson-flow" element={<LessonFlowPage />} />
                   <Route path="/teacher-demo-blank" element={<TeacherBlankCanvasEntryPage />} />
                   <Route path="/demo-blank" element={<TeacherBlankCanvasEntryPage />} />
                   <Route path="/openclass" element={<OpenClassEntryPage />} />
@@ -123,7 +121,6 @@ const App = () => {
                       </LicenseGuard>
                     }
                   />
-                  <Route path="/lesson-flow" element={<LessonFlowPage />} />
                   <Route path="/teacher-demo-blank" element={<TeacherBlankCanvasEntryPage />} />
                   <Route path="/demo-blank" element={<TeacherBlankCanvasEntryPage />} />
                   <Route path="/openclass" element={<OpenClassEntryPage />} />

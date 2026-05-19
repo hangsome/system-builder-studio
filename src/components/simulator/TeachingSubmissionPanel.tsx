@@ -15,6 +15,11 @@ import { submitAssignmentApi } from '@/api/eduApi';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from 'sonner';
+import {
+  CLASSROOM_HARDWARE_MATCHING_STORAGE_KEY,
+  classroomHardwareMatchingModules,
+  type HardwareMatchingAnswerMap,
+} from '@/data/classroomHardwareMatching';
 
 interface TeachingSubmissionPanelProps {
   assignmentId: number;
@@ -30,7 +35,27 @@ export function TeachingSubmissionPanel({
   const token = useAuthStore((state) => state.token);
   const [open, setOpen] = useState(false);
   const [studentName, setStudentName] = useState('');
+  const [hardwareMatchingCount, setHardwareMatchingCount] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+
+  const readHardwareMatchingAnswers = (): HardwareMatchingAnswerMap => {
+    if (typeof window === 'undefined') return {};
+
+    try {
+      const saved = window.localStorage.getItem(CLASSROOM_HARDWARE_MATCHING_STORAGE_KEY);
+      const parsed = saved ? JSON.parse(saved) : {};
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const refreshHardwareMatchingCount = () => {
+    const answers = readHardwareMatchingAnswers();
+    setHardwareMatchingCount(
+      classroomHardwareMatchingModules.reduce((sum, item) => sum + (answers[item.id]?.length || 0), 0)
+    );
+  };
 
   const handleSubmit = async () => {
     if (!token) {
@@ -66,10 +91,14 @@ export function TeachingSubmissionPanel({
           connectionCount: simulator.connections.length,
         },
       };
+      const hardwareMatchingAnswers = readHardwareMatchingAnswers();
 
       const labReport = {
         studentName: studentName.trim(),
         submittedAt: new Date().toISOString(),
+        hardwareMatching: {
+          answers: hardwareMatchingAnswers,
+        },
       };
 
       const response = await submitAssignmentApi(token, assignmentId, {
@@ -93,7 +122,15 @@ export function TeachingSubmissionPanel({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (nextOpen) {
+          refreshHardwareMatchingCount();
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button size="sm">提交作业</Button>
       </DialogTrigger>
@@ -119,6 +156,9 @@ export function TeachingSubmissionPanel({
 
           <div className="rounded-lg border bg-muted/40 p-3 text-sm leading-6 text-muted-foreground">
             自动提交内容：画布组件、连线、智能终端（micro:bit）代码、Flask 代码、数据库记录、运行日志。教师后台可打开该同学提交的画布，并查看自动检测得分。
+          </div>
+          <div className="rounded-lg border bg-muted/40 p-3 text-sm leading-6 text-muted-foreground">
+            已同步课堂活动连线题：{hardwareMatchingCount} 条连线。未完成或连错的连线会在教师后台显示为待订正。
           </div>
         </div>
 

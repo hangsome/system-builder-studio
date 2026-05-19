@@ -2,10 +2,10 @@
  import { useEffect, useRef, useCallback, useMemo } from 'react';
  import { useSimulatorStore } from '@/store/simulatorStore';
  import { componentDefinitions } from '@/data/componentDefinitions';
- import { 
-   sensorConfigs, 
-   generateSensorFluctuation, 
-   simulateFlaskRoute 
+ import {
+   sensorConfigs,
+   generateSensorFluctuation,
+   simulateFlaskRoute
  } from '@/lib/simulationEngine';
  import { validateSystem } from '@/lib/connectionValidator';
  import { findFaultyComponent, getComponentFaultMessage, isComponentFaulty } from '@/lib/faultModel';
@@ -14,9 +14,9 @@
    getSensorPinMismatchMessage,
    getUploadMethodMismatchMessage,
  } from '@/lib/simulationDiagnostics';
- import { CLASSROOM_TEMPERATURE_THRESHOLD } from '@/data/classroomLesson';
+ import { getClassroomTemperatureThreshold } from '@/lib/classroomThreshold';
  import { useShallow } from 'zustand/react/shallow';
- 
+
  export function useSimulationRunner() {
    const {
      isRunning,
@@ -55,16 +55,16 @@
         demoSweepActive: state.demoSweepActive,
      }))
    );
- 
+
    const simulationRef = useRef<NodeJS.Timeout | null>(null);
    const dataFlowRef = useRef<NodeJS.Timeout | null>(null);
    const sensorValuesRef = useRef<Record<string, number>>({});
-   
+
    // 同步 sensorValues 到 ref
    useEffect(() => {
      sensorValuesRef.current = sensorValues;
    }, [sensorValues]);
- 
+
    // 获取传感器组件
   const sensorComponents = useMemo(() => {
      return placedComponents.filter((c) => {
@@ -79,7 +79,7 @@
       return def?.category === 'actuator';
     });
   }, [placedComponents]);
- 
+
   // 初始化传感器值
   useEffect(() => {
     sensorComponents.forEach((sensor) => {
@@ -95,18 +95,18 @@
      const validation = validateSystem(placedComponents, connections);
      return validation.powerStatus;
    }, [placedComponents, connections]);
- 
+
    // 检查 IoT 模块连接状态
     const checkNetworkStatus = useCallback(() => {
       const powerStatus = getPowerStatus();
       const iotComponent = placedComponents.find(
         c => c.definitionId === 'iot-module' || c.definitionId === 'obloq'
       );
-     
+
      if (!iotComponent) return false;
-     
+
      const iotPowered = powerStatus.get(iotComponent.instanceId) ?? false;
-     
+
      const hasMatchedSerialConnection = (iotPin: 'tx' | 'rx', expansionPin: 'p15' | 'p16') =>
        connections.some((connection) => {
          const iotOnFromSide =
@@ -128,10 +128,10 @@
      const hasTxRx =
        hasMatchedSerialConnection('tx', 'p15') &&
        hasMatchedSerialConnection('rx', 'p16');
-     
+
      return iotPowered && hasTxRx && !!routerConfig.ssid;
    }, [placedComponents, connections, routerConfig.ssid, getPowerStatus]);
- 
+
    // 主仿真循环
    useEffect(() => {
      if (!isRunning) {
@@ -139,7 +139,7 @@
        if (dataFlowRef.current) clearInterval(dataFlowRef.current);
        return;
      }
- 
+
      const networkConnected = checkNetworkStatus();
 
      // 传感器值更新循环：演示扫描优先（让温度从 ~24 平滑升到 ~33 再回落，跨过 30°C 阈值）
@@ -171,7 +171,7 @@
          });
        }, 2000 / simulationSpeed);
      }
- 
+
      // 数据发送循环
       if (codeBurned) {
         dataFlowRef.current = setInterval(() => {
@@ -252,36 +252,37 @@
               });
               return;
             }
-           
+
            const value = sensorValuesRef.current[sensor.instanceId];
            const def = componentDefinitions.find(d => d.id === sensor.definitionId);
            const numericValue = Number(value ?? 0);
-           
+
            addLog({
              type: 'data',
              message: `读取 ${def?.name}: ${value?.toFixed(1) ?? '?'} ${sensorConfigs[sensor.definitionId]?.unit ?? ''}`,
              source: '智能终端',
            });
- 
+
            const requestPath = `/upload?id=1&val=${numericValue.toFixed(1)}`;
            const fullUrl = `http://${serverConfig.ip}:${serverConfig.port}${requestPath}`;
-           
+
            addLog({
              type: 'info',
              message: `发送请求: GET ${fullUrl}`,
              source: 'IOT模块',
            });
-           
+
            const result = simulateFlaskRoute(
              {
                method: 'GET',
                path: requestPath,
                timestamp: new Date(),
+               microbitCode,
              },
              serverConfig,
              database
            );
- 
+
            if (result.response.status === 200) {
              const responseBody = result.response.body as { status?: string; id?: number; message?: string };
              addLog({
@@ -289,7 +290,7 @@
                message: `响应: ${result.response.status} OK - ${responseBody.message || '数据已保存'} (ID: ${responseBody.id})`,
                source: 'Flask',
              });
- 
+
               if (result.updatedDatabase) {
                 if (databaseFault) {
                   addLog({
@@ -315,7 +316,8 @@
                     connections,
                     microbitCode
                   );
-                  const aboveThreshold = numericValue > CLASSROOM_TEMPERATURE_THRESHOLD;
+                  const temperatureThreshold = getClassroomTemperatureThreshold(microbitCode);
+                  const aboveThreshold = numericValue > temperatureThreshold;
                   const actuatorReady = !isComponentFaulty(primaryActuator) && !actuatorMismatchMessage;
                   updateComponentState(primaryActuator.instanceId, { active: aboveThreshold && actuatorReady });
 
@@ -334,7 +336,7 @@
                   } else if (aboveThreshold) {
                     addLog({
                       type: 'data',
-                      message: `温度超过 ${CLASSROOM_TEMPERATURE_THRESHOLD}°C，服务器返回 BUZZER_ON，蜂鸣器已响应`,
+                      message: `温度超过 ${temperatureThreshold}°C，服务器返回 BUZZER_ON，蜂鸣器已响应`,
                       source: '执行器',
                     });
                   }
@@ -351,12 +353,12 @@
          });
        }, 3000 / simulationSpeed);
      }
- 
+
      return () => {
        if (simulationRef.current) clearInterval(simulationRef.current);
        if (dataFlowRef.current) clearInterval(dataFlowRef.current);
      };
     }, [isRunning, simulationSpeed, autoFluctuation, demoSweepActive, codeBurned, microbitCode, serverConfig, database, placedComponents, connections, sensorComponents, actuatorComponents, checkNetworkStatus, getPowerStatus, addLog, updateDatabase, setSensorValue, updateComponentState]);
- 
+
    return null;
  }

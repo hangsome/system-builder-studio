@@ -135,9 +135,6 @@ export default function OpenClassEntryPage() {
                     <Link to={workspacePath}>打开画布</Link>
                   </Button>
                 ) : null}
-                <Button asChild variant="ghost" className="text-slate-300 hover:bg-white/10 hover:text-white">
-                  <Link to="/lesson-flow">查看课堂流程</Link>
-                </Button>
               </div>
             </div>
           </aside>

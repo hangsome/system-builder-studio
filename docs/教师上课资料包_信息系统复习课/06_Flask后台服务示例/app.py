@@ -21,7 +21,7 @@ ACTIVITY_SECTION_LABELS = {
     "hardware": "硬件观察",
     "software": "软件分析",
     "debug": "运行排错",
-    "summary": "知识总结",
+    "summary": "自我评价",
 }
 
 

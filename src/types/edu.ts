@@ -57,12 +57,21 @@ export interface ScoreDimension {
   score: number;
   max: number;
   reason: string;
+  checks?: ScoreCheck[];
 }
 
 export type ScoreDimensionMap = Record<
   string,
   Partial<ScoreDimension> & Pick<ScoreDimension, 'score' | 'max' | 'reason'>
 >;
+
+export interface ScoreCheck {
+  id: string;
+  label: string;
+  ok: boolean;
+  score?: number;
+  max?: number;
+}
 
 export interface AutoScore {
   rubricVersion: string;

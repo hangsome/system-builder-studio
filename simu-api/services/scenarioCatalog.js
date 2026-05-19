@@ -1,8 +1,8 @@
 ﻿const scenarioCatalog = [
   {
     id: 'classroom-temperature',
-    name: '教室温度检测系统课堂版',
-    description: '补全用户端设备，修正传感器和执行器引脚代码，验证 POST 上传、GET 查询和数据库记录。',
+    name: '食堂温度监测与预警系统课堂版',
+    description: '补全用户端设备，完成模块功能匹配，修正传感器和执行器引脚代码，验证 GET 上传、GET 查询和数据库记录。',
     requiredComponents: [
       'microbit',
       'expansion-board',

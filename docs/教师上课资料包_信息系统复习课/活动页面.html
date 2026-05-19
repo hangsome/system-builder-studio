@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>存储间温度监测与预警系统：信息系统复习课</title>
+  <title>食堂温度监测与预警系统：信息系统复习课</title>
   <style>
     :root {
       --bg: #f3f6fa;
@@ -308,18 +308,120 @@
       color: var(--accent-dark);
     }
 
-    .module-match {
+    .module-match-board {
+      position: relative;
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
+      grid-template-columns: minmax(180px, .8fr) minmax(84px, 120px) minmax(260px, 1.2fr);
+      gap: 14px;
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #f9fbfd;
+    }
+
+    .match-column {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+
+    .match-column-title {
+      margin: 0 0 2px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+
+    .match-node {
+      width: 100%;
+      min-height: 48px;
+      border: 1px solid #c8d4e0;
+      border-radius: 12px;
+      padding: 9px 11px;
+      color: #253a4d;
+      background: #fff;
+      text-align: left;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform .16s ease, border-color .16s ease, background .16s ease;
+    }
+
+    .match-node:hover {
+      transform: translateY(-1px);
+      border-color: var(--accent);
+    }
+
+    .match-node.active {
+      color: #173047;
+      border-color: var(--accent-dark);
+      background: #dff3fb;
+      box-shadow: inset 0 0 0 2px rgba(35, 122, 150, .18);
+    }
+
+    .match-node.connected {
+      border-color: #9fb9c8;
+      background: #f2f8fb;
+    }
+
+    .match-node small {
+      display: block;
+      margin-top: 2px;
+      color: inherit;
+      font-weight: 500;
+      opacity: .72;
+    }
+
+    .match-lines {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .match-lines line {
+      stroke: var(--accent);
+      stroke-width: 3;
+      stroke-linecap: round;
+    }
+
+    .match-hint {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      color: var(--accent-dark);
+      font-size: 13px;
+      font-weight: 800;
+      text-align: center;
+      transition: opacity .16s ease, visibility .16s ease;
+    }
+
+    .match-hint.is-hidden {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .match-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
       margin-top: 10px;
     }
 
-    .module-match label {
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 10px;
-      background: #f9fbfd;
+    .match-pill {
+      border: 1px solid #d5e1ea;
+      border-radius: 999px;
+      padding: 5px 9px;
+      color: var(--muted);
+      background: #fff;
+      font-size: 13px;
+      font-weight: 700;
     }
 
     .code-study {
@@ -376,7 +478,12 @@
 
 
     .single-select {
+      position: relative;
+      z-index: 1;
+      display: block;
       margin-top: 8px;
+      cursor: pointer;
+      touch-action: manipulation;
     }
 
     .score-grid {
@@ -423,7 +530,8 @@
     }
 
     @media (max-width: 860px) {
-      .title-row, .identity, .grid.two, .method-demo, .module-match, .code-study { grid-template-columns: 1fr; }
+      .title-row, .identity, .grid.two, .method-demo, .module-match-board, .code-study { grid-template-columns: 1fr; }
+      .match-hint, .match-lines { display: none; }
       .tabs {
         position: static;
         grid-template-columns: 1fr;
@@ -433,13 +541,13 @@
     }
   </style>
 </head>
-<body>
+
   <div class="page">
     <header>
       <div class="title-row">
         <div>
-          <h1>存储间温度监测与预警系统复习活动</h1>
-          <p class="subtitle">某中学食堂希望夜间无人值守时也能掌握配餐间食材存储温度，并在温度异常时及时提醒值班人员。我们会把这个需求拆成硬件、软件、网络、数据和用户活动，边搭建边复习。</p>
+          <h1>食堂温度监测与预警系统复习活动</h1>
+          <p class="subtitle">某中学食堂发生了一次食物险遭变质的风险：一天半夜，制冷设备发生故障，储物间食材温度异常升高，幸好食堂负责人及时发现，差点影响全校早餐供应。</p>
         </div>
         <a class="student-link" id="studentCanvasLink" target="_blank" rel="noreferrer">打开学生半成品画布</a>
       </div>
@@ -447,7 +555,7 @@
       <div class="identity">
         <label>
           班级
-          <input id="className" type="text" placeholder="例如：高一（2）班">
+          <input id="className" type="text" placeholder="例如：高一1班">
         </label>
         <label>
           姓名
@@ -461,7 +569,7 @@
       <button class="tab-btn" data-tab="hardware" type="button">硬件搭建</button>
       <button class="tab-btn" data-tab="software" type="button">软件分析</button>
       <button class="tab-btn" data-tab="debug" type="button">运行排错</button>
-      <button class="tab-btn" data-tab="summary" type="button">知识总结</button>
+      <button class="tab-btn" data-tab="summary" type="button">自我评价</button>
     </nav>
 
     <main>
@@ -469,8 +577,8 @@
         <div class="section-body">
           <h2>情境导入</h2>
           <div class="task-card scenario-card">
-            <p class="lead">去年秋季，某中学食堂遇到过一次险情：早餐食材晚上存放在配餐间，工作人员下班后无人值守。一天半夜，制冷设备发生故障，第二天早上食材温度异常升高，存在变质风险，差点影响全校早餐供应。</p>
-            <p>现在你们要像学校信息技术小组成员一样，设计并模拟搭建一套“存储间温度监测与预警系统”：系统要能自动感知存储间温度变化；当温度超过安全阈值时，要能在现场发出声音提醒，并通过物联网模块把异常信息发送给值班人员；值班人员用手机访问服务器页面查看实时温度和历史记录。</p>
+            <p class="lead">某中学食堂发生了一次食物险遭变质的风险：一天半夜，制冷设备发生故障，储物间食材温度异常升高，幸好食堂负责人及时发现，差点影响全校早餐供应。</p>
+            <p>请同学们设计并模拟搭建一套“食堂温度监测与预警系统”：系统要能自动感知储物间温度变化；当温度超过安全阈值时，要能在现场发出声音提醒，并通过物联网模块把异常信息发送给值班人员；值班人员用手机访问服务器页面查看实时温度和历史记录。</p>
             <p>请根据情境一步步判断：要感知“温度变化”，应选择哪类传感器？要发出“声音提醒”，应选择哪类执行器？程序要写在哪里，浏览器应该访问哪个地址，数据最后保存到哪里；如果运行时没有数据或蜂鸣器不响，又应该从哪一环开始排查。</p>
           </div>
         </div>
@@ -479,14 +587,14 @@
       <section class="tab-panel" data-section="hardware">
         <div class="section-body">
           <h2>硬件搭建与连接观察</h2>
-          <p>半成品画布已经给出智能终端、IoT 模块、网络、服务器和数据库。本环节请先从食材存储情境判断：要感知温度变化应选择哪种传感器；要发出声音提醒应选择哪种执行器。再观察它们自动连到了智能终端的哪个引脚。</p>
+          <p>半成品画布已经给出智能终端、IoT 模块、网络、服务器和数据库。本环节请先从食堂储物间情境判断：要感知温度变化应选择哪种传感器；要发出声音提醒应选择哪种执行器。再观察它们自动连到了智能终端的哪个引脚。</p>
 
           <div class="grid two">
             <div class="task-card">
               <h3>课堂任务</h3>
               <ol>
                 <li>打开学生半成品画布。</li>
-                <li>从传感器组件中选择适合“存储间温度监测”的传感器并放到画布。</li>
+                <li>从传感器组件中选择适合“食堂储物间温度监测”的传感器并放到画布。</li>
                 <li>从执行器组件中选择适合“现场声音提醒”的执行器并放到画布。</li>
                 <li>沿着连线观察传感器 DATA、执行器 IO 分别接到智能终端哪个引脚。</li>
                 <li>判断用户通过浏览器或手机查看数据时，这个系统更接近哪种架构。</li>
@@ -507,7 +615,7 @@
               <label>蜂鸣器 IO 接到哪个引脚？
                 <span class="choice-row" data-name="buzzerIoPin"></span>
               </label>
-              <label>这个存储间监测系统是哪种架构？
+              <label>这个食堂温度监测系统是哪种架构？
                 <span class="choice-row" data-name="systemArchitecture" data-options="C/S,B/S"></span>
               </label>
             </div>
@@ -515,35 +623,41 @@
 
           <div class="task-card" style="margin-top:14px">
             <h3>模块功能匹配</h3>
-            <p>硬件搭建完成后，把每项功能与主要负责的模块对应起来，为下一步阅读代码做准备。</p>
-            <div class="module-match">
-              <label>读取温度数据
-                <span class="choice-row" data-name="moduleReadTemp" data-options="智能终端,IoT模块,Flask服务器,浏览器 / 手机"></span>
-              </label>
-              <label>判断是否超过阈值
-                <span class="choice-row" data-name="moduleThreshold" data-options="智能终端,IoT模块,Flask服务器,浏览器 / 手机"></span>
-              </label>
-              <label>控制蜂鸣器报警
-                <span class="choice-row" data-name="moduleBuzzer" data-options="智能终端,IoT模块,Flask服务器,浏览器 / 手机"></span>
-              </label>
-              <label>通过 WiFi 发送 HTTP 请求
-                <span class="choice-row" data-name="moduleWifiHttp" data-options="智能终端,IoT模块,Flask服务器,浏览器 / 手机"></span>
-              </label>
-              <label>接收 <code>/upload?id=...&amp;val=...</code> 请求
-                <span class="choice-row" data-name="moduleReceiveUpload" data-options="智能终端,IoT模块,Flask服务器,浏览器 / 手机"></span>
-              </label>
-              <label>查询并渲染网页
-                <span class="choice-row" data-name="moduleRenderPage" data-options="智能终端,IoT模块,Flask服务器,浏览器 / 手机"></span>
-              </label>
-              <label>查看实时温度和历史记录
-                <span class="choice-row" data-name="moduleViewRealtime" data-options="智能终端,IoT模块,Flask服务器,浏览器 / 手机"></span>
-              </label>
+            <p>硬件搭建完成后，先点击左侧模块，再点击右侧功能完成连线。注意：“判断是否超过阈值”在智能终端和 Flask 服务器中都会出现，可以连两条线。</p>
+            <div class="module-match-board" id="moduleMatchBoard">
+              <svg class="match-lines" id="moduleMatchLines" aria-hidden="true"></svg>
+              <div class="match-column">
+                <p class="match-column-title">模块</p>
+                <button class="match-node" type="button" data-match-module="智能终端">智能终端<small>运行 micro:bit 程序</small></button>
+                <button class="match-node" type="button" data-match-module="IoT模块">IoT 模块<small>负责无线通信</small></button>
+                <button class="match-node" type="button" data-match-module="Flask服务器">Flask 服务器<small>接收、判断、渲染</small></button>
+                <button class="match-node" type="button" data-match-module="浏览器 / 手机">浏览器 / 手机<small>值班人员查看</small></button>
+              </div>
+              <div class="match-hint">点击模块<br>连接功能</div>
+              <div class="match-column">
+                <p class="match-column-title">功能</p>
+                <button class="match-node" type="button" data-match-function="moduleReadTemp">读取温度数据<small>传感器数值进入程序</small></button>
+                <button class="match-node" type="button" data-match-function="moduleThreshold" data-multiple="true">判断是否超过阈值<small>这里需要两条线</small></button>
+                <button class="match-node" type="button" data-match-function="moduleBuzzer">控制蜂鸣器报警<small>向执行器输出控制信号</small></button>
+                <button class="match-node" type="button" data-match-function="moduleWifiHttp">接入无线网络<small>让设备进入 WiFi 通信环境</small></button>
+                <button class="match-node" type="button" data-match-function="moduleReceiveUpload">接收 /upload?id=...&amp;val=... 请求<small>服务器接收上传</small></button>
+                <button class="match-node" type="button" data-match-function="moduleRenderPage">查询并渲染网页<small>生成查看页面</small></button>
+                <button class="match-node" type="button" data-match-function="moduleViewRealtime">查看实时温度和历史记录<small>值班人员使用</small></button>
+              </div>
+              <input type="hidden" data-field="moduleReadTemp">
+              <input type="hidden" data-field="moduleThreshold">
+              <input type="hidden" data-field="moduleBuzzer">
+              <input type="hidden" data-field="moduleWifiHttp">
+              <input type="hidden" data-field="moduleReceiveUpload">
+              <input type="hidden" data-field="moduleRenderPage">
+              <input type="hidden" data-field="moduleViewRealtime">
             </div>
+            <div class="match-summary" id="moduleMatchSummary"></div>
           </div>
 
           <div class="section-actions">
             <span class="status" data-status="hardware">未提交</span>
-            <button class="submit-btn" data-submit="hardware" type="button">提交硬件观察</button>
+            <button class="submit-btn" data-submit="hardware" type="button">提交硬件活动作答</button>
           </div>
         </div>
       </section>
@@ -559,6 +673,7 @@
               <pre>from microbit import *
 import obloq
 
+# 这些参数决定智能终端连接哪一个 WiFi、把数据发到哪一台服务器。
 WIFI_SSID = "School_WiFi"
 WIFI_PASSWORD = "12345678"
 SERVER_IP = "192.168.1.100"
@@ -566,22 +681,29 @@ SERVER_PORT = 5000
 UPLOAD_ROUTE = "/upload"
 TEMP_THRESHOLD = 30
 
+# 先连接无线网络，后面才能通过 IoT 模块发送 HTTP 请求。
 obloq.setup(WIFI_SSID, WIFI_PASSWORD)
 
 while True:
+    # 画布中温湿度传感器 DATA 接 P1，所以这里用 pin1 读取模拟量。
     raw = pin1.read_analog()
     temp = round(raw / 10, 1)
     display.scroll(str(temp))
 
+    # 温度超过阈值时，向 P2 输出 1；否则输出 0。
+    # 画布中蜂鸣器 IO 接 P2，所以这里用 pin2 控制执行器。
     if temp &gt; TEMP_THRESHOLD:
         pin2.write_digital(1)
     else:
         pin2.write_digital(0)
 
+    # 拼出上传地址：服务器地址 + 上传路由 + 问号后的 id 和 val 参数。
+    # 这条 URL 是智能终端上传数据用的，不是浏览器查看页面用的。
     url = "http://" + SERVER_IP + ":" + str(SERVER_PORT) + UPLOAD_ROUTE
     url = url + "?id=1&amp;val=" + str(temp)
     obloq.http_get(url)
 
+    # 每 5 秒采集和上传一次，避免请求过快。
     sleep(5000)</pre>
             </div>
 
@@ -627,16 +749,22 @@ from datetime import datetime
 app = Flask(__name__)
 TEMP_THRESHOLD = 30
 
+# /upload 是智能终端上传数据的入口，请求方法是 GET。
+# 例如：/upload?id=1&amp;val=32.5
 @app.route('/upload', methods=['GET'])
 def upload_data():
+    # request.args 读取的是 URL 问号后面的参数。
+    # val 表示温度值，id 表示传感器编号。
     temperature = request.args.get('val')
     sensor_id = request.args.get('id', 1)
     if temperature is None:
         return "缺少 val", 400
 
+    # 把字符串温度转成数字，再判断是否超过阈值。
     temperature = float(temperature)
     alarm = 1 if temperature &gt; TEMP_THRESHOLD else 0
 
+    # 把本次温度、报警状态和时间写入 SQLite 数据库。
     conn = sqlite3.connect('sensor.db')
     cursor = conn.cursor()
     cursor.execute(
@@ -649,6 +777,8 @@ def upload_data():
     command = "BUZZER_ON" if alarm else "BUZZER_OFF"
     return "success:" + command
 
+# / 是浏览器或手机查看页面的入口。
+# 用户访问首页时，服务器从数据库读取最近 10 条记录并渲染网页。
 @app.route('/', methods=['GET'])
 def index():
     conn = sqlite3.connect('sensor.db')
@@ -709,7 +839,7 @@ if __name__ == '__main__':
       <section class="tab-panel" data-section="debug">
         <div class="section-body">
           <h2>运行排错：先看画布，再看代码</h2>
-          <p>运行后如果数据不通，先核对画布上的实际连接，再判断代码中的引脚是否对应。代码和连线可以任选一边修改，但最终必须对应；浏览器也要写完整地址才能访问页面。</p>
+          <p>运行后如果数据不通，先核对画布上的实际连接，再判断代码中的引脚是否对应。代码和连线可以任选一边修改，但最终必须对应；浏览器访问地址回到软件分析环节的首页路由证据中核对。</p>
 
           <div class="grid two">
             <div class="task-card">
@@ -718,7 +848,7 @@ if __name__ == '__main__':
                 <li>回到画布，确认传感器 DATA 和蜂鸣器 IO 的实际引脚。</li>
                 <li>检查 <code>read_analog()</code> 读取的是哪个引脚，<code>write_digital()</code> 控制的是哪个引脚。</li>
                 <li>只改一个变量：要么改代码引脚，要么改画布连线，改完重新运行验证。</li>
-                <li>在模拟浏览器地址栏写完整 URL，再观察页面和数据库记录。</li>
+                <li>如果页面访问异常，回到软件分析中填写的浏览器首页地址，再观察页面和数据库记录。</li>
               </ol>
             </div>
 
@@ -729,9 +859,6 @@ if __name__ == '__main__':
               </label>
               <label>运行排错时，蜂鸣器 IO 实际接到：
                 <span class="choice-row" data-name="debugBuzzerPin"></span>
-              </label>
-              <label>模拟浏览器地址栏应填写：
-                <input data-field="browserUrl" type="text" placeholder="">
               </label>
               <label>当温度高于阈值后，执行器是否正常执行？
                 <span class="choice-row" data-name="debugActuatorResponse" data-options="能正常执行,不能正常执行（需排查蜂鸣器IO或执行器）,无法判断"></span>
@@ -758,29 +885,25 @@ if __name__ == '__main__':
 
       <section class="tab-panel" data-section="summary">
         <div class="section-body">
-          <h2>知识总结自评</h2>
-          <p>完成画布提交前，用 1 到 5 分给自己打分：1 分表示还需要老师带着做，5 分表示能独立说清楚并完成排查。</p>
+          <h2>自我评价</h2>
+          <p>完成画布提交前，用 1 到 5 分给自己打分：1 分表示还需要老师带着做，5 分表示能独立说清楚。</p>
 
           <div class="score-grid">
             <div class="rating-item">
-              <span class="rating-title">能识别传感器读取引脚和执行器控制引脚</span>
+              <span class="rating-title">一、能从代码中判断传感器读取的引脚口是哪个引脚口</span>
               <span class="rating-row" data-name="scorePins" data-options="1,2,3,4,5"></span>
             </div>
             <div class="rating-item">
-              <span class="rating-title">能说出智能终端需要设置的关键参数</span>
+              <span class="rating-title">二、能从代码中判断是哪个引脚向执行器发送指令数据</span>
               <span class="rating-row" data-name="scoreMicrobitParams" data-options="1,2,3,4,5"></span>
             </div>
             <div class="rating-item">
-              <span class="rating-title">能根据 Flask 路由写出浏览器访问 URL</span>
+              <span class="rating-title">三、能根据 Flask 代码写出查询数据或上传数据的 URL 地址</span>
               <span class="rating-row" data-name="scoreUrl" data-options="1,2,3,4,5"></span>
             </div>
             <div class="rating-item">
-              <span class="rating-title">能根据现象排查可能的故障环节</span>
+              <span class="rating-title">四、能根据系统故障情况推导出可能的原因</span>
               <span class="rating-row" data-name="scoreFault" data-options="1,2,3,4,5"></span>
-            </div>
-            <div class="rating-item">
-              <span class="rating-title">能说明数据从采集到存储、显示的流向</span>
-              <span class="rating-row" data-name="scoreDataFlow" data-options="1,2,3,4,5"></span>
             </div>
           </div>
 
@@ -790,7 +913,22 @@ if __name__ == '__main__':
 
           <div class="section-actions">
             <span class="status" data-status="summary">未提交</span>
-            <button class="submit-btn" data-submit="summary" type="button">提交知识总结</button>
+            <button class="submit-btn" data-submit="summary" type="button">提交自我评价</button>
+          </div>
+
+          <div class="task-card question-stack" style="margin-top:14px">
+            <h3>能力拓展：回到画布自主探索</h3>
+            <p>完成自评后，选择一个新功能设想，回到画布中尝试添加合适的传感器或执行器。这个环节不计入基础评分，重点看你能不能根据新需求自己选硬件、找连线、想清楚数据流。</p>
+            <label>如果要让系统同时监测“是否有人进入存储间”，你会考虑添加什么传感器？为什么？
+              <textarea data-field="extensionSensorIdea" placeholder="例如：需要感知人的进入、门的开关或光线变化，可以选择相应传感器，并说明理由。"></textarea>
+            </label>
+            <label>如果要让异常提醒更明显，除了蜂鸣器，还可以添加什么执行器？它应该由哪个模块控制？
+              <textarea data-field="extensionActuatorIdea" placeholder="例如：灯光、显示屏、风扇等，说明它负责什么动作，以及可能连接到哪个引脚。"></textarea>
+            </label>
+            <label>请在画布中任选一个拓展功能试一试，记录你的尝试结果或遇到的问题：
+              <textarea data-field="extensionCanvasTry" placeholder="可以写：我添加了什么设备、接到了哪里、运行时看到了什么现象、还没解决的问题是什么。"></textarea>
+            </label>
+            <button class="submit-btn" data-submit="summary" type="button">提交拓展发现</button>
           </div>
         </div>
       </section>
@@ -807,8 +945,12 @@ if __name__ == '__main__':
       (location.protocol.startsWith('http') && !['localhost', '127.0.0.1'].includes(location.hostname)
         ? `${location.origin}/activity-submit`
         : DEFAULT_ACTIVITY_API_BASE);
-    const STORAGE_KEY = 'classroom-activity-answers-v2';
-    const LEGACY_STORAGE_KEY = 'classroom-activity-answers-v1';
+    const STORAGE_KEY = 'classroom-activity-session-answers-v1';
+    const LEGACY_STORAGE_KEYS = [
+      'classroom-activity-answers-v2',
+      'classroom-activity-answers-v1',
+      'classroom-activity-active-tab',
+    ];
     const PIN_OPTIONS = ['P0', 'P1', 'P2', 'P3'];
 
     document.getElementById('studentCanvasLink').href = `${SERVER_BASE}/openclass`;
@@ -838,15 +980,163 @@ if __name__ == '__main__':
       });
     }
 
+    function stabilizeSelectDropdowns() {
+      document.querySelectorAll('.single-select').forEach((select) => {
+        ['pointerdown', 'mousedown', 'touchstart', 'click'].forEach((eventName) => {
+          select.addEventListener(eventName, (event) => event.stopPropagation());
+        });
+      });
+    }
+
+    const MODULE_MATCH_FUNCTION_LABELS = {
+      moduleReadTemp: '读取温度数据',
+      moduleThreshold: '判断是否超过阈值',
+      moduleBuzzer: '控制蜂鸣器报警',
+      moduleWifiHttp: '接入无线网络',
+      moduleReceiveUpload: '接收上传请求',
+      moduleRenderPage: '查询并渲染网页',
+      moduleViewRealtime: '查看实时温度和历史记录',
+    };
+    const MODULE_MATCH_FIELDS = Object.keys(MODULE_MATCH_FUNCTION_LABELS);
+    const MODULE_MATCH_EXPECTED_CONNECTION_COUNT = 8;
+
+    let activeMatchModule = '';
+    let moduleMatchStarted = false;
+
+    function splitMatchValue(value) {
+      return String(value || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    function getMatchInput(field) {
+      return document.querySelector(`input[type="hidden"][data-field="${field}"]`);
+    }
+
+    function setMatchValue(field, modules) {
+      const input = getMatchInput(field);
+      if (!input) return;
+      input.value = modules.join(',');
+    }
+
+    function clearModuleMatchAnswers() {
+      MODULE_MATCH_FIELDS.forEach((field) => setMatchValue(field, []));
+      activeMatchModule = '';
+      moduleMatchStarted = false;
+    }
+
+    function refreshModuleMatch() {
+      const board = document.getElementById('moduleMatchBoard');
+      const svg = document.getElementById('moduleMatchLines');
+      const summary = document.getElementById('moduleMatchSummary');
+      if (!board || !svg || !summary) return;
+
+      board.querySelectorAll('[data-match-module]').forEach((button) => {
+        const moduleName = button.dataset.matchModule;
+        const used = Array.from(board.querySelectorAll('input[type="hidden"][data-field]'))
+          .some((input) => splitMatchValue(input.value).includes(moduleName));
+        button.classList.toggle('active', activeMatchModule === moduleName);
+        button.classList.toggle('connected', used);
+      });
+
+      board.querySelectorAll('[data-match-function]').forEach((button) => {
+        const input = getMatchInput(button.dataset.matchFunction);
+        button.classList.toggle('connected', splitMatchValue(input?.value).length > 0);
+      });
+
+      const boardRect = board.getBoundingClientRect();
+      svg.setAttribute('viewBox', `0 0 ${boardRect.width} ${boardRect.height}`);
+      svg.innerHTML = '';
+
+      let connectedCount = 0;
+      Object.keys(MODULE_MATCH_FUNCTION_LABELS).forEach((field) => {
+        const input = getMatchInput(field);
+        const modules = splitMatchValue(input?.value);
+        connectedCount += modules.length;
+        const functionNode = board.querySelector(`[data-match-function="${field}"]`);
+        modules.forEach((moduleName) => {
+          const moduleNode = board.querySelector(`[data-match-module="${moduleName}"]`);
+          if (!moduleNode || !functionNode) return;
+          const moduleRect = moduleNode.getBoundingClientRect();
+          const functionRect = functionNode.getBoundingClientRect();
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', String(moduleRect.right - boardRect.left));
+          line.setAttribute('y1', String(moduleRect.top + moduleRect.height / 2 - boardRect.top));
+          line.setAttribute('x2', String(functionRect.left - boardRect.left));
+          line.setAttribute('y2', String(functionRect.top + functionRect.height / 2 - boardRect.top));
+          svg.appendChild(line);
+        });
+      });
+      summary.innerHTML = `
+        <span class="match-pill">已完成 ${connectedCount}/${MODULE_MATCH_EXPECTED_CONNECTION_COUNT} 条连线</span>
+        <span class="match-pill">先选左侧模块，再点右侧功能</span>
+      `;
+
+      board.querySelector('.match-hint')?.classList.toggle('is-hidden', moduleMatchStarted || connectedCount > 0);
+    }
+
+    function setupModuleMatching() {
+      const board = document.getElementById('moduleMatchBoard');
+      if (!board) return;
+
+      board.querySelectorAll('[data-match-module]').forEach((button) => {
+        button.addEventListener('click', () => {
+          moduleMatchStarted = true;
+          activeMatchModule = activeMatchModule === button.dataset.matchModule ? '' : button.dataset.matchModule;
+          refreshModuleMatch();
+        });
+      });
+
+      board.querySelectorAll('[data-match-function]').forEach((button) => {
+        button.addEventListener('click', () => {
+          if (!activeMatchModule) return;
+          const field = button.dataset.matchFunction;
+          const input = getMatchInput(field);
+          const current = splitMatchValue(input?.value);
+          const allowsMultiple = button.dataset.multiple === 'true';
+          const alreadyLinked = current.includes(activeMatchModule);
+          let next;
+          if (alreadyLinked) {
+            next = current.filter((item) => item !== activeMatchModule);
+          } else if (!allowsMultiple && current.length > 0) {
+            activeMatchModule = '';
+            refreshModuleMatch();
+            return;
+          } else {
+            next = allowsMultiple ? [...current, activeMatchModule] : [activeMatchModule];
+          }
+          setMatchValue(field, next);
+          activeMatchModule = '';
+          saveAll();
+          refreshModuleMatch();
+        });
+      });
+
+      window.addEventListener('resize', refreshModuleMatch);
+      refreshModuleMatch();
+    }
+
+    function clearPersistentAnswerCache() {
+      try {
+        LEGACY_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+      } catch {}
+    }
+
     function getSaved() {
-      const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY) || '{}';
-      try { return JSON.parse(raw); }
-      catch { return {}; }
+      try {
+        const raw = sessionStorage.getItem(STORAGE_KEY) || '{}';
+        return JSON.parse(raw);
+      } catch {
+        return {};
+      }
     }
 
     function saveAll() {
       const data = collectAll();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      try {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch {}
     }
 
     function collectFields(root) {
@@ -882,6 +1172,7 @@ if __name__ == '__main__':
       const answers = saved.answers || {};
       document.querySelectorAll('[data-field]').forEach((el) => {
         const key = el.dataset.field;
+        if (MODULE_MATCH_FIELDS.includes(key)) return;
         if (!(key in answers)) return;
         if (el.type === 'radio') el.checked = el.value === answers[key];
         else if (el.type === 'checkbox') {
@@ -916,7 +1207,6 @@ if __name__ == '__main__':
       document.querySelectorAll('.tab-panel').forEach((panel) => {
         panel.classList.toggle('active', panel.dataset.section === key);
       });
-      localStorage.setItem('classroom-activity-active-tab', key);
     }
 
     async function submitSection(section) {
@@ -959,8 +1249,12 @@ if __name__ == '__main__':
     }
 
     createPinChoices();
+    stabilizeSelectDropdowns();
+    clearPersistentAnswerCache();
     restoreSaved();
-    activateTab(localStorage.getItem('classroom-activity-active-tab') || 'intro');
+    clearModuleMatchAnswers();
+    setupModuleMatching();
+    activateTab('intro');
 
     document.addEventListener('input', saveAll);
     document.addEventListener('change', saveAll);

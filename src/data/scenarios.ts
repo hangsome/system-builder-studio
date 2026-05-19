@@ -50,8 +50,8 @@ const classroomHardwareChallengeConnections: Scenario['connections'] = [
 
 export const classroomTemperatureScenario: Scenario = {
   id: 'classroom-temperature',
-  name: '教室温度检测系统课堂版',
-  description: '学生从半成品硬件链路开始，选择温湿度传感器和蜂鸣器，观察 P1/P2 引脚连接后再运行排错。',
+  name: '食堂温度监测与预警系统课堂版',
+  description: '学生从半成品硬件链路开始，选择温湿度传感器和蜂鸣器，完成模块功能匹配，观察 P1/P2 引脚连接后再运行排错。',
   components: classroomCoreComponents,
   connections: classroomCoreConnections,
   microbitCode: classroomStarterMicrobitCode,
@@ -63,7 +63,7 @@ export const classroomTemperatureScenario: Scenario = {
 
 export const classroomTemperatureDemoScenario: Scenario = {
   id: 'classroom-temperature-demo',
-  name: '教室温度检测系统完整演示',
+  name: '食堂温度监测与预警系统完整演示',
   description: '教师投屏演示用：硬件链路完整，代码仍保留两处引脚排错点，适合讲解数据流与故障排查。',
   components: [...classroomCoreComponents, ...classroomHardwareChallengeComponents],
   connections: [...classroomCoreConnections, ...classroomHardwareChallengeConnections],

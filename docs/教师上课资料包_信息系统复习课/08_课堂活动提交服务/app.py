@@ -28,7 +28,7 @@ SECTION_LABELS = {
     "hardware": "硬件搭建",
     "software": "软件分析",
     "debug": "运行排错",
-    "summary": "知识总结",
+    "summary": "自我评价",
 }
 SECTION_ORDER = ["hardware", "software", "debug", "summary"]
 SECTION_MAX_SCORES = {
@@ -95,6 +95,10 @@ def check_exact(answers, field, expected):
     return normalize_answer(answers.get(field)) == normalize_answer(expected)
 
 
+def check_match_contains(answers, field, expected):
+    return normalize_answer(expected) in set(answer_list(answers.get(field)))
+
+
 def check_route(answers, field, expected):
     return normalize_route(answers.get(field)) == normalize_route(expected)
 
@@ -145,23 +149,28 @@ def score_activity_section(section, answers):
     checks = []
 
     if section == "hardware":
-        each = SECTION_MAX_SCORES[section] / 12
+        each = SECTION_MAX_SCORES[section] / 13
         expected = [
             ("sensorChoice", "选择温湿度传感器", "温湿度传感器"),
             ("actuatorChoice", "选择蜂鸣器", "蜂鸣器"),
             ("sensorDataPin", "传感器 DATA 接 P1", "P1"),
             ("buzzerIoPin", "蜂鸣器 IO 接 P2", "P2"),
             ("systemArchitecture", "系统架构判断为 B/S", "B/S"),
-            ("moduleReadTemp", "读取温度数据由智能终端完成", "智能终端"),
-            ("moduleThreshold", "阈值判断由智能终端完成", "智能终端"),
-            ("moduleBuzzer", "蜂鸣器控制由智能终端完成", "智能终端"),
-            ("moduleWifiHttp", "WiFi HTTP 请求由 IoT 模块发送", "IoT模块"),
-            ("moduleReceiveUpload", "上传请求由 Flask 服务器接收", "Flask服务器"),
-            ("moduleRenderPage", "网页查询渲染由 Flask 服务器完成", "Flask服务器"),
-            ("moduleViewRealtime", "实时温度由浏览器 / 手机查看", "浏览器 / 手机"),
         ]
         for field, label, expected_value in expected:
             add_check(checks, label, each, 1 if check_exact(answers, field, expected_value) else 0)
+        match_expected = [
+            ("moduleReadTemp", "读取温度数据连到智能终端", "智能终端"),
+            ("moduleThreshold", "阈值判断连到智能终端", "智能终端"),
+            ("moduleThreshold", "阈值判断连到 Flask 服务器", "Flask服务器"),
+            ("moduleBuzzer", "蜂鸣器控制连到智能终端", "智能终端"),
+            ("moduleWifiHttp", "接入无线网络连到 IoT 模块", "IoT模块"),
+            ("moduleReceiveUpload", "上传请求连到 Flask 服务器", "Flask服务器"),
+            ("moduleRenderPage", "网页查询渲染连到 Flask 服务器", "Flask服务器"),
+            ("moduleViewRealtime", "实时温度查看连到浏览器 / 手机", "浏览器 / 手机"),
+        ]
+        for field, label, expected_value in match_expected:
+            add_check(checks, label, each, 1 if check_match_contains(answers, field, expected_value) else 0)
 
     elif section == "software":
         each = SECTION_MAX_SCORES[section] / 16
@@ -188,19 +197,18 @@ def score_activity_section(section, answers):
             add_check(checks, label, each, ratio)
 
     elif section == "debug":
-        add_check(checks, "排错确认传感器 DATA 接 P1", 4, 1 if check_exact(answers, "debugSensorPin", "P1") else 0)
-        add_check(checks, "排错确认蜂鸣器 IO 接 P2", 4, 1 if check_exact(answers, "debugBuzzerPin", "P2") else 0)
-        add_check(checks, "浏览器 URL 填写完整", 5, 1 if check_url(answers, "browserUrl") else 0)
+        add_check(checks, "排错确认传感器 DATA 接 P1", 5, 1 if check_exact(answers, "debugSensorPin", "P1") else 0)
+        add_check(checks, "排错确认蜂鸣器 IO 接 P2", 5, 1 if check_exact(answers, "debugBuzzerPin", "P2") else 0)
         add_check(
             checks,
             "观察温度超阈值后的执行器响应",
-            4,
+            5,
             1 if normalize_answer(answers.get("debugActuatorResponse")) else 0,
         )
         add_check(
             checks,
             "优先排查代码、服务器、URL、网络等关键环节",
-            8,
+            10,
             score_multi_select(
                 answers,
                 "debugCauses",
@@ -210,13 +218,12 @@ def score_activity_section(section, answers):
 
     elif section == "summary":
         for field, label in [
-            ("scorePins", "完成引脚识别自评"),
-            ("scoreMicrobitParams", "完成智能终端参数自评"),
+            ("scorePins", "完成传感器读取引脚自评"),
+            ("scoreMicrobitParams", "完成执行器控制引脚自评"),
             ("scoreUrl", "完成 URL 书写自评"),
-            ("scoreFault", "完成故障排查自评"),
-            ("scoreDataFlow", "完成数据流向自评"),
+            ("scoreFault", "完成故障原因推导自评"),
         ]:
-            add_check(checks, label, 2, 1 if normalize_answer(answers.get(field)) else 0)
+            add_check(checks, label, 2.5, 1 if normalize_answer(answers.get(field)) else 0)
         add_check(checks, "写出还需要复习的问题", 5, 1 if normalize_answer(answers.get("needReview")) else 0)
 
     max_score = SECTION_MAX_SCORES.get(section, round(sum(item["points"] for item in checks), 1))
@@ -253,6 +260,19 @@ def build_section_entry(row):
     }
 
 
+def dedupe_activity_submissions(conn):
+    conn.execute(
+        """
+        DELETE FROM activity_submissions
+        WHERE id NOT IN (
+            SELECT MAX(id)
+            FROM activity_submissions
+            GROUP BY class_name, student_name, section
+        )
+        """
+    )
+
+
 def init_db():
     with get_conn() as conn:
         conn.execute(
@@ -280,6 +300,13 @@ def init_db():
         conn.execute("CREATE INDEX IF NOT EXISTS idx_activity_student ON activity_submissions(student_name)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_activity_section ON activity_submissions(section)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_submissions(created_at DESC)")
+        dedupe_activity_submissions(conn)
+        conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_activity_unique_student_section
+            ON activity_submissions(class_name, student_name, section)
+            """
+        )
         conn.commit()
 
 
@@ -318,11 +345,17 @@ def submit_activity():
         return {"error": "answers must be an object"}, 400
 
     with get_conn() as conn:
-        result = conn.execute(
+        conn.execute(
             """
             INSERT INTO activity_submissions
               (class_name, student_name, client_id, section, answers_json, page_url, submitted_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(class_name, student_name, section) DO UPDATE SET
+              client_id = excluded.client_id,
+              answers_json = excluded.answers_json,
+              page_url = excluded.page_url,
+              submitted_at = excluded.submitted_at,
+              created_at = CURRENT_TIMESTAMP
             """,
             (
                 class_name,
@@ -334,11 +367,19 @@ def submit_activity():
                 submitted_at,
             ),
         )
+        row = conn.execute(
+            """
+            SELECT id
+            FROM activity_submissions
+            WHERE class_name = ? AND student_name = ? AND section = ?
+            """,
+            (class_name, student_name, section),
+        ).fetchone()
         conn.commit()
 
     return {
         "success": True,
-        "id": result.lastrowid,
+        "id": row["id"] if row else None,
         "className": class_name,
         "studentName": student_name,
         "section": section,
@@ -435,12 +476,11 @@ def teacher_dashboard():
 
     student_cards.sort(key=lambda item: (item["class_name"], item["student_name"]))
 
-    recent_submissions = []
-    for row in rows[:30]:
-        entry = build_section_entry(row)
-        entry["class_name"] = row["class_name"]
-        entry["student_name"] = row["student_name"]
-        recent_submissions.append(entry)
+    recent_students = sorted(
+        student_cards,
+        key=lambda item: item["updated_at"] or "",
+        reverse=True,
+    )[:30]
 
     total_students = len(student_cards)
     completed_students = sum(1 for student in student_cards if student["submitted_count"] == len(SECTION_LABELS))
@@ -462,7 +502,7 @@ def teacher_dashboard():
     return render_template(
         "teacher.html",
         students=student_cards,
-        recent_submissions=recent_submissions,
+        recent_students=recent_students,
         section_labels=SECTION_LABELS,
         section_order=SECTION_ORDER,
         summary=summary,
