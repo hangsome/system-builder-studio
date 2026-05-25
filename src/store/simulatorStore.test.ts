@@ -73,6 +73,7 @@ describe('simulatorStore', () => {
     });
     useSimulatorStore.persist.clearStorage();
     useSimulatorStore.getState().resetSimulator();
+    useSimulatorStore.getState().setAutoConnectEnabled(false);
   });
 
   afterEach(() => {
@@ -155,9 +156,21 @@ describe('simulatorStore', () => {
     expect(state.lastConnectionResult?.success).toBe(true);
   });
 
+  it('keeps component auto connection disabled by default', () => {
+    const store = useSimulatorStore.getState();
+
+    store.addComponent(expansionBoard);
+    store.addComponent(iotModule);
+
+    const state = useSimulatorStore.getState();
+    expect(state.autoConnectEnabled).toBe(false);
+    expect(state.connections).toHaveLength(0);
+  });
+
   it('auto connects iot module to expansion board when added to canvas', () => {
     const store = useSimulatorStore.getState();
 
+    store.setAutoConnectEnabled(true);
     store.addComponent(expansionBoard);
     store.addComponent(iotModule);
 
@@ -180,6 +193,7 @@ describe('simulatorStore', () => {
   it('adds a smart terminal as a microbit and expansion board pair', () => {
     const store = useSimulatorStore.getState();
 
+    store.setAutoConnectEnabled(true);
     store.addSmartTerminal({ x: 250, y: 260 });
 
     const state = useSimulatorStore.getState();
@@ -254,6 +268,7 @@ describe('simulatorStore', () => {
   it('auto connects classroom sensor and actuator to the planned pins', () => {
     const store = useSimulatorStore.getState();
 
+    store.setAutoConnectEnabled(true);
     store.addComponent(expansionBoard);
     store.addComponent(tempSensor);
     store.addComponent(buzzer);
@@ -268,13 +283,14 @@ describe('simulatorStore', () => {
           connection.toPin === toPin,
       );
 
-    expect(hasConnection('temp-1', 'data', 'p1')).toBe(true);
-    expect(hasConnection('buzzer-1', 'io', 'p2')).toBe(true);
+    expect(hasConnection('temp-1', 'data', 'p0')).toBe(true);
+    expect(hasConnection('buzzer-1', 'io', 'p3')).toBe(true);
   });
 
-  it('auto connects extra sensors and actuators to different free expansion pins', () => {
+  it('only auto connects classroom components that match the current code pins', () => {
     const store = useSimulatorStore.getState();
 
+    store.setAutoConnectEnabled(true);
     store.addComponent(expansionBoard);
     store.addComponent(tempSensor);
     store.addComponent(lightSensor);
@@ -291,26 +307,29 @@ describe('simulatorStore', () => {
     expect(
       state.connections.some(
         (connection) =>
-          connection.fromComponent === 'light-1' &&
-          connection.fromPin === 'ao' &&
+          connection.fromComponent === 'temp-1' &&
+          connection.fromPin === 'data' &&
           connection.toComponent === 'expansion-1' &&
-          connection.toPin !== 'p1',
+          connection.toPin === 'p0',
       ),
     ).toBe(true);
     expect(
       state.connections.some(
         (connection) =>
-          connection.fromComponent === 'led-1' &&
-          connection.fromPin === 'din' &&
+          connection.fromComponent === 'buzzer-1' &&
+          connection.fromPin === 'io' &&
           connection.toComponent === 'expansion-1' &&
-          connection.toPin !== 'p2',
+          connection.toPin === 'p3',
       ),
     ).toBe(true);
+    expect(state.connections.some((connection) => connection.fromComponent === 'light-1')).toBe(false);
+    expect(state.connections.some((connection) => connection.fromComponent === 'led-1')).toBe(false);
   });
 
   it('auto connects IoT, router, server, and database classroom chain', () => {
     const store = useSimulatorStore.getState();
 
+    store.setAutoConnectEnabled(true);
     store.addComponent(expansionBoard);
     store.addComponent(iotModule);
     store.addComponent(router);
@@ -335,6 +354,7 @@ describe('simulatorStore', () => {
   it('auto connects the WiFi link when router and IoT are added in either order', () => {
     let store = useSimulatorStore.getState();
 
+    store.setAutoConnectEnabled(true);
     store.addComponent(iotModule);
     store.addComponent(router);
 

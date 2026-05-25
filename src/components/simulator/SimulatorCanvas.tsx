@@ -3,7 +3,7 @@ import { useSimulatorStore } from '@/store/simulatorStore';
 import { componentDefinitions, smartTerminalDefinition } from '@/data/componentDefinitions';
 import { ComponentDefinition, Connection, PlacedComponent, Pin } from '@/types/simulator';
 import { cn, createId } from '@/lib/utils';
-import { ChevronDown, ChevronRight, Zap, CheckCircle2, XCircle, Eye, EyeOff, LayoutGrid } from 'lucide-react';
+import { ChevronDown, ChevronRight, Zap, CheckCircle2, XCircle, Eye, EyeOff, LayoutGrid, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { isInitiallyPowered } from '@/lib/connectionValidator';
 
@@ -189,12 +189,21 @@ interface SimulatorCanvasProps {
   classroomMode?: boolean;
 }
 
+interface ConnectionContextMenuState {
+  connectionId: string;
+  x: number;
+  y: number;
+}
+
 export function SimulatorCanvas({ classroomMode = false }: SimulatorCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedComponent, setDraggedComponent] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [showConnectionFeedback, setShowConnectionFeedback] = useState(false);
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
+  const [hoveredConnectionId, setHoveredConnectionId] = useState<string | null>(null);
+  const [connectionContextMenu, setConnectionContextMenu] = useState<ConnectionContextMenuState | null>(null);
   
   // 画布拖拽平移状态
   const [isPanning, setIsPanning] = useState(false);
@@ -227,6 +236,8 @@ export function SimulatorCanvas({ classroomMode = false }: SimulatorCanvasProps)
     toggleDetailsVisible,
     setZoom,
     setPan,
+    removeConnection,
+    setRunning,
   } = useSimulatorStore(
     useShallow((state) => ({
       zoom: state.zoom,
@@ -254,6 +265,8 @@ export function SimulatorCanvas({ classroomMode = false }: SimulatorCanvasProps)
       toggleDetailsVisible: state.toggleDetailsVisible,
       setZoom: state.setZoom,
       setPan: state.setPan,
+      removeConnection: state.removeConnection,
+      setRunning: state.setRunning,
     }))
   );
 
@@ -358,6 +371,61 @@ export function SimulatorCanvas({ classroomMode = false }: SimulatorCanvasProps)
     }
   }, [lastConnectionResult, clearConnectionResult]);
 
+  useEffect(() => {
+    if (selectedConnectionId && !connections.some((connection) => connection.id === selectedConnectionId)) {
+      setSelectedConnectionId(null);
+    }
+
+    if (connectionContextMenu && !connections.some((connection) => connection.id === connectionContextMenu.connectionId)) {
+      setConnectionContextMenu(null);
+    }
+  }, [connectionContextMenu, connections, selectedConnectionId]);
+
+  const deleteConnection = useCallback(
+    (connectionId: string) => {
+      removeConnection(connectionId);
+      if (isRunning) {
+        setRunning(false);
+      }
+      setSelectedConnectionId((current) => (current === connectionId ? null : current));
+      setHoveredConnectionId((current) => (current === connectionId ? null : current));
+      setConnectionContextMenu((current) => (current?.connectionId === connectionId ? null : current));
+    },
+    [isRunning, removeConnection, setRunning]
+  );
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName.toLowerCase();
+      const isEditableTarget =
+        tagName === 'input' ||
+        tagName === 'textarea' ||
+        tagName === 'select' ||
+        target?.isContentEditable;
+
+      if (isEditableTarget) {
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        setConnectionContextMenu(null);
+        setSelectedConnectionId(null);
+        return;
+      }
+
+      if (!selectedConnectionId || (event.key !== 'Delete' && event.key !== 'Backspace')) {
+        return;
+      }
+
+      event.preventDefault();
+      deleteConnection(selectedConnectionId);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [deleteConnection, selectedConnectionId]);
+
   // 处理拖放到画布
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
@@ -434,6 +502,8 @@ export function SimulatorCanvas({ classroomMode = false }: SimulatorCanvasProps)
       
       // 左键在空白处拖拽画布
       if (e.button === 0 && isCanvasBackground && !isDrawingConnection) {
+        setConnectionContextMenu(null);
+        setSelectedConnectionId(null);
         e.preventDefault();
         setIsPanning(true);
         setPanStart({ x: e.clientX, y: e.clientY });
@@ -493,6 +563,8 @@ export function SimulatorCanvas({ classroomMode = false }: SimulatorCanvasProps)
   const handlePinClick = useCallback(
     (e: React.MouseEvent, componentId: string, pinId: string) => {
       e.stopPropagation();
+      setConnectionContextMenu(null);
+      setSelectedConnectionId(null);
       
       if (isDrawingConnection && connectionStart) {
         completeConnection(componentId, pinId);
@@ -507,6 +579,8 @@ export function SimulatorCanvas({ classroomMode = false }: SimulatorCanvasProps)
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('canvas-grid')) {
+        setConnectionContextMenu(null);
+        setSelectedConnectionId(null);
         if (isDrawingConnection) {
           cancelConnection();
         } else {
@@ -515,6 +589,38 @@ export function SimulatorCanvas({ classroomMode = false }: SimulatorCanvasProps)
       }
     },
     [isDrawingConnection, cancelConnection, selectComponent]
+  );
+
+  const handleConnectionClick = useCallback(
+    (e: React.MouseEvent<SVGLineElement>, connectionId: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setConnectionContextMenu(null);
+      setSelectedConnectionId(connectionId);
+      selectComponent(null);
+      if (isDrawingConnection) {
+        cancelConnection();
+      }
+    },
+    [cancelConnection, isDrawingConnection, selectComponent]
+  );
+
+  const handleConnectionContextMenu = useCallback(
+    (e: React.MouseEvent<SVGLineElement>, connectionId: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setSelectedConnectionId(connectionId);
+      selectComponent(null);
+      if (isDrawingConnection) {
+        cancelConnection();
+      }
+      setConnectionContextMenu({
+        connectionId,
+        x: e.clientX,
+        y: e.clientY,
+      });
+    },
+    [cancelConnection, isDrawingConnection, selectComponent]
   );
 
   // 滚轮缩放和平移
@@ -741,6 +847,9 @@ export function SimulatorCanvas({ classroomMode = false }: SimulatorCanvasProps)
           
           const color = getConnectionColorByValidity(connection.valid);
           const isWireless = isWirelessConnection(connection.type);
+          const isSelectedConnection = selectedConnectionId === connection.id;
+          const isHoveredConnection = hoveredConnectionId === connection.id;
+          const activeStrokeWidth = isSelectedConnection ? 5 : isHoveredConnection ? 4 : 3;
           
           // 计算连线长度用于动画时长
           const length = Math.sqrt(Math.pow(points.to.x - points.from.x, 2) + Math.pow(points.to.y - points.from.y, 2));
@@ -751,6 +860,20 @@ export function SimulatorCanvas({ classroomMode = false }: SimulatorCanvasProps)
           
           return (
             <g key={connection.id}>
+              {isSelectedConnection && (
+                <line
+                  x1={points.from.x}
+                  y1={points.from.y}
+                  x2={points.to.x}
+                  y2={points.to.y}
+                  stroke="hsl(var(--foreground))"
+                  strokeWidth={activeStrokeWidth + 5}
+                  strokeLinecap="round"
+                  opacity={0.22}
+                  strokeDasharray={strokeDasharray}
+                  pointerEvents="none"
+                />
+              )}
               {/* 外层光晕效果 - 更宽更亮 */}
               <line
                 x1={points.from.x}
@@ -763,6 +886,7 @@ export function SimulatorCanvas({ classroomMode = false }: SimulatorCanvasProps)
                 opacity={0.1}
                 filter="url(#glow)"
                 strokeDasharray={isWireless ? "14,10" : undefined}
+                pointerEvents="none"
               />
               {/* 中层阴影 */}
               <line
@@ -775,6 +899,7 @@ export function SimulatorCanvas({ classroomMode = false }: SimulatorCanvasProps)
                 strokeLinecap="round"
                 opacity={0.2}
                 strokeDasharray={isWireless ? "10,8" : undefined}
+                pointerEvents="none"
               />
               {/* 主连线 - 更粗，无线连接用虚线 */}
               <line
@@ -783,9 +908,10 @@ export function SimulatorCanvas({ classroomMode = false }: SimulatorCanvasProps)
                 x2={points.to.x}
                 y2={points.to.y}
                 stroke={color}
-                strokeWidth={3}
+                strokeWidth={activeStrokeWidth}
                 strokeLinecap="round"
                 strokeDasharray={strokeDasharray}
+                pointerEvents="none"
               />
               {/* 连线高光 */}
               <line
@@ -798,6 +924,7 @@ export function SimulatorCanvas({ classroomMode = false }: SimulatorCanvasProps)
                 strokeLinecap="round"
                 opacity={0.35}
                 strokeDasharray={strokeDasharray}
+                pointerEvents="none"
               />
               {/* 连线端点圆圈 - 无线连接用wifi信号图标样式 */}
               {isWireless ? (
@@ -871,6 +998,22 @@ export function SimulatorCanvas({ classroomMode = false }: SimulatorCanvasProps)
                   );
                 });
               })()}
+              <line
+                x1={points.from.x}
+                y1={points.from.y}
+                x2={points.to.x}
+                y2={points.to.y}
+                stroke="transparent"
+                strokeWidth={18}
+                strokeLinecap="round"
+                className="cursor-pointer"
+                pointerEvents="stroke"
+                aria-label="连线操作区域"
+                onMouseEnter={() => setHoveredConnectionId(connection.id)}
+                onMouseLeave={() => setHoveredConnectionId((current) => (current === connection.id ? null : current))}
+                onClick={(event) => handleConnectionClick(event, connection.id)}
+                onContextMenu={(event) => handleConnectionContextMenu(event, connection.id)}
+              />
             </g>
           );
         })}
@@ -936,6 +1079,30 @@ export function SimulatorCanvas({ classroomMode = false }: SimulatorCanvasProps)
 
       {/* 供电说明浮窗 - 可折叠 */}
       {detailsVisible && <PowerGuidePanel />}
+
+      {connectionContextMenu && (
+        <div
+          className="fixed z-[260] min-w-32 overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+          style={{
+            left: connectionContextMenu.x,
+            top: connectionContextMenu.y,
+          }}
+          role="menu"
+          data-connection-menu="true"
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm transition hover:bg-destructive hover:text-destructive-foreground focus:bg-destructive focus:text-destructive-foreground focus:outline-none"
+            role="menuitem"
+            onClick={() => deleteConnection(connectionContextMenu.connectionId)}
+          >
+            <Trash2 className="h-4 w-4" />
+            删除连线
+          </button>
+        </div>
+      )}
       
       {/* 连接成功/失败反馈 */}
       {showConnectionFeedback && lastConnectionResult && (
