@@ -419,10 +419,10 @@ export function EnhancedSimulationPanel() {
             className="h-7 w-full text-[10px] gap-1"
             onClick={() => setDemoSweepActive(!demoSweepActive)}
             disabled={!isRunning}
-            title="让温度在 25°C↔32°C 之间正弦扫描，方便演示阈值触发与回落"
+            title="让温度在 4.5°C↔10.5°C 之间正弦扫描，方便演示冷藏阈值触发与回落"
           >
             <Flame className="h-3 w-3" />
-            {demoSweepActive ? '停止演示扫描' : '演示扫描（25 ↔ 33°C）'}
+            {demoSweepActive ? '停止演示扫描' : '演示扫描（4.5 ↔ 10.5°C）'}
           </Button>
         </div>
       </div>

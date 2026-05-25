@@ -9,7 +9,7 @@ import {
   LogEntry 
 } from '@/types/simulator';
 import { createId } from '@/lib/utils';
-import { validateConnection } from '@/lib/connectionValidator';
+import { validateConnection, validateSystem } from '@/lib/connectionValidator';
 import { componentDefinitions } from '@/data/componentDefinitions';
 import {
   classroomDatabase,
@@ -80,6 +80,9 @@ interface SimulatorStore {
 
   // 课堂细节显示
   detailsVisible: boolean;
+
+  // 教师课堂设置
+  autoConnectEnabled: boolean;
   
   // Actions
   setZoom: (zoom: number) => void;
@@ -119,6 +122,7 @@ interface SimulatorStore {
   updateServerConfig: (config: Partial<ServerConfig>) => void;
   
   addLog: (log: Omit<LogEntry, 'timestamp'>) => void;
+  setLogs: (logs: LogEntry[]) => void;
   clearLogs: () => void;
   clearConnectionResult: () => void;
   
@@ -132,6 +136,8 @@ interface SimulatorStore {
   setBrowserLastUpdate: (timestamp: number | null) => void;
   setBrowserAutoRefresh: (enabled: boolean) => void;
   toggleDetailsVisible: () => void;
+  setAutoConnectEnabled: (enabled: boolean) => void;
+  generateRandomFault: () => { success: boolean; message: string };
   resetBrowserState: () => void;
   
   resetSimulator: () => void;
@@ -145,6 +151,10 @@ interface SimulatorStore {
     serverConfig: ServerConfig;
   }) => void;
 }
+
+type ClassroomFaultResult =
+  | { success: false; message: string }
+  | { success: true; message: string; changes: Partial<SimulatorStore> };
 
 const defaultMicrobitCode = classroomStarterMicrobitCode;
 const defaultFlaskCode = classroomFlaskCode;
@@ -174,6 +184,7 @@ function recoverPersistedCodeState(state: Partial<SimulatorStore> | null | undef
   nextState.codeBurned = typeof nextState.microbitCode === 'string' && nextState.microbitCode.trim().length > 0;
   nextState.codeMode = 'python';
   nextState.detailsVisible = false;
+  nextState.autoConnectEnabled = nextState.autoConnectEnabled === true;
   return nextState;
 }
 
@@ -196,6 +207,264 @@ function createClassroomServerConfig() {
     logs: [],
   };
 }
+
+const SENSOR_SIGNAL_PINS = new Set(['data', 'io', 'out', 'signal', 'ao']);
+const ACTUATOR_SIGNAL_PINS = new Set(['io', 'in', 'din', 'signal']);
+const SENSOR_FAULT_PIN_OPTIONS = ['p1', 'p2', 'p4', 'p5', 'p13', 'p14'];
+const ACTUATOR_FAULT_PIN_OPTIONS = ['p2', 'p4', 'p5', 'p13', 'p14', 'p0'];
+
+function getPinNumber(pinId: string) {
+  const match = /^p(\d+)$/i.exec(pinId);
+  return match ? match[1] : null;
+}
+
+function getFirstMicrobitReadPinId(code: string) {
+  const match = /\bpin(\d+)\s*\.\s*read_(?:analog|digital)\s*\(/i.exec(code);
+  return match ? `p${match[1]}` : null;
+}
+
+function getFirstMicrobitWritePinId(code: string) {
+  const match = /\bpin(\d+)\s*\.\s*write_(?:analog|digital)\s*\(/i.exec(code);
+  return match ? `p${match[1]}` : null;
+}
+
+function replaceMicrobitReadPin(code: string, pinNumber: string) {
+  return code.replace(/\bpin\d+(\s*\.\s*read_(?:analog|digital)\s*\()/gi, `pin${pinNumber}$1`);
+}
+
+function replaceMicrobitWritePin(code: string, pinNumber: string) {
+  return code.replace(/\bpin\d+(\s*\.\s*write_(?:analog|digital)\s*\()/gi, `pin${pinNumber}$1`);
+}
+
+function getFirstComponentByDefinition(components: PlacedComponent[], definitionId: string) {
+  return components.find((component) => component.definitionId === definitionId);
+}
+
+function isPinOccupiedByOtherConnection(
+  connections: Connection[],
+  componentId: string,
+  pinId: string,
+  ignoredConnectionId?: string
+) {
+  return connections.some(
+    (connection) =>
+      connection.id !== ignoredConnectionId &&
+      ((connection.fromComponent === componentId && connection.fromPin === pinId) ||
+        (connection.toComponent === componentId && connection.toPin === pinId))
+  );
+}
+
+function findComponentSignalConnection(
+  component: PlacedComponent | undefined,
+  placedComponents: PlacedComponent[],
+  connections: Connection[],
+  signalPins: Set<string>
+) {
+  if (!component) return null;
+
+  for (const connection of connections) {
+    const componentOnFromSide =
+      connection.fromComponent === component.instanceId && signalPins.has(connection.fromPin);
+    const componentOnToSide =
+      connection.toComponent === component.instanceId && signalPins.has(connection.toPin);
+
+    if (!componentOnFromSide && !componentOnToSide) {
+      continue;
+    }
+
+    const otherComponentId = componentOnFromSide ? connection.toComponent : connection.fromComponent;
+    const otherPinId = componentOnFromSide ? connection.toPin : connection.fromPin;
+    const otherComponent = placedComponents.find((candidate) => candidate.instanceId === otherComponentId);
+
+    if (otherComponent?.definitionId === 'expansion-board' && /^p\d+$/i.test(otherPinId)) {
+      return {
+        connection,
+        expansionComponentId: otherComponentId,
+        expansionPinId: otherPinId.toLowerCase(),
+        componentOnFromSide,
+      };
+    }
+  }
+
+  return null;
+}
+
+function chooseFaultPin(
+  connections: Connection[],
+  expansionComponentId: string,
+  currentPinId: string,
+  options: string[],
+  ignoredConnectionId: string
+) {
+  return options.find(
+    (pinId) =>
+      pinId !== currentPinId &&
+      !isPinOccupiedByOtherConnection(connections, expansionComponentId, pinId, ignoredConnectionId)
+  );
+}
+
+function alignMicrobitCodeToCanvas(
+  code: string,
+  placedComponents: PlacedComponent[],
+  connections: Connection[]
+) {
+  let nextCode = code.trim().length > 0 ? code : defaultMicrobitCode;
+  const tempSensor = getFirstComponentByDefinition(placedComponents, 'temp-humidity-sensor');
+  const tempSignal = findComponentSignalConnection(tempSensor, placedComponents, connections, SENSOR_SIGNAL_PINS);
+  const tempPinNumber = tempSignal ? getPinNumber(tempSignal.expansionPinId) : null;
+  if (tempPinNumber) {
+    nextCode = replaceMicrobitReadPin(nextCode, tempPinNumber);
+  }
+
+  const buzzer = getFirstComponentByDefinition(placedComponents, 'buzzer');
+  const buzzerSignal = findComponentSignalConnection(buzzer, placedComponents, connections, ACTUATOR_SIGNAL_PINS);
+  const buzzerPinNumber = buzzerSignal ? getPinNumber(buzzerSignal.expansionPinId) : null;
+  if (buzzerPinNumber) {
+    nextCode = replaceMicrobitWritePin(nextCode, buzzerPinNumber);
+  }
+
+  return nextCode;
+}
+
+function changeExpansionPin(connection: Connection, componentOnFromSide: boolean, nextExpansionPinId: string) {
+  return componentOnFromSide
+    ? { ...connection, toPin: nextExpansionPinId, valid: true }
+    : { ...connection, fromPin: nextExpansionPinId, valid: true };
+}
+
+function createRandomClassroomFault(state: SimulatorStore): ClassroomFaultResult {
+  const validation = validateSystem(state.placedComponents, state.connections);
+  if (validation.issues.length > 0) {
+    return {
+      success: false,
+      message: `请先完成正常关系图：${validation.issues[0]}`,
+    };
+  }
+
+  const normalCode = alignMicrobitCodeToCanvas(
+    state.microbitCode,
+    state.placedComponents,
+    state.connections
+  );
+  const faultCandidates: Array<() => {
+    message: string;
+    changes: Partial<SimulatorStore>;
+  }> = [];
+
+  const tempSensor = getFirstComponentByDefinition(state.placedComponents, 'temp-humidity-sensor');
+  const tempSignal = findComponentSignalConnection(
+    tempSensor,
+    state.placedComponents,
+    state.connections,
+    SENSOR_SIGNAL_PINS
+  );
+  if (tempSignal) {
+    const connectedPinNumber = getPinNumber(tempSignal.expansionPinId);
+    const codeFaultPin = SENSOR_FAULT_PIN_OPTIONS.find((pinId) => pinId !== tempSignal.expansionPinId);
+    const codeFaultPinNumber = codeFaultPin ? getPinNumber(codeFaultPin) : null;
+    if (connectedPinNumber && codeFaultPin && codeFaultPinNumber) {
+      faultCandidates.push(() => ({
+        message: `已生成代码故障：代码改为读取 ${codeFaultPin.toUpperCase()}，但温度传感器信号线仍接在 ${tempSignal.expansionPinId.toUpperCase()}`,
+        changes: {
+          microbitCode: replaceMicrobitReadPin(normalCode, codeFaultPinNumber),
+          codeBurned: true,
+        },
+      }));
+    }
+
+    const nextPin = chooseFaultPin(
+      state.connections,
+      tempSignal.expansionComponentId,
+      tempSignal.expansionPinId,
+      SENSOR_FAULT_PIN_OPTIONS,
+      tempSignal.connection.id
+    );
+    if (nextPin) {
+      faultCandidates.push(() => ({
+        message: `已生成连线故障：温度传感器信号线改接到 ${nextPin.toUpperCase()}，代码仍读取 ${tempSignal.expansionPinId.toUpperCase()}`,
+        changes: {
+          microbitCode: normalCode,
+          codeBurned: true,
+          connections: state.connections.map((connection) =>
+            connection.id === tempSignal.connection.id
+              ? changeExpansionPin(connection, tempSignal.componentOnFromSide, nextPin)
+              : connection
+          ),
+        },
+      }));
+    }
+  }
+
+  const buzzer = getFirstComponentByDefinition(state.placedComponents, 'buzzer');
+  const buzzerSignal = findComponentSignalConnection(
+    buzzer,
+    state.placedComponents,
+    state.connections,
+    ACTUATOR_SIGNAL_PINS
+  );
+  if (buzzerSignal) {
+    const connectedPinNumber = getPinNumber(buzzerSignal.expansionPinId);
+    const codeFaultPin = ACTUATOR_FAULT_PIN_OPTIONS.find((pinId) => pinId !== buzzerSignal.expansionPinId);
+    const codeFaultPinNumber = codeFaultPin ? getPinNumber(codeFaultPin) : null;
+    if (connectedPinNumber && codeFaultPin && codeFaultPinNumber) {
+      faultCandidates.push(() => ({
+        message: `已生成代码故障：代码改为控制 ${codeFaultPin.toUpperCase()}，但蜂鸣器信号线仍接在 ${buzzerSignal.expansionPinId.toUpperCase()}`,
+        changes: {
+          microbitCode: replaceMicrobitWritePin(normalCode, codeFaultPinNumber),
+          codeBurned: true,
+        },
+      }));
+    }
+
+    const nextPin = chooseFaultPin(
+      state.connections,
+      buzzerSignal.expansionComponentId,
+      buzzerSignal.expansionPinId,
+      ACTUATOR_FAULT_PIN_OPTIONS,
+      buzzerSignal.connection.id
+    );
+    if (nextPin) {
+      faultCandidates.push(() => ({
+        message: `已生成连线故障：蜂鸣器信号线改接到 ${nextPin.toUpperCase()}，代码仍控制 ${buzzerSignal.expansionPinId.toUpperCase()}`,
+        changes: {
+          microbitCode: normalCode,
+          codeBurned: true,
+          connections: state.connections.map((connection) =>
+            connection.id === buzzerSignal.connection.id
+              ? changeExpansionPin(connection, buzzerSignal.componentOnFromSide, nextPin)
+              : connection
+          ),
+        },
+      }));
+    }
+  }
+
+  const hasUploadPathComponents =
+    state.placedComponents.some((component) => component.definitionId === 'iot-module' || component.definitionId === 'obloq') &&
+    state.placedComponents.some((component) => component.definitionId === 'router') &&
+    state.placedComponents.some((component) => component.definitionId === 'web-server');
+
+  if (hasUploadPathComponents && /obloq\.http_get\s*\(/i.test(normalCode) && /\/upload/i.test(normalCode)) {
+    faultCandidates.push(() => ({
+      message: '已生成代码故障：上传请求被改成 POST /upload，课堂要求应使用 GET /upload?id=...&val=...',
+      changes: {
+        microbitCode: normalCode.replace(/obloq\.http_get/gi, 'obloq.http_post'),
+        codeBurned: true,
+      },
+    }));
+  }
+
+  if (faultCandidates.length === 0) {
+    return {
+      success: false,
+      message: '请先搭建并连好温湿度传感器或蜂鸣器，再生成排查故障。',
+    };
+  }
+
+  const selected = faultCandidates[Math.floor(Math.random() * faultCandidates.length)]();
+  return { success: true, ...selected };
+}
+
 
 const initialState = {
   zoom: 1,
@@ -227,6 +496,7 @@ const initialState = {
   browserLastUpdate: null,
   browserAutoRefresh: true,
   detailsVisible: false,
+  autoConnectEnabled: false,
 };
 
 function syncFlaskCodeServerAddress(code: string, serverConfig: ServerConfig) {
@@ -359,6 +629,11 @@ export const useSimulatorStore = create<SimulatorStore>()(
       addComponent: (component) => {
         const state = get();
         const newComponents = [...state.placedComponents, component];
+        if (!state.autoConnectEnabled) {
+          set({ placedComponents: newComponents });
+          return;
+        }
+
         const microbit = newComponents.find(c => c.definitionId === 'microbit');
         const expansionBoard = newComponents.find(c => c.definitionId === 'expansion-board');
         const pendingConnections: Connection[] = [];
@@ -475,15 +750,24 @@ export const useSimulatorStore = create<SimulatorStore>()(
         }
 
         if (expansionBoard) {
+          const codeSensorPin = getFirstMicrobitReadPinId(state.microbitCode);
+          const codeActuatorPin = getFirstMicrobitWritePinId(state.microbitCode);
+          const preferredSensorPin = codeSensorPin && EXPANSION_SENSOR_SIGNAL_PINS.includes(codeSensorPin)
+            ? codeSensorPin
+            : 'p0';
+          const preferredActuatorPin = codeActuatorPin && EXPANSION_ACTUATOR_SIGNAL_PINS.includes(codeActuatorPin)
+            ? codeActuatorPin
+            : 'p3';
           const sensorMappings: Record<string, { signalPin: string; expansionPins: string[] }> = {
-            'temp-humidity-sensor': { signalPin: 'data', expansionPins: EXPANSION_SENSOR_SIGNAL_PINS },
-            'light-sensor': { signalPin: 'ao', expansionPins: ['p0', 'p3', 'p4', 'p5', 'p13', 'p14', 'p1'] },
-            'sound-sensor': { signalPin: 'ao', expansionPins: ['p3', 'p4', 'p5', 'p13', 'p14', 'p0', 'p1'] },
-            'infrared-sensor': { signalPin: 'out', expansionPins: ['p4', 'p5', 'p13', 'p14', 'p3', 'p0', 'p1'] },
+            // 自动连线只处理课堂默认代码覆盖的首个温湿度传感器，并优先使用代码实际读取的引脚。
+            'temp-humidity-sensor': { signalPin: 'data', expansionPins: [preferredSensorPin] },
           };
 
-          const sensorComponents = newComponents.filter((candidate) => sensorMappings[candidate.definitionId]);
+          const sensorComponents = newComponents
+            .filter((candidate) => sensorMappings[candidate.definitionId])
+            .slice(0, 1);
           let autoConnectedSensorCount = 0;
+          const autoConnectedSensorPins: string[] = [];
 
           sensorComponents.forEach((sensor) => {
             const mapping = sensorMappings[sensor.definitionId];
@@ -505,22 +789,25 @@ export const useSimulatorStore = create<SimulatorStore>()(
             pushAutoConnection(sensor.instanceId, mapping.signalPin, expansionBoard.instanceId, expansionPin, 'data');
             if (pendingConnections.length > beforeCount) {
               autoConnectedSensorCount += 1;
+              autoConnectedSensorPins.push(expansionPin);
             }
           });
 
           if (autoConnectedSensorCount > 0) {
-            autoMessages.push(`已自动连接 ${autoConnectedSensorCount} 个传感器到智能终端空闲引脚`);
+            const connectedPin = autoConnectedSensorPins[autoConnectedSensorPins.length - 1];
+            autoMessages.push(`温湿度传感器已自动连接到 ${connectedPin.toUpperCase()}，与读取代码一致`);
           }
 
           const actuatorMappings: Record<string, { signalPin: string; expansionPins: string[] }> = {
-            buzzer: { signalPin: 'io', expansionPins: EXPANSION_ACTUATOR_SIGNAL_PINS },
-            'led-strip': { signalPin: 'din', expansionPins: ['p3', 'p4', 'p5', 'p13', 'p14', 'p2', 'p0'] },
-            servo: { signalPin: 'signal', expansionPins: ['p4', 'p5', 'p13', 'p14', 'p3', 'p2', 'p0'] },
-            relay: { signalPin: 'in', expansionPins: ['p5', 'p13', 'p14', 'p4', 'p3', 'p2', 'p0'] },
+            // 自动连线只处理课堂默认代码覆盖的首个蜂鸣器，并优先使用代码实际控制的引脚。
+            buzzer: { signalPin: 'io', expansionPins: [preferredActuatorPin] },
           };
 
-          const actuatorComponents = newComponents.filter((candidate) => actuatorMappings[candidate.definitionId]);
+          const actuatorComponents = newComponents
+            .filter((candidate) => actuatorMappings[candidate.definitionId])
+            .slice(0, 1);
           let autoConnectedActuatorCount = 0;
+          const autoConnectedActuatorPins: string[] = [];
 
           actuatorComponents.forEach((actuator) => {
             const mapping = actuatorMappings[actuator.definitionId];
@@ -542,11 +829,13 @@ export const useSimulatorStore = create<SimulatorStore>()(
             pushAutoConnection(actuator.instanceId, mapping.signalPin, expansionBoard.instanceId, expansionPin, 'data');
             if (pendingConnections.length > beforeCount) {
               autoConnectedActuatorCount += 1;
+              autoConnectedActuatorPins.push(expansionPin);
             }
           });
 
           if (autoConnectedActuatorCount > 0) {
-            autoMessages.push(`已自动连接 ${autoConnectedActuatorCount} 个执行器到智能终端空闲引脚`);
+            const connectedPin = autoConnectedActuatorPins[autoConnectedActuatorPins.length - 1];
+            autoMessages.push(`蜂鸣器已自动连接到 ${connectedPin.toUpperCase()}，与控制代码一致`);
           }
         }
 
@@ -912,6 +1201,17 @@ export const useSimulatorStore = create<SimulatorStore>()(
       addLog: (log) => set((state) => ({
         logs: [...state.logs, { ...log, timestamp: Date.now() }].slice(-100),
       })),
+      setLogs: (logs) => set({
+        logs: logs
+          .filter((log) => log && typeof log.message === 'string')
+          .map((log) => ({
+            timestamp: typeof log.timestamp === 'number' ? log.timestamp : Date.now(),
+            type: ['info', 'warning', 'error', 'data'].includes(log.type) ? log.type : 'info',
+            message: log.message,
+            source: typeof log.source === 'string' ? log.source : '系统',
+          }))
+          .slice(-100),
+      }),
       clearLogs: () => set({ logs: [] }),
       clearConnectionResult: () => set({ lastConnectionResult: null }),
       
@@ -927,22 +1227,48 @@ export const useSimulatorStore = create<SimulatorStore>()(
       setBrowserLastUpdate: (timestamp) => set({ browserLastUpdate: timestamp }),
       setBrowserAutoRefresh: (enabled) => set({ browserAutoRefresh: enabled }),
       toggleDetailsVisible: () => set((state) => ({ detailsVisible: !state.detailsVisible })),
+      setAutoConnectEnabled: (enabled) => set({ autoConnectEnabled: enabled }),
+      generateRandomFault: () => {
+        const result = createRandomClassroomFault(get());
+        if (!result.success) {
+          set({
+            lastConnectionResult: {
+              success: false,
+              message: result.message,
+              type: 'error',
+            },
+          });
+          return result;
+        }
+
+        set({
+          ...result.changes,
+          isRunning: false,
+          lastConnectionResult: {
+            success: false,
+            message: result.message,
+            type: 'error',
+          },
+        });
+        return { success: true, message: result.message };
+      },
       resetBrowserState: () => set({
-        browserUrl: initialState.browserUrl,
+        browserUrl: '',
         browserResponse: initialState.browserResponse,
         browserPageRecords: initialState.browserPageRecords,
         browserLastUpdate: initialState.browserLastUpdate,
         browserAutoRefresh: initialState.browserAutoRefresh,
       }),
       
-      resetSimulator: () => set({
+      resetSimulator: () => set((state) => ({
         ...initialState,
         microbitCode: defaultMicrobitCode,
         flaskCode: defaultFlaskCode,
         database: cloneClassroomDatabase(),
         routerConfig: createClassroomRouterConfig(),
         serverConfig: createClassroomServerConfig(),
-      }),
+        autoConnectEnabled: state.autoConnectEnabled,
+      })),
       
       loadScenario: (scenario) => set({
         placedComponents: scenario.components,
@@ -1010,6 +1336,8 @@ export const useSimulatorStore = create<SimulatorStore>()(
         database: state.database,
         routerConfig: state.routerConfig,
         serverConfig: state.serverConfig,
+        browserUrl: state.browserUrl,
+        autoConnectEnabled: state.autoConnectEnabled,
       }),
     }
   )

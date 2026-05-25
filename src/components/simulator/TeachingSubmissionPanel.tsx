@@ -79,6 +79,10 @@ export function TeachingSubmissionPanel({
         database: simulator.database,
         routerConfig: simulator.routerConfig,
         serverConfig: simulator.serverConfig,
+        browserUrl: simulator.browserUrl,
+        browserResponse: simulator.browserResponse,
+        browserPageRecords: simulator.browserPageRecords,
+        browserLastUpdate: simulator.browserLastUpdate,
       };
 
       const evidence = {
@@ -86,6 +90,13 @@ export function TeachingSubmissionPanel({
         logs: simulator.logs.slice(-30),
         database: simulator.database,
         sensorlogCount: simulator.database.records.sensorlog?.length ?? 0,
+        browser: {
+          url: simulator.browserUrl,
+          response: simulator.browserResponse,
+          recordCount: simulator.browserPageRecords?.length ?? 0,
+          records: simulator.browserPageRecords ?? [],
+          lastUpdate: simulator.browserLastUpdate,
+        },
         counters: {
           componentCount: simulator.placedComponents.length,
           connectionCount: simulator.connections.length,
@@ -158,7 +169,7 @@ export function TeachingSubmissionPanel({
             自动提交内容：画布组件、连线、智能终端（micro:bit）代码、Flask 代码、数据库记录、运行日志。教师后台可打开该同学提交的画布，并查看自动检测得分。
           </div>
           <div className="rounded-lg border bg-muted/40 p-3 text-sm leading-6 text-muted-foreground">
-            已同步课堂活动连线题：{hardwareMatchingCount} 条连线。未完成或连错的连线会在教师后台显示为待订正。
+            已检测到本机课堂活动连线题记录：{hardwareMatchingCount} 条。活动页已单独提交的内容以活动后台为准，画布后台不再重复判错。
           </div>
         </div>
 

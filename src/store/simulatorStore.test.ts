@@ -237,7 +237,18 @@ describe('simulatorStore', () => {
       x: 250,
       y: 260,
     });
+    expect(state.browserUrl).toBe('');
     expect(state.detailsVisible).toBe(false);
+  });
+
+  it('keeps a manually entered browser URL until the browser state is reset', () => {
+    const store = useSimulatorStore.getState();
+
+    store.setBrowserUrl('http://192.168.1.100:5000/');
+    expect(useSimulatorStore.getState().browserUrl).toBe('http://192.168.1.100:5000/');
+
+    store.resetBrowserState();
+    expect(useSimulatorStore.getState().browserUrl).toBe('');
   });
 
   it('auto connects classroom sensor and actuator to the planned pins', () => {

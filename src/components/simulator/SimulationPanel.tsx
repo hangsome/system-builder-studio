@@ -387,7 +387,7 @@ export function SimulationPanel() {
 function getSensorConfig(type: string) {
   switch (type) {
     case 'temp-humidity-sensor':
-      return { min: -10, max: 50, step: 0.1, unit: '°C', defaultValue: 25, decimals: 1 };
+      return { min: -10, max: 50, step: 0.1, unit: '°C', defaultValue: 6, decimals: 1 };
     case 'light-sensor':
       return { min: 0, max: 1000, step: 10, unit: 'lux', defaultValue: 500, decimals: 0 };
     case 'sound-sensor':

@@ -17,7 +17,14 @@ function getTokenExpireAt(token: string) {
     if (!payloadSegment) return Date.now() + TOKEN_TTL_MS;
     const payload = JSON.parse(decodeBase64Url(payloadSegment)) as { exp?: number };
     if (typeof payload.exp === 'number') {
-      return payload.exp * 1000;
+      const expiresAt = payload.exp * 1000;
+      const now = Date.now();
+      if (expiresAt > now) return expiresAt;
+
+      // Some classroom machines have incorrect system clocks. A freshly issued
+      // server token can look expired on those clients, so keep the client-side
+      // gate open and let the API remain the source of truth for real expiry.
+      return now + TOKEN_TTL_MS;
     }
     return Date.now() + TOKEN_TTL_MS;
   } catch {

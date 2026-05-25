@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { UserRole } from '@/types/edu';
@@ -6,6 +6,26 @@ import { UserRole } from '@/types/edu';
 interface RequireAuthProps {
   allowedRoles?: UserRole[];
   children: ReactNode;
+}
+
+function RoleMismatchLoginRedirect({ from }: { from: string }) {
+  const clearSession = useAuthStore((state) => state.clearSession);
+  const [cleared, setCleared] = useState(false);
+
+  useEffect(() => {
+    clearSession();
+    setCleared(true);
+  }, [clearSession]);
+
+  if (!cleared) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-muted-foreground">
+        正在切换登录身份...
+      </div>
+    );
+  }
+
+  return <Navigate to="/login" replace state={{ from }} />;
 }
 
 export function RequireAuth({ allowedRoles, children }: RequireAuthProps) {
@@ -29,7 +49,7 @@ export function RequireAuth({ allowedRoles, children }: RequireAuthProps) {
   }
 
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/403" replace />;
+    return <RoleMismatchLoginRedirect from={location.pathname} />;
   }
 
   return <>{children}</>;

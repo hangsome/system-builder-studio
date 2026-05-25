@@ -300,7 +300,12 @@ export function validateSystem(
       });
       
       if (!hasPowerConnection) {
-        issues.push(`${def.name} 未连接电源(VCC/3V)`);
+        const message = `${def.name} 未连接电源(VCC/3V)`;
+        if (def.category === 'actuator') {
+          warnings.push(message);
+        } else {
+          issues.push(message);
+        }
       } else {
         powerStatus.set(component.instanceId, true);
       }
@@ -331,7 +336,12 @@ export function validateSystem(
       });
       
       if (!hasGroundConnection) {
-        issues.push(`${def.name} 未连接接地(GND)`);
+        const message = `${def.name} 未连接接地(GND)`;
+        if (def.category === 'actuator') {
+          warnings.push(message);
+        } else {
+          issues.push(message);
+        }
       }
     }
   });

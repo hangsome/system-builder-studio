@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateConnection } from "@/lib/connectionValidator";
+import { validateConnection, validateSystem } from "@/lib/connectionValidator";
 import type { Connection, PlacedComponent } from "@/types/simulator";
 
 const microbit: PlacedComponent = {
@@ -17,6 +17,12 @@ const expansionBoard: PlacedComponent = {
 const iotModule: PlacedComponent = {
   instanceId: "iot-1",
   definitionId: "iot-module",
+  position: { x: 0, y: 0 },
+};
+
+const buzzer: PlacedComponent = {
+  instanceId: "buzzer-1",
+  definitionId: "buzzer",
   position: { x: 0, y: 0 },
 };
 
@@ -87,5 +93,29 @@ describe("validateConnection", () => {
 
     expect(result.valid).toBe(false);
     expect(result.errors[0]).toContain("已被占用");
+  });
+});
+
+describe("validateSystem", () => {
+  it("does not block running when an actuator power lead is incomplete", () => {
+    const validation = validateSystem(
+      [microbit, expansionBoard, buzzer],
+      [
+        {
+          id: "conn-buzzer-io",
+          fromComponent: buzzer.instanceId,
+          fromPin: "io",
+          toComponent: expansionBoard.instanceId,
+          toPin: "p2",
+          type: "data",
+          valid: true,
+        },
+      ],
+    );
+
+    expect(validation.issues).not.toContain("蜂鸣器 未连接电源(VCC/3V)");
+    expect(validation.issues).not.toContain("蜂鸣器 未连接接地(GND)");
+    expect(validation.warnings).toContain("蜂鸣器 未连接电源(VCC/3V)");
+    expect(validation.warnings).toContain("蜂鸣器 未连接接地(GND)");
   });
 });

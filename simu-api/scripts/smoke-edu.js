@@ -26,8 +26,8 @@ async function api(path, options = {}) {
 async function main() {
   const adminUsername = process.env.SEED_ADMIN_USERNAME || 'admin';
   const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Admin@123';
-  const teacherUsername = process.env.SEED_TEACHER_USERNAME || 'teacher01';
-  const teacherPassword = process.env.SEED_TEACHER_PASSWORD || 'Teacher@123';
+  const teacherUsername = process.env.SEED_TEACHER_USERNAME || 'teacher';
+  const teacherPassword = process.env.SEED_TEACHER_PASSWORD || 'teacher@123';
 
   const adminLogin = await api('/api/auth/login', {
     method: 'POST',
@@ -40,7 +40,7 @@ async function main() {
     body: JSON.stringify({
       username: `teacher_${Date.now().toString(36)}`,
       displayName: 'Smoke Teacher',
-      password: 'Teacher@123',
+      password: 'teacher@123',
     }),
   });
 

@@ -99,6 +99,38 @@ export function getSubmissionDetailApi(token: string, submissionId: number) {
   });
 }
 
+export interface AiModelConfig {
+  apiUrl: string;
+  apiKey: string;
+  model: string;
+}
+
+export function testAiModelApi(token: string, payload: AiModelConfig) {
+  return httpJson<{
+    success: boolean;
+    model: string;
+    content: string;
+    usage?: Record<string, unknown> | null;
+  }>('/edu/ai/test-model', {
+    method: 'POST',
+    token,
+    body: payload,
+  });
+}
+
+export function analyzeSubmissionWithAiApi(token: string, submissionId: number, payload: AiModelConfig) {
+  return httpJson<{
+    success: boolean;
+    model: string;
+    analysis: string;
+    usage?: Record<string, unknown> | null;
+  }>(`/edu/submissions/${submissionId}/ai-analysis`, {
+    method: 'POST',
+    token,
+    body: payload,
+  });
+}
+
 export function submitAssignmentApi(
   token: string,
   assignmentId: number,

@@ -185,7 +185,11 @@ const playConnectionSound = (success: boolean) => {
   }
 };
 
-export function SimulatorCanvas() {
+interface SimulatorCanvasProps {
+  classroomMode?: boolean;
+}
+
+export function SimulatorCanvas({ classroomMode = false }: SimulatorCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedComponent, setDraggedComponent] = useState<string | null>(null);
@@ -207,6 +211,7 @@ export function SimulatorCanvas() {
     isDrawingConnection,
     connectionStart,
     tempConnectionEnd,
+    isRunning,
     lastConnectionResult,
     detailsVisible,
     addComponent,
@@ -233,6 +238,7 @@ export function SimulatorCanvas() {
       isDrawingConnection: state.isDrawingConnection,
       connectionStart: state.connectionStart,
       tempConnectionEnd: state.tempConnectionEnd,
+      isRunning: state.isRunning,
       lastConnectionResult: state.lastConnectionResult,
       detailsVisible: state.detailsVisible,
       addComponent: state.addComponent,
@@ -589,6 +595,65 @@ export function SimulatorCanvas() {
   // 判断是否为无线连接
   const isWirelessConnection = (type: string) => type === 'wireless';
 
+  const getFlowNodeKind = useCallback(
+    (componentId: string) => {
+      const component = connectionPlacedById.get(componentId);
+      const definition = component ? definitionById.get(component.definitionId) : null;
+      if (!component || !definition) return 'unknown';
+      if (definition.category === 'sensor') return 'sensor';
+      if (definition.category === 'actuator') return 'actuator';
+      if (component.definitionId === 'microbit' || component.definitionId === 'expansion-board') {
+        return 'smart-terminal';
+      }
+      return component.definitionId;
+    },
+    [connectionPlacedById, definitionById]
+  );
+
+  const getFlowDirection = useCallback(
+    (connection: Connection): 'forward' | 'reverse' | 'bidirectional' | 'none' => {
+      if (connection.type === 'power' || connection.type === 'ground') return 'none';
+
+      const fromKind = getFlowNodeKind(connection.fromComponent);
+      const toKind = getFlowNodeKind(connection.toComponent);
+      const pairKey = [fromKind, toKind].sort().join('|');
+      const bidirectionalPairs = new Set([
+        'iot-module|router',
+        'obloq|router',
+        'router|web-server',
+        'database|web-server',
+        'browser|router',
+        'mobile-client|router',
+        'pc-computer|smart-terminal',
+        'iot-module|smart-terminal',
+        'obloq|smart-terminal',
+      ]);
+
+      if (bidirectionalPairs.has(pairKey) || connection.type === 'wireless') {
+        return 'bidirectional';
+      }
+
+      const forwardPairs = new Set([
+        'sensor>smart-terminal',
+        'smart-terminal>actuator',
+        'smart-terminal>iot-module',
+        'smart-terminal>obloq',
+        'iot-module>router',
+        'obloq>router',
+        'router>web-server',
+        'web-server>database',
+        'browser>router',
+        'mobile-client>router',
+      ]);
+
+      if (forwardPairs.has(`${fromKind}>${toKind}`)) return 'forward';
+      if (forwardPairs.has(`${toKind}>${fromKind}`)) return 'reverse';
+
+      return 'forward';
+    },
+    [getFlowNodeKind]
+  );
+
   return (
     <div
       ref={canvasRef}
@@ -630,15 +695,17 @@ export function SimulatorCanvas() {
           <LayoutGrid className="h-4 w-4" />
           一键优化布局
         </button>
-        <button
-          type="button"
-          onClick={toggleDetailsVisible}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-xs font-medium text-foreground shadow-sm transition hover:bg-muted"
-          title={detailsVisible ? '隐藏智能终端内部结构、VCC/GND 引脚、电源线和手动运行细节' : '显示智能终端内部结构、VCC/GND 引脚、电源线和手动运行细节'}
-        >
-          {detailsVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          {detailsVisible ? '隐藏细节' : '显示细节'}
-        </button>
+        {!classroomMode ? (
+          <button
+            type="button"
+            onClick={toggleDetailsVisible}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-xs font-medium text-foreground shadow-sm transition hover:bg-muted"
+            title={detailsVisible ? '隐藏智能终端内部结构、VCC/GND 引脚、电源线和手动运行细节' : '显示智能终端内部结构、VCC/GND 引脚、电源线和手动运行细节'}
+          >
+            {detailsVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            {detailsVisible ? '隐藏细节' : '显示细节'}
+          </button>
+        ) : null}
       </div>
 
       {/* SVG 连线层 - z-20 确保在组件之上，使用 viewBox 支持负坐标 */}
@@ -751,38 +818,59 @@ export function SimulatorCanvas() {
                 </>
               )}
               {/* 连线不再显示类型标签：引脚端点已经标注 VCC/GND/DATA，隐藏连线文字可降低课堂投屏噪声 */}
-              {/* 数据流动画 - 双层动画效果，无线连接用波浪扩散效果 */}
-              {isWireless ? (
-                <>
-                  {/* 无线信号波动画 */}
-                  <circle r={6} fill={color} opacity={0.8}>
-                    <animateMotion
-                      dur={`${animDuration * 0.8}s`}
-                      repeatCount="indefinite"
-                      path={`M${points.from.x},${points.from.y} L${points.to.x},${points.to.y}`}
-                    />
-                    <animate attributeName="r" values="4;8;4" dur="0.5s" repeatCount="indefinite" />
-                    <animate attributeName="opacity" values="0.9;0.4;0.9" dur="0.5s" repeatCount="indefinite" />
-                  </circle>
-                </>
-              ) : (
-                <>
-                  <circle r={7} fill="#ffffff" opacity={0.9}>
-                    <animateMotion
-                      dur={`${animDuration}s`}
-                      repeatCount="indefinite"
-                      path={`M${points.from.x},${points.from.y} L${points.to.x},${points.to.y}`}
-                    />
-                  </circle>
-                  <circle r={4} fill={color}>
-                    <animateMotion
-                      dur={`${animDuration}s`}
-                      repeatCount="indefinite"
-                      path={`M${points.from.x},${points.from.y} L${points.to.x},${points.to.y}`}
-                    />
-                  </circle>
-                </>
-              )}
+              {/* 数据流动画：仅运行时展示，并按真实链路方向流动 */}
+              {(() => {
+                const direction = isRunning && connection.valid ? getFlowDirection(connection) : 'none';
+                if (direction === 'none') return null;
+
+                const flowSegments = direction === 'bidirectional'
+                  ? [
+                      { from: points.from, to: points.to },
+                      { from: points.to, to: points.from },
+                    ]
+                  : [
+                      direction === 'reverse'
+                        ? { from: points.to, to: points.from }
+                        : { from: points.from, to: points.to },
+                    ];
+
+                return flowSegments.map((segment, index) => {
+                  const path = `M${segment.from.x},${segment.from.y} L${segment.to.x},${segment.to.y}`;
+                  const begin = `${index * 0.42}s`;
+
+                  return isWireless ? (
+                    <circle key={`${connection.id}-flow-${index}`} r={6} fill={color} opacity={0.8}>
+                      <animateMotion
+                        dur={`${animDuration * 0.8}s`}
+                        begin={begin}
+                        repeatCount="indefinite"
+                        path={path}
+                      />
+                      <animate attributeName="r" values="4;8;4" dur="0.5s" begin={begin} repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.9;0.4;0.9" dur="0.5s" begin={begin} repeatCount="indefinite" />
+                    </circle>
+                  ) : (
+                    <g key={`${connection.id}-flow-${index}`}>
+                      <circle r={7} fill="#ffffff" opacity={0.9}>
+                        <animateMotion
+                          dur={`${animDuration}s`}
+                          begin={begin}
+                          repeatCount="indefinite"
+                          path={path}
+                        />
+                      </circle>
+                      <circle r={4} fill={color}>
+                        <animateMotion
+                          dur={`${animDuration}s`}
+                          begin={begin}
+                          repeatCount="indefinite"
+                          path={path}
+                        />
+                      </circle>
+                    </g>
+                  );
+                });
+              })()}
             </g>
           );
         })}

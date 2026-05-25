@@ -30,6 +30,7 @@ export const BrowserSimulator: React.FC = () => {
     setBrowserPageRecords,
     setBrowserLastUpdate,
     setBrowserAutoRefresh,
+    updateDatabase,
   } = useSimulatorStore(
     useShallow((state) => ({
       serverConfig: state.serverConfig,
@@ -49,6 +50,7 @@ export const BrowserSimulator: React.FC = () => {
       setBrowserPageRecords: state.setBrowserPageRecords,
       setBrowserLastUpdate: state.setBrowserLastUpdate,
       setBrowserAutoRefresh: state.setBrowserAutoRefresh,
+      updateDatabase: state.updateDatabase,
     }))
   );
 
@@ -65,7 +67,6 @@ export const BrowserSimulator: React.FC = () => {
   const actuatorMismatchMessage = primaryActuator
     ? getActuatorPinMismatchMessage(primaryActuator, placedComponents, connections, microbitCode)
     : null;
-
   const markUpdated = useCallback(() => {
     setBrowserLastUpdate(Date.now());
   }, [setBrowserLastUpdate]);
@@ -91,9 +92,10 @@ export const BrowserSimulator: React.FC = () => {
 
       const urlObj = new URL(requestUrl);
       const path = urlObj.pathname + urlObj.search;
+      const pathWithoutSearch = urlObj.pathname;
       const expectedHost = `${serverConfig.ip}:${serverConfig.port}`;
 
-      if (urlObj.host !== expectedHost || path !== '/') {
+      if (urlObj.host !== expectedHost || !['/', '/upload'].includes(pathWithoutSearch)) {
         setBrowserPageRecords(null);
         setBrowserResponse('访问地址不正确。请根据 Flask 服务代码和服务器配置重新填写。');
         markUpdated();
@@ -117,9 +119,9 @@ export const BrowserSimulator: React.FC = () => {
         return;
       }
 
-      if (databaseFault && path === '/') {
+      if (databaseFault) {
         setBrowserPageRecords(null);
-        setBrowserResponse(getComponentFaultMessage(databaseFault, '错误：SQLite 数据库故障，无法读取 sensorlog 表'));
+        setBrowserResponse(getComponentFaultMessage(databaseFault, '错误：SQLite 数据库故障，无法读写 sensorlog 表'));
         markUpdated();
         return;
       }
@@ -131,6 +133,35 @@ export const BrowserSimulator: React.FC = () => {
       );
 
       if (result.response.status === 200) {
+        if (pathWithoutSearch === '/upload') {
+          const body = result.response.body as {
+            id?: number;
+            command?: string;
+            message?: string;
+          };
+
+          if (result.updatedDatabase) {
+            updateDatabase(result.updatedDatabase);
+            addLog({
+              type: 'data',
+              message: `sensorlog 表新增1条记录，ID: ${body.id ?? '-'}`,
+              source: 'SQLite',
+            });
+          }
+
+          setBrowserPageRecords(null);
+          setBrowserResponse(
+            `GET /upload 成功：${body.message || '数据已保存'}，服务器返回 ${body.command || 'OK'}。`
+          );
+          addLog({
+            type: 'info',
+            message: `响应: 200 OK - GET ${path} 已写入 sensorlog`,
+            source: '浏览器',
+          });
+          markUpdated();
+          return;
+        }
+
         const body = result.response.body as {
           template?: string;
           render?: string;
@@ -174,10 +205,18 @@ export const BrowserSimulator: React.FC = () => {
     setBrowserPageRecords,
     setBrowserResponse,
     microbitCode,
+    updateDatabase,
   ]);
 
   useEffect(() => {
     if (!browserAutoRefresh || !isRunning || !browserUrl.trim()) {
+      return undefined;
+    }
+    try {
+      if (new URL(browserUrl.trim()).pathname !== '/') {
+        return undefined;
+      }
+    } catch {
       return undefined;
     }
 
@@ -259,7 +298,16 @@ export const BrowserSimulator: React.FC = () => {
         </Button>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3">
+      {browserResponse && (
+        <div className="flex shrink-0 items-start gap-2 border-b bg-primary/5 px-3 py-2 text-xs" aria-live="polite">
+          <Badge variant="secondary" className="mt-0.5 shrink-0 text-[11px]">
+            页面响应
+          </Badge>
+          <p className="min-w-0 flex-1 leading-5 text-muted-foreground">{browserResponse}</p>
+        </div>
+      )}
+
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3">
         <div className="flex shrink-0 items-center justify-between gap-3">
           <div>
             <h1 className="text-base font-bold leading-tight">存储间温度监测</h1>
@@ -279,7 +327,7 @@ export const BrowserSimulator: React.FC = () => {
                 ? actuatorFault
                   ? getComponentFaultMessage(actuatorFault, '执行器故障，无法响应服务器指令')
                   : actuatorMismatchMessage
-                : `当前温度 ${latestTemperature?.toFixed(1)}°C 超过阈值 ${temperatureThreshold}°C，蜂鸣器已触发报警。`}
+                : `当前温度 ${latestTemperature?.toFixed(1)}°C 超过冷藏阈值 ${temperatureThreshold}°C，蜂鸣器已触发报警。`}
             </AlertDescription>
           </Alert>
         )}
@@ -337,12 +385,6 @@ export const BrowserSimulator: React.FC = () => {
           </div>
         </div>
 
-        {browserResponse && (
-          <div className="shrink-0 rounded-md border bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">页面响应：</span>
-            {browserResponse}
-          </div>
-        )}
       </div>
     </div>
   );

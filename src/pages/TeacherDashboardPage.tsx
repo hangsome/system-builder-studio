@@ -154,7 +154,12 @@ function getSubmissionTime(submission: SubmissionInfo) {
 }
 
 function getStudentKey(submission: SubmissionInfo) {
-  return String(submission.student_id ?? submission.submitted_student_name ?? submission.username ?? submission.id);
+  const submittedName = submission.submitted_student_name?.trim();
+  if (submittedName && submission.username === 'openclass') {
+    return `submitted:${submittedName}`;
+  }
+
+  return `student:${submission.student_id ?? submission.username ?? submittedName ?? submission.id}`;
 }
 
 function getStudentName(submission: SubmissionInfo) {
@@ -485,7 +490,7 @@ export default function TeacherDashboardPage() {
   const submittedStudentCount = useMemo(() => {
     const keys = new Set<string>();
     submissions.forEach((submission) => {
-      keys.add(String(submission.student_id ?? submission.username ?? submission.id));
+      keys.add(getStudentKey(submission));
     });
     return keys.size;
   }, [submissions]);
@@ -537,7 +542,8 @@ export default function TeacherDashboardPage() {
       ? selectedClass.student_count ?? students.length
       : students.length
     : 0;
-  const submissionCoverage = students.length > 0 ? Math.round((submittedStudentCount / students.length) * 100) : 0;
+  const expectedStudentCount = Math.max(students.length, submittedStudentCount);
+  const submissionCoverage = expectedStudentCount > 0 ? Math.round((submittedStudentCount / expectedStudentCount) * 100) : 0;
   const overriddenCount = submissions.filter(
     (submission) => Number(submission.final_total) !== Number(submission.auto_total)
   ).length;
@@ -1239,7 +1245,7 @@ export default function TeacherDashboardPage() {
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>提交覆盖</span>
                       <span>
-                        {submittedStudentCount}/{students.length}
+                        {submittedStudentCount}/{expectedStudentCount}
                       </span>
                     </div>
                     <Progress value={submissionCoverage} className="h-2" />

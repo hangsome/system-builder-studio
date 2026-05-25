@@ -36,7 +36,7 @@ export const sensorConfigs: Record<string, {
   fluctuation: number; // 自动波动范围
 }> = {
   'temp-humidity-sensor': { 
-    min: -10, max: 50, unit: '°C', defaultValue: 25, decimals: 1, fluctuation: 2 
+    min: -10, max: 50, unit: '°C', defaultValue: 6, decimals: 1, fluctuation: 2
   },
   'light-sensor': { 
     min: 0, max: 1000, unit: 'lux', defaultValue: 500, decimals: 0, fluctuation: 50 

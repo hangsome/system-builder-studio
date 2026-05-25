@@ -35,8 +35,8 @@ function main() {
   });
 
   const teacher = upsertUser({
-    username: process.env.SEED_TEACHER_USERNAME || 'teacher01',
-    password: process.env.SEED_TEACHER_PASSWORD || 'Teacher@123',
+    username: process.env.SEED_TEACHER_USERNAME || 'teacher',
+    password: process.env.SEED_TEACHER_PASSWORD || 'teacher@123',
     role: 'teacher',
     displayName: process.env.SEED_TEACHER_DISPLAY_NAME || 'Demo Teacher',
   });

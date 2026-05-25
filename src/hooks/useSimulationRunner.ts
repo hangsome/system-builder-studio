@@ -142,13 +142,13 @@
 
      const networkConnected = checkNetworkStatus();
 
-     // 传感器值更新循环：演示扫描优先（让温度从 ~24 平滑升到 ~33 再回落，跨过 30°C 阈值）
+     // 传感器值更新循环：演示扫描优先（让冷藏温度从 ~5 平滑升到 ~11 再回落，跨过 8°C 阈值）
      if (demoSweepActive) {
        simulationRef.current = setInterval(() => {
          const currentPowerStatus = getPowerStatus();
          const t = Date.now() / 1000;
-         // 24 秒一个完整正弦周期，温度区间 24.5 - 32.5
-         const sweepValue = 28.5 + 4 * Math.sin((2 * Math.PI * t) / 24);
+         // 24 秒一个完整正弦周期，温度区间 4.5 - 10.5
+         const sweepValue = 7.5 + 3 * Math.sin((2 * Math.PI * t) / 24);
          sensorComponents.forEach(sensor => {
            if (sensor.definitionId !== 'temp-humidity-sensor') return;
            const isPowered = currentPowerStatus.get(sensor.instanceId);

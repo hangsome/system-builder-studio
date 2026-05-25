@@ -17,7 +17,7 @@ const classroomCoreComponents: Scenario['components'] = [
 ];
 
 const classroomHardwareChallengeComponents: Scenario['components'] = [
-  { instanceId: 'temp-sensor-1', definitionId: 'temp-humidity-sensor', position: { x: 95, y: 500 }, state: { powered: true, active: false, value: 25 } },
+  { instanceId: 'temp-sensor-1', definitionId: 'temp-humidity-sensor', position: { x: 95, y: 500 }, state: { powered: true, active: false, value: 6 } },
   { instanceId: 'buzzer-1', definitionId: 'buzzer', position: { x: 360, y: 510 }, state: { powered: true, active: false } },
 ];
 

@@ -35,9 +35,10 @@ describe('authStore', () => {
     vi.useRealTimers();
   });
 
-  it('invalidates expired session without side effects', () => {
+  it('keeps expired-looking session valid for client clock skew without side effects', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-02T10:00:00.000Z'));
+    const now = Date.now();
     const exp = Math.floor(Date.now() / 1000) - 1;
 
     useAuthStore.getState().setSession(makeJwt(exp), {
@@ -47,7 +48,8 @@ describe('authStore', () => {
       displayName: 'Student A',
     });
 
-    expect(useAuthStore.getState().isSessionValid()).toBe(false);
+    expect(useAuthStore.getState().isSessionValid()).toBe(true);
+    expect(useAuthStore.getState().tokenExpireAt).toBeGreaterThan(now);
     expect(useAuthStore.getState().token).toBeTruthy();
     vi.useRealTimers();
   });

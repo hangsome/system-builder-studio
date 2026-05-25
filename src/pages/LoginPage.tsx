@@ -13,6 +13,13 @@ function roleHome(role: string) {
   return '/student';
 }
 
+function canUseReturnPath(path: string, role: string) {
+  if (path.startsWith('/admin')) return role === 'admin';
+  if (path.startsWith('/teacher')) return role === 'teacher';
+  if (path.startsWith('/student')) return role === 'student';
+  return true;
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -45,7 +52,10 @@ export default function LoginPage() {
       const loggedUser = await login(username.trim(), password);
       toast.success(`欢迎回来，${loggedUser.displayName}`);
       const from = (location.state as { from?: string } | null)?.from;
-      navigate(from || roleHome(loggedUser.role), { replace: true });
+      const nextPath = from && canUseReturnPath(from, loggedUser.role)
+        ? from
+        : roleHome(loggedUser.role);
+      navigate(nextPath, { replace: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : '登录失败';
       toast.error(message);

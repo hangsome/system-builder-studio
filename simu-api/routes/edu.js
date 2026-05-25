@@ -56,6 +56,168 @@ function parseJsonField(jsonText, fallback = null) {
   }
 }
 
+function normalizeAiApiUrl(apiUrl) {
+  const trimmed = String(apiUrl || '').trim().replace(/\/+$/, '');
+  if (!trimmed) {
+    throw new Error('apiUrl is required');
+  }
+  if (trimmed.endsWith('/chat/completions')) {
+    return trimmed;
+  }
+  return `${trimmed}/chat/completions`;
+}
+
+function extractAiContent(payload) {
+  const choice = Array.isArray(payload?.choices) ? payload.choices[0] : null;
+  const messageContent = choice?.message?.content;
+  if (typeof messageContent === 'string') return messageContent;
+  if (Array.isArray(messageContent)) {
+    return messageContent
+      .map((part) => typeof part?.text === 'string' ? part.text : '')
+      .filter(Boolean)
+      .join('\n');
+  }
+  if (typeof choice?.text === 'string') return choice.text;
+  if (typeof payload?.output_text === 'string') return payload.output_text;
+  return '';
+}
+
+async function callAiChatCompletion({ apiUrl, apiKey, model, messages }) {
+  const endpoint = normalizeAiApiUrl(apiUrl);
+  const selectedModel = String(model || '').trim();
+  if (!selectedModel) {
+    throw new Error('model is required');
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    const key = String(apiKey || '').trim();
+    if (key) {
+      headers.Authorization = `Bearer ${key}`;
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: selectedModel,
+        messages,
+        temperature: 0.2,
+      }),
+      signal: controller.signal,
+    });
+
+    const rawText = await response.text();
+    let payload = null;
+    try {
+      payload = rawText ? JSON.parse(rawText) : null;
+    } catch {
+      payload = null;
+    }
+
+    if (!response.ok) {
+      const providerMessage =
+        payload?.error?.message ||
+        payload?.message ||
+        rawText ||
+        `HTTP ${response.status}`;
+      throw new Error(providerMessage);
+    }
+
+    const content = extractAiContent(payload);
+    if (!content.trim()) {
+      throw new Error('模型返回为空');
+    }
+
+    return {
+      content,
+      usage: payload?.usage || null,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function truncateText(value, maxLength = 1800) {
+  const text = String(value || '');
+  return text.length > maxLength ? `${text.slice(0, maxLength)}\n...` : text;
+}
+
+function summarizeSubmissionForAi(submission) {
+  const snapshot = parseJsonField(submission.snapshot_json, {});
+  const evidence = parseJsonField(submission.evidence_json, {});
+  const labReport = parseJsonField(submission.lab_report_json, {});
+  const autoScore = parseJsonField(submission.auto_score_json, null);
+
+  const components = Array.isArray(snapshot.placedComponents)
+    ? snapshot.placedComponents.map((component) => ({
+        id: component.instanceId,
+        type: component.definitionId || component.type,
+      }))
+    : [];
+  const componentNameById = new Map(components.map((component) => [component.id, component.type]));
+  const connections = Array.isArray(snapshot.connections)
+    ? snapshot.connections.map((connection) => ({
+        from: `${componentNameById.get(connection.fromComponent) || connection.fromComponent}.${connection.fromPin}`,
+        to: `${componentNameById.get(connection.toComponent) || connection.toComponent}.${connection.toPin}`,
+        type: connection.type,
+        valid: connection.valid,
+      }))
+    : [];
+  const logs = Array.isArray(evidence.logs)
+    ? evidence.logs.slice(-30).map((log) => `[${log.source || '系统'}] ${log.message || ''}`)
+    : [];
+
+  return {
+    student: labReport.studentName || submission.display_name || submission.username || '',
+    attemptNo: submission.attempt_no,
+    score: {
+      autoTotal: submission.auto_total,
+      finalTotal: submission.final_total,
+      detail: autoScore,
+    },
+    components,
+    connections,
+    microbitCode: truncateText(snapshot.microbitCode, 1800),
+    flaskCode: truncateText(snapshot.flaskCode, 1800),
+    databaseRecordCount: Array.isArray(snapshot.database?.records?.sensorlog)
+      ? snapshot.database.records.sensorlog.length
+      : 0,
+    logs,
+    browser: {
+      url: snapshot.browserUrl || evidence.browser?.url || '',
+      response: snapshot.browserResponse || evidence.browser?.response || '',
+    },
+  };
+}
+
+async function getSubmissionForTeacher(req, submissionId) {
+  const db = getDatabase();
+  const submission = db.prepare(`
+    SELECT s.*, u.username, u.display_name, a.class_id, a.title AS assignment_title
+    FROM submissions s
+    JOIN users u ON u.id = s.student_id
+    JOIN assignments a ON a.id = s.assignment_id
+    WHERE s.id = ?
+  `).get(submissionId);
+
+  if (!submission) {
+    return { status: 404, error: 'submission not found' };
+  }
+
+  const permission = assertClassWritable(db, Number(submission.class_id), req.user);
+  if (!permission.ok) {
+    return { status: permission.status, error: permission.error };
+  }
+
+  return { submission };
+}
+
 function isOpenClassEnabled() {
   const value = String(process.env.OPEN_CLASS_ENABLED || 'true').toLowerCase();
   return !['false', '0', 'no', 'off'].includes(value);
@@ -66,8 +228,8 @@ let openClassFixtureReady = false;
 function ensureOpenClassFixture(db) {
   if (openClassFixtureReady) return;
 
-  const teacherUsername = String(process.env.OPEN_CLASS_TEACHER_USERNAME || process.env.SEED_TEACHER_USERNAME || 'teacher01').trim();
-  const teacherPassword = String(process.env.OPEN_CLASS_TEACHER_PASSWORD || process.env.SEED_TEACHER_PASSWORD || 'Teacher@123');
+  const teacherUsername = String(process.env.OPEN_CLASS_TEACHER_USERNAME || process.env.SEED_TEACHER_USERNAME || 'teacher').trim();
+  const teacherPassword = String(process.env.OPEN_CLASS_TEACHER_PASSWORD || process.env.SEED_TEACHER_PASSWORD || 'teacher@123');
   const teacherName = String(process.env.OPEN_CLASS_TEACHER_NAME || '公开课教师').trim();
   const studentUsername = String(process.env.OPEN_CLASS_USERNAME || 'openclass').trim();
   const studentPassword = String(process.env.OPEN_CLASS_PASSWORD || 'Open@12345');
@@ -209,6 +371,33 @@ router.get('/open-class', (req, res) => {
 });
 
 router.use(authMiddleware);
+
+router.post('/ai/test-model', requireRole('teacher', 'admin'), async (req, res) => {
+  const { apiUrl, apiKey, model } = req.body || {};
+
+  try {
+    const result = await callAiChatCompletion({
+      apiUrl,
+      apiKey,
+      model,
+      messages: [
+        { role: 'system', content: '你是一个接口可用性测试助手。' },
+        { role: 'user', content: '请只用一句中文回复：模型连接正常。' },
+      ],
+    });
+
+    return res.json({
+      success: true,
+      model: String(model || '').trim(),
+      content: result.content,
+      usage: result.usage,
+    });
+  } catch (error) {
+    return res.status(502).json({
+      error: error instanceof Error ? error.message : 'AI model test failed',
+    });
+  }
+});
 
 router.get('/scenarios', (req, res) => {
   return res.json({ scenarios: scenarioCatalog });
@@ -750,6 +939,55 @@ router.get('/submissions/:submissionId', requireRole('teacher', 'admin'), (req, 
       teacher_override: parseJsonField(submission.teacher_override_json, null),
     },
   });
+});
+
+router.post('/submissions/:submissionId/ai-analysis', requireRole('teacher', 'admin'), async (req, res) => {
+  const submissionId = Number(req.params.submissionId);
+  if (!submissionId) {
+    return res.status(400).json({ error: 'submissionId is invalid' });
+  }
+
+  const lookup = await getSubmissionForTeacher(req, submissionId);
+  if (!lookup.submission) {
+    return res.status(lookup.status).json({ error: lookup.error });
+  }
+
+  const { apiUrl, apiKey, model } = req.body || {};
+  const summary = summarizeSubmissionForAi(lookup.submission);
+
+  try {
+    const result = await callAiChatCompletion({
+      apiUrl,
+      apiKey,
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: [
+            '你是高中信息技术信息系统复习课的教师助教。',
+            '请根据学生画布提交做教学诊断，重点看系统组成、连线逻辑、代码与引脚对应、数据流和故障排查证据。',
+            '输出中文，结构为：总体判断、主要问题、可追问学生的问题、教师讲评建议。',
+            '不要编造画布中不存在的组件或日志。',
+          ].join('\n'),
+        },
+        {
+          role: 'user',
+          content: `请分析这份学生提交：\n${JSON.stringify(summary, null, 2)}`,
+        },
+      ],
+    });
+
+    return res.json({
+      success: true,
+      model: String(model || '').trim(),
+      analysis: result.content,
+      usage: result.usage,
+    });
+  } catch (error) {
+    return res.status(502).json({
+      error: error instanceof Error ? error.message : 'AI analysis failed',
+    });
+  }
 });
 
 router.patch('/submissions/:submissionId/score', requireRole('teacher', 'admin'), (req, res) => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { classroomDatabase, classroomServerConfig } from '@/data/classroomLesson';
-import { simulateFlaskRoute } from '@/lib/simulationEngine';
+import { classroomTemperatureScenario } from '@/data/scenarios';
+import { canRunSimulation, simulateFlaskRoute } from '@/lib/simulationEngine';
 
 function cloneDatabase() {
   return JSON.parse(JSON.stringify(classroomDatabase));
@@ -58,5 +59,35 @@ describe('simulateFlaskRoute classroom HTTP methods', () => {
       records: [],
     });
     expect(result.updatedDatabase).toBeUndefined();
+  });
+});
+
+describe('classroom canvas runtime readiness', () => {
+  it('keeps the starter canvas half-finished without pre-placed user-end devices', () => {
+    const definitionIds = classroomTemperatureScenario.components.map((component) => component.definitionId);
+    expect(definitionIds).toEqual(
+      expect.arrayContaining([
+        'microbit',
+        'expansion-board',
+        'iot-module',
+        'router',
+        'web-server',
+        'database',
+      ])
+    );
+    expect(definitionIds).not.toContain('pc-computer');
+    expect(definitionIds).not.toContain('browser');
+    expect(definitionIds).not.toContain('mobile-client');
+    expect(definitionIds).not.toContain('temp-humidity-sensor');
+    expect(definitionIds).not.toContain('buzzer');
+
+    const readiness = canRunSimulation(
+      classroomTemperatureScenario.components,
+      classroomTemperatureScenario.connections,
+      true,
+      true
+    );
+    expect(readiness.canRun).toBe(true);
+    expect(readiness.issues).toEqual([]);
   });
 });

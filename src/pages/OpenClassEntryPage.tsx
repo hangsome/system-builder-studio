@@ -4,14 +4,13 @@ import { ArrowRight, BookOpenCheck, Loader2, ShieldCheck, UserRoundCheck } from 
 import { Button } from '@/components/ui/button';
 import { enterOpenClassApi } from '@/api/eduApi';
 import { useAuthStore } from '@/store/authStore';
-import { loadScenario } from '@/data/scenarios';
 import { useSimulatorStore } from '@/store/simulatorStore';
 
 type EntryState = 'loading' | 'ready' | 'error';
 
 const OPENCLASS_CANVAS_INITIALIZED_KEY = 'openclass-classroom-canvas-initialized';
 const OPENCLASS_CANVAS_VERSION_KEY = 'openclass-classroom-canvas-version';
-const CURRENT_OPENCLASS_CANVAS_VERSION = '2026-05-16-smart-terminal-collapsed';
+const CURRENT_OPENCLASS_CANVAS_VERSION = '2026-05-22-blank-classroom-canvas';
 
 export default function OpenClassEntryPage() {
   const navigate = useNavigate();
@@ -23,12 +22,7 @@ export default function OpenClassEntryPage() {
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
 
   const prepareOpenClassWorkspace = () => {
-    const classroomScenario = loadScenario('classroom-temperature');
-    if (classroomScenario) {
-      useSimulatorStore.getState().loadScenario(classroomScenario);
-    } else {
-      useSimulatorStore.getState().resetSimulator();
-    }
+    useSimulatorStore.getState().resetSimulator();
 
     try {
       window.localStorage.setItem(OPENCLASS_CANVAS_INITIALIZED_KEY, CURRENT_OPENCLASS_CANVAS_VERSION);
@@ -80,14 +74,14 @@ export default function OpenClassEntryPage() {
                 不用输入账号，直接进入课堂画布
               </h1>
               <p className="max-w-2xl text-base leading-7 text-slate-300 md:text-lg">
-                系统会自动使用公开课学生身份进入本节课作业。提交画布时只填写自己的姓名，教师后台会查看画布内容并自动统计成绩。
+                系统会自动使用公开课学生身份进入本节课作业。课堂从空白画布开始，提交时只填写自己的姓名，教师后台会查看画布内容并自动统计成绩。
               </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
               {[
                 ['第一步', '自动进入', '无需手动登录，避免账号角色导致 403'],
-                ['第二步', '完成画布', '连线、引脚、URL 与故障排查都在画布中完成'],
+                ['第二步', '自行搭建', '从组件库拖入硬件，连线、引脚、URL 与故障排查都在画布中完成'],
                 ['第三步', '实名提交', '提交窗口只填写姓名，教师后台可见'],
               ].map(([step, title, helper]) => (
                 <div key={step} className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">

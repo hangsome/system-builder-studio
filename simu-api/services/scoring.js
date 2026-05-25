@@ -12,15 +12,15 @@ const HARDWARE_MATCHING_MODULES = [
 ];
 
 const HARDWARE_MATCHING_FUNCTIONS = {
-  'onsite-alert': '温度超过安全阈值时，在现场发出声音提醒',
+  'onsite-alert': '温度超过冷藏阈值时，在现场发出声音提醒',
   'history-records': '保存实时温度、报警状态和历史记录',
   'sense-temperature': '自动感知食堂储物间温度变化',
-  'threshold-judge': '判断当前温度是否超过安全阈值',
+  'threshold-judge': '判断当前温度是否超过冷藏阈值',
   'network-link': '提供无线网络，让设备能够互相通信',
   'duty-view': '值班人员访问服务器页面查看数据',
   'process-control': '运行程序，读取采集值并控制报警执行器',
   'upload-abnormal': '把温度或异常信息发送到服务器',
-  'http-service': '接收上传请求，并提供数据查看页面',
+  'http-service': '接收上传请求，并提供 Web 服务',
 };
 
 const HARDWARE_MATCHING_ANSWER_KEY = {
@@ -33,6 +33,9 @@ const HARDWARE_MATCHING_ANSWER_KEY = {
   database: ['history-records'],
   phone: ['duty-view'],
 };
+
+const EXPANSION_POWER_PINS = ['3v-out1', '3v-out2', '3v-out3', '3v-out4'];
+const EXPANSION_GROUND_PINS = ['gnd-out1', 'gnd-out2', 'gnd-out3', 'gnd-out4'];
 
 function normalizeConnection(connection, componentByInstance) {
   const fromDef = componentByInstance.get(connection.fromComponent)?.definitionId;
@@ -105,6 +108,35 @@ function hasConnectionBetweenDefinitions(snapshot, leftDefinitionId, leftPin, ri
   });
 }
 
+function hasComponentPinConnectedToExpansionPin(snapshot, component, componentPins, expansionPins) {
+  if (!component) return false;
+
+  const components = getComponents(snapshot);
+  const connections = getConnections(snapshot);
+  const componentPinSet = new Set(componentPins.map((pin) => pin.toLowerCase()));
+  const expansionPinSet = new Set(expansionPins.map((pin) => pin.toLowerCase()));
+
+  return connections.some((connection) => {
+    const componentOnFromSide =
+      connection.fromComponent === component.instanceId &&
+      componentPinSet.has(String(connection.fromPin || '').toLowerCase());
+    const componentOnToSide =
+      connection.toComponent === component.instanceId &&
+      componentPinSet.has(String(connection.toPin || '').toLowerCase());
+
+    if (!componentOnFromSide && !componentOnToSide) return false;
+
+    const otherComponentId = componentOnFromSide ? connection.toComponent : connection.fromComponent;
+    const otherPinId = componentOnFromSide ? connection.toPin : connection.fromPin;
+    const otherComponent = components.find((item) => item.instanceId === otherComponentId);
+
+    return (
+      (otherComponent?.definitionId || otherComponent?.type) === 'expansion-board' &&
+      expansionPinSet.has(String(otherPinId || '').toLowerCase())
+    );
+  });
+}
+
 function scoreClassroomCompleteness(snapshot, assignmentConfig) {
   const requiredComponents = assignmentConfig.requiredComponents || [];
   const providedDefinitionIds = new Set(
@@ -123,11 +155,11 @@ function scoreClassroomCompleteness(snapshot, assignmentConfig) {
     hasConnectionBetweenDefinitions(snapshot, 'microbit', 'usb', 'pc-computer', 'usb'),
     hasConnectionBetweenDefinitions(snapshot, 'microbit', '3v', 'expansion-board', 'slot-3v'),
     hasConnectionBetweenDefinitions(snapshot, 'microbit', 'gnd', 'expansion-board', 'slot-gnd'),
-    hasConnectionBetweenDefinitions(snapshot, 'temp-humidity-sensor', 'vcc', 'expansion-board', '3v-out1'),
-    hasConnectionBetweenDefinitions(snapshot, 'temp-humidity-sensor', 'gnd', 'expansion-board', 'gnd-out1'),
+    hasComponentPinConnectedToExpansionPin(snapshot, sensor, ['vcc'], EXPANSION_POWER_PINS),
+    hasComponentPinConnectedToExpansionPin(snapshot, sensor, ['gnd'], EXPANSION_GROUND_PINS),
     Boolean(sensorSignalPin),
-    hasConnectionBetweenDefinitions(snapshot, 'buzzer', 'vcc', 'expansion-board', '3v-out3'),
-    hasConnectionBetweenDefinitions(snapshot, 'buzzer', 'gnd', 'expansion-board', 'gnd-out3'),
+    hasComponentPinConnectedToExpansionPin(snapshot, actuator, ['vcc'], EXPANSION_POWER_PINS),
+    hasComponentPinConnectedToExpansionPin(snapshot, actuator, ['gnd'], EXPANSION_GROUND_PINS),
     Boolean(actuatorSignalPin),
     hasConnectionBetweenDefinitions(snapshot, 'iot-module', 'wifi', 'router', 'wifi'),
     hasConnectionBetweenDefinitions(snapshot, 'router', 'lan', 'web-server', 'network'),
@@ -232,6 +264,41 @@ function codeHasHomeRender(code) {
   return hasHomeRoute && /render_template\s*\(/i.test(text);
 }
 
+function extractTemperatureThreshold(code) {
+  const match = String(code || '').match(/\bTEMP_THRESHOLD\s*=\s*(\d+(?:\.\d+)?)/i);
+  return match ? Number(match[1]) : 8;
+}
+
+function codeCanTriggerActuator(snapshot) {
+  const microbitCode = String(snapshot?.microbitCode || '');
+  const actuator = findComponentByDefinition(snapshot, ['buzzer', 'led-strip', 'servo', 'relay']);
+  const actuatorPin = getSignalExpansionPin(snapshot, actuator, ['io', 'in', 'din', 'signal']);
+  const actuatorPinsInCode = extractWritePins(microbitCode);
+  const writesActuatorPin = Boolean(actuatorPin && actuatorPinsInCode.has(actuatorPin));
+  const hasThresholdBranch = /\bif\s+.+>\s*TEMP_THRESHOLD\s*:/i.test(microbitCode) ||
+    /\bif\s+.+>\s*\d+(?:\.\d+)?\s*:/i.test(microbitCode);
+
+  return writesActuatorPin && hasThresholdBranch;
+}
+
+function getBrowserEvidence(snapshot, evidence) {
+  const browser = evidence?.browser && typeof evidence.browser === 'object' ? evidence.browser : {};
+  const response = String(snapshot?.browserResponse || browser.response || '');
+  const records = Array.isArray(snapshot?.browserPageRecords)
+    ? snapshot.browserPageRecords
+    : Array.isArray(browser.records)
+      ? browser.records
+      : [];
+  const recordCount = records.length > 0 ? records.length : Number(browser.recordCount || 0);
+  const responseMentionsRecords = /查询到\s*[1-9]\d*\s*条记录/.test(response) ||
+    /展示\s*[1-9]\d*\s*条\s*sensorlog/i.test(response);
+
+  return {
+    ok: (/GET\s*\/\s*成功/i.test(response) || /render_template/i.test(response)) &&
+      (recordCount > 0 || responseMentionsRecords),
+  };
+}
+
 function scoreClassroomCode(snapshot) {
   const microbitCode = String(snapshot?.microbitCode || '');
   const flaskCode = String(snapshot?.flaskCode || '');
@@ -282,6 +349,14 @@ function scoreDataFlow(snapshot, evidence) {
 
   const dbSensorLog = snapshot?.database?.records?.sensorlog;
   const dbCount = Array.isArray(dbSensorLog) ? dbSensorLog.length : Number(evidence?.sensorlogCount || 0);
+  const threshold = extractTemperatureThreshold(snapshot?.microbitCode);
+  const overThresholdRecorded = Array.isArray(dbSensorLog)
+    ? dbSensorLog.some((row) =>
+        Number(row?.value || 0) > threshold ||
+        Number(row?.alarm || 0) === 1 ||
+        String(row?.command || '').includes('BUZZER_ON')
+      )
+    : false;
   const alarmRecorded = Array.isArray(dbSensorLog)
     ? dbSensorLog.some((row) => Number(row?.alarm || 0) === 1 || String(row?.command || '').includes('BUZZER_ON'))
     : false;
@@ -290,25 +365,28 @@ function scoreDataFlow(snapshot, evidence) {
   const sensorlogAdded = dbCount > 0 &&
     logs.some((log) => /sensorlog\s*表新增|数据库已更新/i.test(String(log?.message || log || '')));
   const actuatorResponded = logs.some((log) => /BUZZER_ON.*蜂鸣器已响应|蜂鸣器已响应|蜂鸣器报警/i.test(String(log?.message || log || '')));
+  const actuatorReady = codeCanTriggerActuator(snapshot);
+  const actuatorReadyWithoutOverThresholdRun = dbCount > 0 && !overThresholdRecorded && actuatorReady;
   const browserGetSucceeded = logs.some((log) => /GET\s+http:\/\/.+\/$/i.test(String(log?.message || log || ''))) &&
     logs.some((log) => /GET\s+\/.*render_template|render_template.*sensorlog/i.test(String(log?.message || log || '')));
+  const browserEvidenceSucceeded = getBrowserEvidence(snapshot, evidence).ok;
 
   const issueScore = issues.length === 0 ? 5 : Math.max(0, 5 - issues.length);
   const uploadScore = getUploadSucceeded ? 5 : 0;
   const dbScore = sensorlogAdded ? 5 : dbCount > 0 ? 3 : 0;
-  const alarmScore = alarmRecorded && actuatorResponded ? 5 : alarmRecorded ? 3 : 0;
-  const browserScore = browserGetSucceeded ? 5 : 0;
+  const alarmScore = alarmRecorded && (actuatorResponded || actuatorReady) ? 5 : actuatorReadyWithoutOverThresholdRun ? 5 : alarmRecorded ? 3 : 0;
+  const browserScore = browserGetSucceeded || browserEvidenceSucceeded ? 5 : 0;
   const checks = [
     { id: 'validation', ok: issues.length === 0, score: issueScore, label: '运行前没有阻断性校验问题' },
     { id: 'get-upload-run', ok: getUploadSucceeded, score: uploadScore, label: '运行日志出现 GET /upload 且返回 200' },
     { id: 'database-write', ok: sensorlogAdded || dbCount > 0, score: dbScore, label: 'sensorlog 有温度记录写入' },
-    { id: 'alarm-actuator', ok: alarmScore === 5, score: alarmScore, label: '超阈值后报警记录与执行器响应一致' },
-    { id: 'browser-view', ok: browserGetSucceeded, score: browserScore, label: '浏览器 GET / 能展示数据库记录' },
+    { id: 'alarm-actuator', ok: alarmScore === 5, score: alarmScore, label: '超阈值报警逻辑与执行器响应一致' },
+    { id: 'browser-view', ok: browserGetSucceeded || browserEvidenceSucceeded, score: browserScore, label: '浏览器 GET / 能展示数据库记录' },
   ];
 
   return {
     score: issueScore + uploadScore + dbScore + alarmScore + browserScore,
-    reason: `issues=${issues.length}, getUpload=${getUploadSucceeded ? 'yes' : 'no'}, sensorlogAdded=${sensorlogAdded ? 'yes' : 'no'}(${dbCount}), alarmAndActuator=${alarmScore === 5 ? 'yes' : alarmScore > 0 ? 'partial' : 'no'}, browserGet=${browserGetSucceeded ? 'yes' : 'no'}`,
+    reason: `issues=${issues.length}, getUpload=${getUploadSucceeded ? 'yes' : 'no'}, sensorlogAdded=${sensorlogAdded ? 'yes' : 'no'}(${dbCount}), alarmAndActuator=${alarmScore === 5 ? 'yes' : alarmScore > 0 ? 'partial' : 'no'}, browserGet=${browserGetSucceeded || browserEvidenceSucceeded ? 'yes' : 'no'}`,
     checks,
   };
 }
@@ -341,6 +419,14 @@ function scoreHardwareMatching(labReport) {
     reason: `hardwareMatching ${correctCount}/${checks.length}`,
     checks,
   };
+}
+
+function hasHardwareMatchingAnswers(labReport) {
+  const answers = labReport?.hardwareMatching?.answers && typeof labReport.hardwareMatching.answers === 'object'
+    ? labReport.hardwareMatching.answers
+    : {};
+
+  return Object.values(answers).some((value) => Array.isArray(value) && value.length > 0);
 }
 
 function scoreClassroomClient(snapshot) {
@@ -393,7 +479,7 @@ function scoreSubmission({ submission, assignmentConfig }) {
 
   if (isClassroomTemperature) {
     const completeness = scoreClassroomCompleteness(snapshot, assignmentConfig);
-    const hardwareMatch = scoreHardwareMatching(labReport);
+    const hardwareMatch = hasHardwareMatchingAnswers(labReport) ? scoreHardwareMatching(labReport) : null;
     const code = scoreClassroomCode(snapshot);
     const dataFlow = scoreDataFlow(snapshot, evidence);
     const client = scoreClassroomClient(snapshot);
@@ -410,9 +496,11 @@ function scoreSubmission({ submission, assignmentConfig }) {
         id: 'hardwareMatch',
         label: '硬件模块功能匹配',
         max: 10,
-        score: Math.round(hardwareMatch.score * 10) / 10,
-        reason: hardwareMatch.reason,
-        checks: hardwareMatch.checks,
+        score: hardwareMatch ? Math.round(hardwareMatch.score * 10) / 10 : 10,
+        reason: hardwareMatch
+          ? hardwareMatch.reason
+          : '课堂活动页连线题未随画布提交，不在画布后台重复判错',
+        checks: hardwareMatch ? hardwareMatch.checks : [],
       },
       code: {
         id: 'code',
@@ -443,7 +531,7 @@ function scoreSubmission({ submission, assignmentConfig }) {
     const total = Math.round(Object.values(dimensions).reduce((sum, item) => sum + item.score, 0) * 10) / 10;
 
     return {
-      rubricVersion: 'classroom-temperature-v6',
+      rubricVersion: 'classroom-temperature-v7',
       dimensions,
       total,
       reasons: Object.values(dimensions).map((item) => item.reason),

@@ -1,6 +1,7 @@
 ﻿import { ReactNode, useState, useEffect, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { useLicense } from '@/hooks/useLicense';
 import { useUpgradePrompt } from '@/components/UpgradePrompt';
@@ -28,6 +29,7 @@ import {
   PanelRightOpen,
   Package,
   Settings,
+  Shuffle,
   Lock,
   Maximize2,
   Minimize2,
@@ -59,7 +61,7 @@ const PANEL_STATE_KEY = 'simulator-panel-state';
 const MANUAL_SAVE_KEY = 'simulator-manual-save';
 const OPENCLASS_CANVAS_INITIALIZED_KEY = 'openclass-classroom-canvas-initialized';
 const OPENCLASS_CANVAS_VERSION_KEY = 'openclass-classroom-canvas-version';
-const CURRENT_OPENCLASS_CANVAS_VERSION = '2026-05-16-smart-terminal-collapsed';
+const CURRENT_OPENCLASS_CANVAS_VERSION = '2026-05-22-blank-classroom-canvas';
 
 interface SubmissionContext {
   assignmentId: number;
@@ -71,7 +73,6 @@ interface SimulatorLayoutProps {
   role?: UserRole;
   submissionContext?: SubmissionContext;
   headerActions?: ReactNode;
-  initialScenarioId?: string;
 }
 
 interface PanelState {
@@ -101,22 +102,28 @@ function savePanelState(state: PanelState) {
   }
 }
 
-export function SimulatorLayout({ role, submissionContext, headerActions, initialScenarioId }: SimulatorLayoutProps) {
+export function SimulatorLayout({ role, submissionContext, headerActions }: SimulatorLayoutProps) {
   useSimulationRunner();
 
   const { licenseState, featureAccess } = useLicense();
   const upgradePrompt = useUpgradePrompt();
+  const isClassroomMode = role === 'student';
 
-  const [activeTab, setActiveTab] = useState(role === 'student' ? 'code' : 'hardware');
+  const [activeTab, setActiveTab] = useState(isClassroomMode ? 'code' : 'hardware');
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(() => loadPanelState().leftCollapsed);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => loadPanelState().rightCollapsed);
   const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(() =>
-    role === 'student' ? false : loadPanelState().bottomCollapsed
+    isClassroomMode ? false : loadPanelState().bottomCollapsed
   );
   const [bottomPanelLarge, setBottomPanelLarge] = useState(() =>
-    role === 'student' ? false : Boolean(loadPanelState().bottomLarge)
+    isClassroomMode ? false : Boolean(loadPanelState().bottomLarge)
   );
-  const bottomPanelSizeLabel = activeTab === 'browser' ? '浏览器' : '代码区';
+  const bottomPanelSizeLabels: Record<string, string> = {
+    browser: '浏览器',
+    database: '数据库',
+    simulation: '运行区',
+  };
+  const bottomPanelSizeLabel = bottomPanelSizeLabels[activeTab] ?? '代码区';
 
   useEffect(() => {
     savePanelState({
@@ -140,14 +147,17 @@ export function SimulatorLayout({ role, submissionContext, headerActions, initia
     serverConfig,
     addLog,
     clearLogs,
+    autoConnectEnabled,
+    setAutoConnectEnabled,
+    generateRandomFault,
   } = useSimulatorStore();
 
   const canLoadPresetScenarios = role === 'teacher' || role === 'admin' || !role;
-  const classroomScenarioId = initialScenarioId || 'classroom-temperature';
   const studentScenarioInitializedRef = useRef(false);
 
   useEffect(() => {
-    if (role === 'student') {
+    if (isClassroomMode) {
+      setAutoConnectEnabled(false);
       if (studentScenarioInitializedRef.current) {
         return;
       }
@@ -165,12 +175,7 @@ export function SimulatorLayout({ role, submissionContext, headerActions, initia
         return;
       }
 
-      const scenario = loadScenario(classroomScenarioId);
-      if (scenario) {
-        loadScenarioToStore(scenario);
-      } else {
-        resetSimulator();
-      }
+      resetSimulator();
       try {
         localStorage.setItem(OPENCLASS_CANVAS_INITIALIZED_KEY, CURRENT_OPENCLASS_CANVAS_VERSION);
         localStorage.setItem(OPENCLASS_CANVAS_VERSION_KEY, CURRENT_OPENCLASS_CANVAS_VERSION);
@@ -178,11 +183,12 @@ export function SimulatorLayout({ role, submissionContext, headerActions, initia
         // 忽略存储失败。
       }
     }
-  }, [role, classroomScenarioId, placedComponents, loadScenarioToStore, resetSimulator]);
+  }, [isClassroomMode, resetSimulator, setAutoConnectEnabled]);
 
   const handleScenarioChange = (scenarioId: string) => {
     if (!canLoadPresetScenarios && scenarioId !== 'blank') {
-      toast.error('学生仅可使用空白画布');
+      toast.error('学生仅可使用课堂空白画布');
+      setAutoConnectEnabled(false);
       resetSimulator();
       return;
     }
@@ -206,22 +212,20 @@ export function SimulatorLayout({ role, submissionContext, headerActions, initia
   };
 
   const handleReset = () => {
-    if (role === 'student') {
-      const confirmed = window.confirm('确定要重置为课堂半成品画布吗？当前修改会被清空。');
+    if (isClassroomMode) {
+      const confirmed = window.confirm('确定要重置为课堂空白画布吗？当前修改会被清空。');
       if (!confirmed) return;
 
-      const scenario = loadScenario(classroomScenarioId);
-      if (scenario) {
-        loadScenarioToStore(scenario);
-        try {
-          localStorage.setItem(OPENCLASS_CANVAS_INITIALIZED_KEY, CURRENT_OPENCLASS_CANVAS_VERSION);
-          localStorage.setItem(OPENCLASS_CANVAS_VERSION_KEY, CURRENT_OPENCLASS_CANVAS_VERSION);
-        } catch {
-          // 忽略存储失败。
-        }
-        toast.success('已恢复课堂半成品画布');
-        return;
+      setAutoConnectEnabled(false);
+      resetSimulator();
+      try {
+        localStorage.setItem(OPENCLASS_CANVAS_INITIALIZED_KEY, CURRENT_OPENCLASS_CANVAS_VERSION);
+        localStorage.setItem(OPENCLASS_CANVAS_VERSION_KEY, CURRENT_OPENCLASS_CANVAS_VERSION);
+      } catch {
+        // 忽略存储失败。
       }
+      toast.success('已恢复课堂空白画布');
+      return;
     }
 
     resetSimulator();
@@ -275,6 +279,15 @@ export function SimulatorLayout({ role, submissionContext, headerActions, initia
     }
   };
 
+  const handleGenerateRandomFault = () => {
+    const result = generateRandomFault();
+    if (result.success) {
+      toast.warning(result.message);
+    } else {
+      toast.error(result.message);
+    }
+  };
+
   return (
     <TooltipProvider>
       <div className="h-screen flex flex-col bg-background">
@@ -286,16 +299,18 @@ export function SimulatorLayout({ role, submissionContext, headerActions, initia
               <Package className="h-5 w-5 text-primary" />
               信息系统搭建模拟器
               {licenseState && (
-                <span
-                  className={cn(
-                    'text-xs px-2 py-0.5 rounded-full',
-                    licenseState.licenseType === 'trial'
-                      ? 'bg-muted text-muted-foreground'
-                      : 'bg-primary/10 text-primary'
-                  )}
-                >
-                  {getLicenseDisplayName(licenseState.licenseType)}
-                </span>
+                !isClassroomMode ? (
+                  <span
+                    className={cn(
+                      'text-xs px-2 py-0.5 rounded-full',
+                      licenseState.licenseType === 'trial'
+                        ? 'bg-muted text-muted-foreground'
+                        : 'bg-primary/10 text-primary'
+                    )}
+                  >
+                    {getLicenseDisplayName(licenseState.licenseType)}
+                  </span>
+                ) : null
               )}
             </h1>
 
@@ -319,7 +334,7 @@ export function SimulatorLayout({ role, submissionContext, headerActions, initia
                 </SelectContent>
               </Select>
             ) : (
-              <div className="text-xs px-3 py-2 rounded-md border bg-muted/50">学生模式：课堂半成品画布</div>
+              <div className="text-xs px-3 py-2 rounded-md border bg-muted/50">学生模式：课堂空白画布</div>
             )}
 
             {submissionContext ? (
@@ -332,6 +347,21 @@ export function SimulatorLayout({ role, submissionContext, headerActions, initia
 
           <div className="flex items-center gap-2">
             {headerActions ? <div className="flex items-center gap-2 mr-2">{headerActions}</div> : null}
+
+            {!isClassroomMode ? (
+              <div className="mr-2 flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2.5 py-1.5">
+                <Settings className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">自动连线</span>
+                <Switch
+                  checked={autoConnectEnabled}
+                  onCheckedChange={(enabled) => {
+                    setAutoConnectEnabled(enabled);
+                    toast.info(enabled ? '已开启教师自动连线' : '已关闭自动连线，组件将保持未连接');
+                  }}
+                  aria-label="教师自动连线"
+                />
+              </div>
+            ) : null}
 
             <div className="flex items-center gap-1 mr-2 border-r border-border pr-2">
               <Tooltip>
@@ -352,23 +382,25 @@ export function SimulatorLayout({ role, submissionContext, headerActions, initia
                 <TooltipContent>{leftPanelCollapsed ? '展开组件库' : '收起组件库'}</TooltipContent>
               </Tooltip>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}
-                    className="h-8 w-8 p-0"
-                  >
-                    {rightPanelCollapsed ? (
-                      <PanelRightOpen className="h-4 w-4" />
-                    ) : (
-                      <PanelRightClose className="h-4 w-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{rightPanelCollapsed ? '展开属性面板' : '收起属性面板'}</TooltipContent>
-              </Tooltip>
+              {!isClassroomMode ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}
+                      className="h-8 w-8 p-0"
+                    >
+                      {rightPanelCollapsed ? (
+                        <PanelRightOpen className="h-4 w-4" />
+                      ) : (
+                        <PanelRightClose className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{rightPanelCollapsed ? '展开属性面板' : '收起属性面板'}</TooltipContent>
+                </Tooltip>
+              ) : null}
             </div>
 
             <Button
@@ -381,11 +413,20 @@ export function SimulatorLayout({ role, submissionContext, headerActions, initia
               网格
             </Button>
 
-            <Button variant="outline" size="sm" onClick={handleSave}>
-              <Save className="h-4 w-4 mr-1" />
-              保存
-              {!featureAccess.canSave && <Lock className="h-3 w-3 ml-1 text-muted-foreground" />}
-            </Button>
+            {!isClassroomMode ? (
+              <Button variant="outline" size="sm" onClick={handleSave}>
+                <Save className="h-4 w-4 mr-1" />
+                保存
+                {!featureAccess.canSave && <Lock className="h-3 w-3 ml-1 text-muted-foreground" />}
+              </Button>
+            ) : null}
+
+            {!isClassroomMode ? (
+              <Button variant="outline" size="sm" onClick={handleGenerateRandomFault}>
+                <Shuffle className="h-4 w-4 mr-1" />
+                随机故障
+              </Button>
+            ) : null}
 
             <Button variant="outline" size="sm" onClick={handleReset}>
               <RotateCcw className="h-4 w-4 mr-1" />
@@ -432,7 +473,7 @@ export function SimulatorLayout({ role, submissionContext, headerActions, initia
 
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             <div className={cn('min-h-0 relative transition-all duration-300', bottomPanelCollapsed ? 'flex-1' : 'flex-1')}>
-              <SimulatorCanvas />
+              <SimulatorCanvas classroomMode={isClassroomMode} />
             </div>
 
             <div
@@ -453,10 +494,12 @@ export function SimulatorLayout({ role, submissionContext, headerActions, initia
               >
                 <div className="flex items-center justify-between px-4 pt-2">
                   <TabsList className="self-start">
-                    <TabsTrigger value="hardware" className="gap-1.5">
-                      <Layers className="h-4 w-4" />
-                      {!bottomPanelCollapsed && '硬件连接'}
-                    </TabsTrigger>
+                    {!isClassroomMode ? (
+                      <TabsTrigger value="hardware" className="gap-1.5">
+                        <Layers className="h-4 w-4" />
+                        {!bottomPanelCollapsed && '硬件连接'}
+                      </TabsTrigger>
+                    ) : null}
                     <TabsTrigger value="code" className="gap-1.5">
                       <Code className="h-4 w-4" />
                       {!bottomPanelCollapsed && '代码编辑'}
@@ -534,18 +577,20 @@ export function SimulatorLayout({ role, submissionContext, headerActions, initia
             </div>
           </div>
 
-          <div
-            className={cn(
-              'flex-shrink-0 transition-all duration-300 ease-in-out',
-              rightPanelCollapsed ? 'w-12' : 'w-64'
-            )}
-          >
-            {rightPanelCollapsed ? (
-              <CollapsedRightPanel onExpand={() => setRightPanelCollapsed(false)} />
-            ) : (
-              <PropertyPanel />
-            )}
-          </div>
+          {!isClassroomMode ? (
+            <div
+              className={cn(
+                'flex-shrink-0 transition-all duration-300 ease-in-out',
+                rightPanelCollapsed ? 'w-12' : 'w-64'
+              )}
+            >
+              {rightPanelCollapsed ? (
+                <CollapsedRightPanel onExpand={() => setRightPanelCollapsed(false)} />
+              ) : (
+                <PropertyPanel />
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
     </TooltipProvider>

@@ -1,6 +1,6 @@
 import type { DatabaseState, RouterConfig, ServerConfig } from '@/types/simulator';
 
-export const CLASSROOM_TEMPERATURE_THRESHOLD = 30;
+export const CLASSROOM_TEMPERATURE_THRESHOLD = 8;
 
 export const classroomStarterMicrobitCode = `# 食堂温度监测与预警系统 - 智能终端（micro:bit）代码
 # 本段代码用于软件分析与运行测试。先读懂数据采集、阈值判断和网络上传流程。
@@ -14,7 +14,7 @@ WIFI_PASSWORD = "12345678"
 SERVER_IP = "192.168.1.100"
 SERVER_PORT = 5000
 UPLOAD_ROUTE = "/upload"
-TEMP_THRESHOLD = 30
+TEMP_THRESHOLD = 8
 
 obloq.setup(WIFI_SSID, WIFI_PASSWORD)
 
@@ -24,7 +24,7 @@ while True:
     temp = round(raw / 10, 1)
     display.scroll(str(temp))
 
-    # 超过阈值时控制蜂鸣器报警
+    # 超过冷藏阈值时控制蜂鸣器报警
     if temp > TEMP_THRESHOLD:
         pin3.write_digital(1)
     else:
@@ -46,7 +46,7 @@ import sqlite3
 from datetime import datetime
 
 app = Flask(__name__)
-TEMP_THRESHOLD = 30
+TEMP_THRESHOLD = 8
 
 def init_db():
     # 初始化数据库：真实项目第一次运行时，需要创建 sensorlog 表。
