@@ -12,10 +12,15 @@ dist
 dist-ssr
 dist-root/
 dist-system-builder/
+dist-commercial-root/
+dist-commercial-system-builder/
 *.local
 .env
 .env.*
 !.env.example
+!.env.teaching
+!.env.commercial
+!.env.full
 
 # Local deployment and verification artifacts
 .known_hosts_sysbuilder
@@ -33,6 +38,11 @@ docs/*资料包*.tar.gz
 *.pyc
 *.db
 ~$*.docx
+
+# Classroom material working files
+docs/教师上课资料包_信息系统复习课/上课材料/.wpp_backup/
+docs/教师上课资料包_信息系统复习课/上课材料/账号密码.txt
+artifacts/
 
 # Editor directories and files
 .vscode/*

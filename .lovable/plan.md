@@ -10,6 +10,16 @@
 | 阶段三：前后端联调 | ⏳ 待部署 | 后端部署后修改 `src/lib/api.ts` 的 `useMock: false` |
 | 阶段四：PWA离线支持 | ✅ 已完成 | vite-plugin-pwa 已配置，Service Worker 自动生成 |
 
+## 当前分支约定
+
+| 构建模式 | 环境变量 | 默认行为 |
+|---------|----------|----------|
+| 公开课/教学版 | `VITE_FEATURE_MODE=teaching` | 开放公开课入口、教师后台、学生提交，不强制激活 |
+| 商业版 | `VITE_FEATURE_MODE=commercial` | 默认关闭公开课入口，根路径进入授权保护后的模拟器 |
+| 全量内测版 | `VITE_FEATURE_MODE=full` | 同时打开教学工作流和授权入口，便于联调 |
+
+推荐使用 `npm run build:teaching` 生成公开课版本，使用 `npm run build:commercial` 或 `scripts/build-commercial-artifacts.sh` 生成商业授权版本。
+
 ## 测试序列号（Mock 模式）
 
 | 序列号 | 类型 | 说明 |

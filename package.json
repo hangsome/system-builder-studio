@@ -5,7 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:teaching": "vite --mode teaching",
+    "dev:commercial": "vite --mode commercial",
     "build": "vite build",
+    "build:teaching": "vite build --mode teaching",
+    "build:commercial": "vite build --mode commercial",
+    "build:full": "vite build --mode full",
     "build:dev": "vite build --mode development",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "lint": "eslint .",

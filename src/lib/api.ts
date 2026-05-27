@@ -10,8 +10,8 @@ const API_CONFIG = {
     import.meta.env.VITE_API_USE_MOCK ??
     (import.meta.env.MODE === 'development' ? 'true' : 'false')
   ) === 'true',
-  // 后端 API 地址（部署后修改）
-  baseUrl: import.meta.env.VITE_API_BASE_URL || 'https://api.your-domain.com',
+  // 后端 API 地址。默认使用同源 /api，部署到子路径时可用 VITE_API_BASE_URL 覆盖。
+  baseUrl: import.meta.env.VITE_API_BASE_URL || '',
   // 请求超时时间（毫秒）
   timeout: Number(import.meta.env.VITE_API_TIMEOUT_MS || 10000),
 };
@@ -19,6 +19,7 @@ const API_CONFIG = {
 function buildApiUrl(path: string) {
   const baseUrl = API_CONFIG.baseUrl.replace(/\/$/, '');
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  if (!baseUrl) return `/api${normalizedPath}`;
   const apiBase = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
   return `${apiBase}${normalizedPath}`;
 }

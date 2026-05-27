@@ -6,7 +6,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { RoleHomeRedirect } from "@/components/auth/RoleHomeRedirect";
-import { isTeachingEnabled } from "@/config/featureMode";
+import { isLicenseRequired, isOpenClassEnabled, isTeachingEnabled } from "@/config/featureMode";
 import { LicenseGuard } from "./components/LicenseGuard";
 
 const queryClient = new QueryClient();
@@ -38,6 +38,8 @@ function RouteFallback() {
 
 const App = () => {
   const teachingEnabled = isTeachingEnabled();
+  const openClassEnabled = isOpenClassEnabled();
+  const licenseRequired = isLicenseRequired();
   const routerBasename = import.meta.env.BASE_URL === '/'
     ? undefined
     : import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -56,8 +58,12 @@ const App = () => {
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/teacher-demo-blank" element={<TeacherBlankCanvasEntryPage />} />
                   <Route path="/demo-blank" element={<TeacherBlankCanvasEntryPage />} />
-                  <Route path="/openclass" element={<OpenClassEntryPage />} />
-                  <Route path="/open-class" element={<OpenClassEntryPage />} />
+                  {openClassEnabled && (
+                    <>
+                      <Route path="/openclass" element={<OpenClassEntryPage />} />
+                      <Route path="/open-class" element={<OpenClassEntryPage />} />
+                    </>
+                  )}
                   <Route path="/403" element={<ForbiddenPage />} />
                   <Route path="/simulator" element={<Index />} />
                   <Route
@@ -116,15 +122,19 @@ const App = () => {
                   <Route
                     path="/"
                     element={
-                      <LicenseGuard>
+                      <LicenseGuard requireActivation={licenseRequired}>
                         <Index />
                       </LicenseGuard>
                     }
                   />
-                  <Route path="/teacher-demo-blank" element={<TeacherBlankCanvasEntryPage />} />
-                  <Route path="/demo-blank" element={<TeacherBlankCanvasEntryPage />} />
-                  <Route path="/openclass" element={<OpenClassEntryPage />} />
-                  <Route path="/open-class" element={<OpenClassEntryPage />} />
+                  {openClassEnabled && (
+                    <>
+                      <Route path="/teacher-demo-blank" element={<TeacherBlankCanvasEntryPage />} />
+                      <Route path="/demo-blank" element={<TeacherBlankCanvasEntryPage />} />
+                      <Route path="/openclass" element={<OpenClassEntryPage />} />
+                      <Route path="/open-class" element={<OpenClassEntryPage />} />
+                    </>
+                  )}
                   <Route path="/activation" element={<Activation />} />
                   <Route path="/admin" element={<Admin />} />
                 </>

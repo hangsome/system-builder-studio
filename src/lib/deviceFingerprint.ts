@@ -1,10 +1,15 @@
  /**
   * 生成设备指纹
-  * 使用浏览器特征组合生成唯一标识
-  */
+ * 使用浏览器特征组合生成唯一标识
+ */
+
+function canUseCanvasFingerprinting() {
+  return typeof HTMLCanvasElement !== 'undefined' && !navigator.userAgent.toLowerCase().includes('jsdom');
+}
  
  async function getCanvasFingerprint(): Promise<string> {
    try {
+     if (!canUseCanvasFingerprinting()) return '';
      const canvas = document.createElement('canvas');
      const ctx = canvas.getContext('2d');
      if (!ctx) return '';
@@ -29,6 +34,7 @@
  
  function getWebGLInfo(): string {
    try {
+     if (!canUseCanvasFingerprinting()) return '';
      const canvas = document.createElement('canvas');
      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
      if (!gl || !(gl instanceof WebGLRenderingContext)) return '';

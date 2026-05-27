@@ -1,17 +1,21 @@
- import { useState } from 'react';
- import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
  import { Button } from '@/components/ui/button';
  import { Input } from '@/components/ui/input';
  import { Label } from '@/components/ui/label';
  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
- import { Alert, AlertDescription } from '@/components/ui/alert';
- import { useLicense } from '@/hooks/useLicense';
- import { getLicenseDisplayName } from '@/lib/license';
- import { KeyRound, Sparkles, GraduationCap, User, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
- 
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useLicense } from '@/hooks/useLicense';
+import { getLicenseDisplayName } from '@/lib/license';
+import { isLicenseRequired } from '@/config/featureMode';
+import { KeyRound, Sparkles, GraduationCap, User, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+
  export default function Activation() {
    const navigate = useNavigate();
+   const location = useLocation();
    const { activate, isLoading, isActivated, licenseState } = useLicense();
+   const requireActivation = isLicenseRequired();
+   const returnPath = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/';
    
    const [licenseKey, setLicenseKey] = useState('');
    const [error, setError] = useState<string | null>(null);
@@ -55,7 +59,7 @@
       setError(null);
       // 延迟跳转
       setTimeout(() => {
-        navigate('/');
+        navigate(returnPath, { replace: true });
       }, 1500);
      } else {
        setError(result.message);
@@ -64,6 +68,10 @@
    };
    
    const handleTrialMode = () => {
+     if (requireActivation) {
+       setError('商业版需要先完成激活，不能以体验版进入。');
+       return;
+     }
      navigate('/');
    };
    
@@ -195,7 +203,7 @@
                <Label htmlFor="license-key">序列号</Label>
                <Input
                  id="license-key"
-                 placeholder="SIMU-XXXX-XXXX-XXXX"
+                 placeholder="SIMU-PXXX-XXXX-XXXX"
                  value={licenseKey}
                  onChange={handleInputChange}
                  className="font-mono text-center text-lg tracking-wider"
@@ -203,7 +211,7 @@
                  disabled={isLoading}
                />
                <p className="text-xs text-muted-foreground">
-                 序列号格式：SIMU-XXXX-XXXX-XXXX
+                 序列号格式：SIMU-PXXX-XXXX-XXXX 或 SIMU-TXXX-XXXX-XXXX
                </p>
              </div>
              
@@ -237,30 +245,39 @@
                )}
              </Button>
              
-             <div className="relative">
-               <div className="absolute inset-0 flex items-center">
-                 <span className="w-full border-t" />
+             {!requireActivation && (
+               <>
+                 <div className="relative">
+                   <div className="absolute inset-0 flex items-center">
+                     <span className="w-full border-t" />
+                   </div>
+                   <div className="relative flex justify-center text-xs uppercase">
+                     <span className="bg-background px-2 text-muted-foreground">或者</span>
+                   </div>
+                 </div>
+                <Button
+                  variant="outline"
+                  onClick={handleTrialMode}
+                   className="w-full"
+                   disabled={isLoading}
+                 >
+                   <Sparkles className="w-4 h-4 mr-2" />
+                   以体验版模式进入
+                 </Button>
+               </>
+             )}
+
+             {requireActivation && (
+               <div className="rounded-md border bg-muted/40 px-3 py-2 text-center text-xs text-muted-foreground">
+                 商业版需要激活后使用。公开课版本请使用教学版构建入口。
                </div>
-               <div className="relative flex justify-center text-xs uppercase">
-                 <span className="bg-background px-2 text-muted-foreground">或者</span>
-               </div>
-             </div>
-             
-             <Button 
-               variant="outline" 
-               onClick={handleTrialMode} 
-               className="w-full"
-               disabled={isLoading}
-             >
-               <Sparkles className="w-4 h-4 mr-2" />
-               以体验版模式进入
-             </Button>
+             )}
              
              <p className="text-xs text-center text-muted-foreground">
                还没有序列号？
-               <a href="#" className="text-primary hover:underline ml-1">
-                 点击购买
-               </a>
+               <span className="text-primary ml-1">
+                 请联系管理员获取
+               </span>
              </p>
            </CardContent>
          </Card>

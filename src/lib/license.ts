@@ -29,10 +29,10 @@ export const OFFLINE_GRACE_DAYS = 7;
  
  /**
   * 验证序列号格式
-  * 格式：SIMU-XXXX-XXXX-XXXX
+  * 格式：SIMU-PXXX-XXXX-XXXX / SIMU-TXXX-XXXX-XXXX
   */
  export function validateLicenseFormat(key: string): boolean {
-   const pattern = /^SIMU-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+   const pattern = /^SIMU-[PT][A-Z0-9]{3}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
    return pattern.test(key.toUpperCase());
  }
  
@@ -40,7 +40,9 @@ export const OFFLINE_GRACE_DAYS = 7;
   * 从序列号解析类型
   * P开头 = personal, T开头 = teacher
   */
- export function parseLicenseType(key: string): LicenseType {
+export function parseLicenseType(key: string): LicenseType {
+  if (!validateLicenseFormat(key)) return 'trial';
+
    const parts = key.split('-');
    if (parts.length !== 4) return 'trial';
    

@@ -1,10 +1,14 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, beforeEach, vi } from 'vitest';
  import { activateLicense, verifyLicense, setApiConfig, getApiConfig } from './api';
  
  describe('api', () => {
-   beforeEach(() => {
-     // 确保使用 mock 模式
-     setApiConfig({ useMock: true });
+  beforeEach(() => {
+    // 确保使用 mock 模式
+     setApiConfig({ useMock: true, baseUrl: '' });
+   });
+
+   afterEach(() => {
+     vi.unstubAllGlobals();
    });
  
    describe('activateLicense (mock mode)', () => {
@@ -69,7 +73,21 @@ import { describe, it, expect, beforeEach } from 'vitest';
        expect(newConfig.baseUrl).toBe('https://test.com');
        
        // Reset
-       setApiConfig({ useMock: true, baseUrl: 'https://api.your-domain.com' });
+       setApiConfig({ useMock: true, baseUrl: '' });
+     });
+
+     it('uses same-origin api base when no base url is configured', async () => {
+       const fetchMock = vi.fn().mockResolvedValue(
+         new Response(JSON.stringify({ valid: true, licenseType: 'teacher' }), { status: 200 })
+       );
+       vi.stubGlobal('fetch', fetchMock);
+
+       setApiConfig({ useMock: false, baseUrl: '' });
+       const result = await verifyLicense('SIMU-T001-TEST-0001', 'test-device-id');
+
+       expect(result.valid).toBe(true);
+       expect(fetchMock).toHaveBeenCalledTimes(1);
+       expect(fetchMock.mock.calls[0][0]).toBe('/api/verify');
      });
    });
  });

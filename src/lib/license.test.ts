@@ -28,8 +28,9 @@
        expect(validateLicenseFormat('')).toBe(false);
        expect(validateLicenseFormat('INVALID')).toBe(false);
        expect(validateLicenseFormat('SIMU-P001-TEST')).toBe(false); // too short
-       expect(validateLicenseFormat('SIMU-P001-TEST-00011')).toBe(false); // too long
-       expect(validateLicenseFormat('ABCD-P001-TEST-0001')).toBe(false); // wrong prefix
+      expect(validateLicenseFormat('SIMU-P001-TEST-00011')).toBe(false); // too long
+      expect(validateLicenseFormat('ABCD-P001-TEST-0001')).toBe(false); // wrong prefix
+      expect(validateLicenseFormat('SIMU-X001-TEST-0001')).toBe(false); // unknown license type
      });
    });
  
@@ -44,8 +45,8 @@
        expect(parseLicenseType('SIMU-TABC-TEST-0001')).toBe('teacher');
      });
  
-     it('should default to personal for unknown types', () => {
-       expect(parseLicenseType('SIMU-X001-TEST-0001')).toBe('personal');
+     it('should return trial for unknown types', () => {
+       expect(parseLicenseType('SIMU-X001-TEST-0001')).toBe('trial');
      });
  
      it('should return trial for invalid format', () => {
