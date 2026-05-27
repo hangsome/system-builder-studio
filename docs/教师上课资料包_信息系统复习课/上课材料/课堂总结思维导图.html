@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>课堂总结 - 食堂温度监测与预警系统</title>
+    
+    <style>
+        /* 1. 基础重置与变量定义 (还原 Tailwind 色板) */
+        :root {
+            --slate-200: #e2e8f0; --slate-300: #cbd5e1; --slate-400: #94a3b8;
+            --slate-600: #475569; --slate-700: #334155; --slate-800: #1e293b; --slate-900: #0f172a;
+            --indigo-400: #818cf8; --indigo-500: #6366f1;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background-color: #070b14;
+            color: var(--slate-200);
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            overflow: auto;
+            min-height: 100vh;
+        }
+
+        ::selection { background-color: rgba(99, 102, 241, 0.3); }
+
+        /* 2. 背景与光效 (还原 Tailwind 滤镜与 Grid) */
+        .bg-effects {
+            position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0;
+        }
+        .bg-glow-1 {
+            position: absolute; top: -10%; left: -10%; width: 40%; height: 40%;
+            border-radius: 50%; background-color: rgba(30, 58, 138, 0.2); filter: blur(120px);
+        }
+        .bg-glow-2 {
+            position: absolute; bottom: -10%; right: -10%; width: 50%; height: 50%;
+            border-radius: 50%; background-color: rgba(6, 78, 59, 0.1); filter: blur(150px);
+        }
+        .bg-glow-3 {
+            position: absolute; top: 40%; left: 50%; width: 30%; height: 30%;
+            border-radius: 50%; background-color: rgba(88, 28, 135, 0.1); filter: blur(100px);
+        }
+        .bg-grid {
+            position: absolute; inset: 0;
+            background-image: linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px), 
+                              linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 4rem 4rem;
+            -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000 20%, transparent 100%);
+            mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000 20%, transparent 100%);
+        }
+
+        /* 3. 布局排版 */
+        .app-container {
+            position: relative; z-index: 10;
+            display: flex; align-items: center; min-width: max-content;
+            padding: 3rem; min-height: 100vh;
+        }
+        @media (min-width: 768px) { .app-container { padding: 5rem; } }
+
+        /* 4. 根节点样式 (玻璃拟物化) */
+        .root-connection { position: relative; flex-shrink: 0; z-index: 20; }
+        .root-connection::after {
+            content: ''; position: absolute; right: -40px; top: 50%; width: 40px; height: 3px;
+            background: var(--slate-600); transform: translateY(-50%);
+        }
+        .root-card {
+            width: 20rem; padding: 2rem; border-radius: 1rem;
+            background-color: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--slate-700);
+            box-shadow: 0 0 40px rgba(0,0,0,0.5);
+            position: relative; transition: border-color 0.5s;
+        }
+        .root-card:hover { border-color: rgba(99, 102, 241, 0.5); }
+        .root-card-bg {
+            position: absolute; inset: 0; pointer-events: none; border-radius: 1rem;
+            background: linear-gradient(to bottom right, rgba(99,102,241,0.05), rgba(168,85,247,0.05));
+        }
+
+        /* 5. 树状连线及主干 */
+        .master-spine {
+            position: relative; padding-left: 60px; margin-left: 40px;
+            display: flex; flex-direction: column; gap: 2.5rem; margin-top: 2.5rem; margin-bottom: 2.5rem; z-index: 10;
+        }
+        .master-spine::before {
+            content: ''; position: absolute; left: 0; top: 40px; bottom: 40px; width: 3px; border-radius: 4px;
+            background: linear-gradient(to bottom, #2dd4bf, #fb923c, #60a5fa, #c084fc, #34d399);
+        }
+        .master-node { position: relative; display: flex; align-items: flex-start; flex-direction: row; }
+        .master-node::before {
+            content: ''; position: absolute; left: -60px; top: 50%; width: 60px; height: 2px;
+            background: var(--slate-600); transform: translateY(-50%); z-index: 0;
+        }
+
+        /* 6. 主分类按钮 (动态颜色主题控制) */
+        .category-btn {
+            flex-shrink: 0; width: 16rem; padding: 1.25rem; border-radius: 0.75rem;
+            background: var(--theme-bg); border: 1px solid var(--slate-800);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            text-align: left; cursor: pointer; position: relative; z-index: 10;
+            transition: all 0.3s ease; color: var(--theme-color); font-family: inherit;
+        }
+        .category-btn:hover:not(.is-open) { border-color: var(--slate-600); }
+        .category-btn.is-open {
+            border-color: var(--theme-border);
+            box-shadow: 0 0 15px var(--theme-shadow);
+        }
+        .category-btn.is-open:hover { box-shadow: 0 0 25px var(--theme-shadow-hover); }
+
+        .btn-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+        .btn-icon-wrapper {
+            padding: 0.625rem; border-radius: 0.5rem; background-color: rgba(15,23,42,0.5);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .btn-count {
+            font-size: 0.75rem; font-weight: 500; padding: 0.25rem 0.625rem;
+            border-radius: 9999px; background-color: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.2);
+        }
+        .btn-footer { display: flex; align-items: center; justify-content: space-between; }
+        .btn-title { font-size: 1.25rem; font-weight: 700; letter-spacing: 0.025em; margin: 0;}
+        .btn-chevron { transition: transform 0.3s ease; display: flex; }
+        .category-btn.is-open .btn-chevron { transform: rotate(90deg); }
+
+        /* 7. 子节点与连线 */
+        .tree-children-container {
+            position: relative; margin-left: 24px; padding-left: 32px; padding-top: 8px; padding-bottom: 8px;
+            display: none; flex-direction: column; gap: 1rem;
+        }
+        .tree-children-container.is-visible { display: flex; }
+        .tree-children-container::before {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+            background: var(--theme-color); box-shadow: 0 0 10px var(--theme-color); border-radius: 4px;
+        }
+        .tree-child-node { position: relative; flex-shrink: 0; }
+        .tree-child-node::before {
+            content: ''; position: absolute; left: -32px; top: 50%; width: 32px; height: 2px;
+            background: var(--theme-color); box-shadow: 0 0 8px var(--theme-color); transform: translateY(-50%);
+        }
+
+        /* 8. 子节点卡片 */
+        .child-card {
+            width: 20rem; padding: 1rem; border-radius: 0.75rem;
+            background-color: rgba(30, 41, 59, 0.4); backdrop-filter: blur(4px);
+            border: 1px solid rgba(51, 65, 85, 0.5); transition: all 0.3s ease;
+        }
+        .child-card:hover {
+            background-color: rgba(30, 41, 59, 0.8);
+            border-color: var(--theme-border);
+        }
+        .child-title {
+            font-size: 1rem; font-weight: 700; color: white; margin-bottom: 0.5rem; transition: color 0.3s;
+        }
+        .child-card:hover .child-title { color: var(--theme-color); }
+        
+        .desc-line { margin-bottom: 0.25rem; color: var(--slate-300); font-size: 0.875rem; line-height: 1.625; }
+        .desc-line:last-child { margin-bottom: 0; }
+        
+        /* 代码块高亮 */
+        .inline-code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 13px; padding: 0.125rem 0.375rem; border-radius: 0.25rem;
+            background-color: rgba(15,23,42,0.8); color: white;
+            border: 1px solid rgba(51,65,85,0.5); box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+            margin: 0 0.125rem; display: inline-block;
+        }
+
+        /* 教师重点标注高亮 */
+        .teacher-mark {
+            color: var(--theme-color); 
+            font-weight: 700; 
+            padding: 0 2px;
+            letter-spacing: 0.025em;
+        }
+
+        /* 9. 动画 */
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(-15px) scale(0.98); }
+            to { opacity: 1; transform: translateX(0) scale(1); }
+        }
+        .animate-slide-in {
+            animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse { animation: pulseGlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+        /* 主题颜色变量注入类 */
+        .theme-teal { --theme-color:#2dd4bf; --theme-bg:rgba(20,184,166,0.1); --theme-border:rgba(20,184,166,0.5); --theme-shadow:rgba(45,212,191,0.2); --theme-shadow-hover:rgba(45,212,191,0.5); }
+        .theme-orange { --theme-color:#fb923c; --theme-bg:rgba(249,115,22,0.1); --theme-border:rgba(249,115,22,0.5); --theme-shadow:rgba(249,115,22,0.2); --theme-shadow-hover:rgba(249,115,22,0.5); }
+        .theme-blue { --theme-color:#60a5fa; --theme-bg:rgba(59,130,246,0.1); --theme-border:rgba(59,130,246,0.5); --theme-shadow:rgba(59,130,246,0.2); --theme-shadow-hover:rgba(59,130,246,0.5); }
+        .theme-purple { --theme-color:#c084fc; --theme-bg:rgba(168,85,247,0.1); --theme-border:rgba(168,85,247,0.5); --theme-shadow:rgba(168,85,247,0.2); --theme-shadow-hover:rgba(168,85,247,0.5); }
+        .theme-emerald { --theme-color:#34d399; --theme-bg:rgba(16,185,129,0.1); --theme-border:rgba(16,185,129,0.5); --theme-shadow:rgba(16,185,129,0.2); --theme-shadow-hover:rgba(16,185,129,0.5); }
+    </style>
+</head>
+<body>
+    <!-- 背景层 -->
+    <div class="bg-effects">
+        <div class="bg-glow-1"></div>
+        <div class="bg-glow-2"></div>
+        <div class="bg-glow-3"></div>
+        <div class="bg-grid"></div>
+    </div>
+
+    <!-- 主体内容 -->
+    <div class="app-container">
+        
+        <!-- 根节点 (标题块) -->
+        <div class="root-connection">
+            <div class="root-card">
+                <div class="root-card-bg"></div>
+                <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem; color:var(--indigo-400);">
+                    <svg class="animate-pulse" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <h2 style="font-size:0.875rem; font-weight:600; letter-spacing:0.05em;">十一、课堂总结</h2>
+                </div>
+                <h1 style="font-size:1.5rem; font-weight:700; color:white; margin-bottom:0.5rem; line-height:1.3;">
+                    食堂温度监测与预警系统
+                </h1>
+                <div style="height:1px; width:100%; background:linear-gradient(to right, rgba(99,102,241,0.5), transparent); margin:1rem 0;"></div>
+            </div>
+        </div>
+
+        <!-- 树状分支渲染容器 -->
+        <div class="master-spine" id="tree-container"></div>
+
+    </div>
+
+    <script>
+        // 1. 图标库 (原生 SVG 字符串)
+        const icons = {
+            users: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+            cpu: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>`,
+            code: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>`,
+            network: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>`,
+            database: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`,
+            chevron: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`
+        };
+
+        // 2. 数据源定义 (严格贴合PPT原词，加入排错链路与高亮)
+        const mindMapData = [
+            { id: 'people', title: '人', count: '共 3 项', theme: 'teal', icon: 'users', items: [
+                { name: '食堂负责人', desc: '发现温度异常风险' },
+                { name: '值班人员', desc: '用手机访问首页，查看**实时温度** + **历史记录**' },
+                { name: '信息技术小组', desc: '搭建并维护这套系统' }
+            ]},
+            { id: 'hardware', title: '硬件', count: '共 6 项', theme: 'orange', icon: 'cpu', items: [
+                { name: '传感器 (例：温湿度传感器)', desc: '感知温度' },
+                { name: '执行器 (例：蜂鸣器)', desc: '现场声音提醒' },
+                { name: '智能终端 (例：micro:bit+扩展板)', desc: '读数据 + 判断 + 控制' },
+                { name: 'IoT 模块', desc: '把数据送上 WiFi / 互联网' },
+                { name: '服务器', desc: '接收 + 处理 + 渲染页面' },
+                { name: '移动终端', desc: '用户端查看入口' }
+            ]},
+            { id: 'software', title: '软件', count: '共 2 项', theme: 'blue', icon: 'code', items: [
+                { name: 'micro:bit板核心代码与功能', desc: '定位：负责**「现场」**事（**采集+判断+控制+上传**）\n`pin1.read_analog()` 读温度\n`if temp > 8` 判阈值\n`pin2.write_digital()` 控蜂鸣器 **(及其他执行器)**' },
+                { name: 'Flask端核心代码与功能', desc: '定位：负责**「后台」**事（**接收+判断+保存+下发指令+渲染**）\n`@app.route(\'/upload\')` 接收请求\n**根据接收数据判阈值并下发控制指令**\n`INSERT INTO sensorlog` 写库保存\n`@app.route(\'/\')` 查库并渲染网页' }
+            ]},
+            { id: 'network', title: '网络', count: '共 4 项', theme: 'purple', icon: 'network', items: [
+                { name: '网络设备', desc: '**IoT 模块**（提供终端入网能力）\n**无线路由器**（组建局域网并分配IP）' },
+                { name: '网络协议', desc: '**HTTP 协议**（超文本传输，负责Web通信）\n**TCP/IP 协议**（底层的网络传输基石）' },
+                { name: '网络请求方式', desc: '本课使用 **GET** 请求（参数在URL中可见，如`?id=1`）\n拓展应用：**POST** 请求（适合提交大量或隐蔽数据）' },
+                { name: '地址与路由组成', desc: '协议 + IP + 端口 + 路径 + 参数\n例：`http://192.168.1.100:5000/upload?id=1`' }
+            ]},
+            { id: 'data', title: '数据', count: '共 4 项', theme: 'emerald', icon: 'database', items: [
+                { name: '采集数据', desc: '产生：**由智能终端读取传感器产生**\n`raw → round(raw/10, 1) → 温度值`' },
+                { name: '上传参数', desc: '流向：**经由 IoT 模块连接网络向外传输**\n`id = 传感器编号`\n`val = 温度值`' },
+                { name: '数据库表与字段', desc: '存储：**Flask 端接收传输数据并写库**\n表名：`sensorlog`\n字段：`id / sensor_id / value / alarm / timestamp`' },
+                { name: '查询语句', desc: '读取：**Flask 查库并将数据渲染给移动终端**\n`ORDER BY id DESC LIMIT 10`' }
+            ]}
+        ];
+
+        // 3. 渲染描述文本（解析 `` 为代码块，解析 ** 为教师强调高亮）
+        function renderDescription(text) {
+            const lines = text.split('\n');
+            let html = '';
+            lines.forEach(line => {
+                let processedLine = line;
+                // 处理 **加粗高亮**，赋予对应主题的颜色
+                processedLine = processedLine.replace(/\*\*(.*?)\*\*/g, '<span class="teacher-mark">$1</span>');
+                
+                // 利用正则匹配被反引号包裹的内容
+                const parts = processedLine.split(/(`[^`]+`)/g);
+                let lineHtml = '';
+                parts.forEach(part => {
+                    if (part.startsWith('`') && part.endsWith('`')) {
+                        lineHtml += `<span class="inline-code">${part.slice(1, -1)}</span>`;
+                    } else {
+                        lineHtml += part;
+                    }
+                });
+                html += `<div class="desc-line">${lineHtml}</div>`;
+            });
+            return html;
+        }
+
+        // 4. 初始化与 DOM 构建
+        const container = document.getElementById('tree-container');
+
+        mindMapData.forEach((category) => {
+            // 节点容器
+            const nodeWrapper = document.createElement('div');
+            nodeWrapper.className = `master-node theme-${category.theme}`;
+
+            // 主干按钮
+            const btn = document.createElement('button');
+            btn.className = 'category-btn';
+            btn.innerHTML = `
+                <div class="btn-header">
+                    <div class="btn-icon-wrapper">${icons[category.icon]}</div>
+                    <span class="btn-count">${category.count}</span>
+                </div>
+                <div class="btn-footer">
+                    <h3 class="btn-title">${category.title}</h3>
+                    <div class="btn-chevron">${icons.chevron}</div>
+                </div>
+            `;
+
+            // 子节点容器
+            const childrenDiv = document.createElement('div');
+            childrenDiv.className = 'tree-children-container';
+            
+            // 预先生成子节点的HTML
+            let childrenHTML = '';
+            category.items.forEach((item, index) => {
+                childrenHTML += `
+                    <div class="tree-child-node animate-slide-in" style="animation-delay: ${index * 60}ms">
+                        <div class="child-card">
+                            <h4 class="child-title">${item.name}</h4>
+                            <div>${renderDescription(item.desc)}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            // 绑定点击事件，处理展开/收起及动画刷新
+            let isOpen = false;
+            btn.addEventListener('click', () => {
+                isOpen = !isOpen;
+                if (isOpen) {
+                    btn.classList.add('is-open');
+                    childrenDiv.classList.add('is-visible');
+                    // 每次展开重新注入HTML以重置并触发CSS帧动画
+                    childrenDiv.innerHTML = childrenHTML;
+                } else {
+                    btn.classList.remove('is-open');
+                    childrenDiv.classList.remove('is-visible');
+                    childrenDiv.innerHTML = ''; // 清空以重置动画状态
+                }
+            });
+
+            // 组装 DOM
+            nodeWrapper.appendChild(btn);
+            nodeWrapper.appendChild(childrenDiv);
+            container.appendChild(nodeWrapper);
+        });
+
+    </script>
+</body>
+</html>

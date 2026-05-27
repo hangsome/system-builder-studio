@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="0; url=http://159.75.213.93/system-builder/teacher">
+  <title>正在进入画布教师后台</title>
+  <style>
+    :root {
+      --ink: #172033;
+      --muted: #5f6c7b;
+      --line: #d8e1ea;
+      --soft: #eef6f4;
+      --accent: #2f7c68;
+      --accent-strong: #1f5d4e;
+      --panel: rgba(255, 255, 255, .9);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      font-family: "Microsoft YaHei", system-ui, sans-serif;
+      background:
+        radial-gradient(circle at 82% 18%, rgba(47, 124, 104, .16), transparent 32%),
+        linear-gradient(135deg, #f7fcfa 0%, #eef3f7 100%);
+      color: var(--ink);
+    }
+
+    main {
+      width: min(720px, 100%);
+      padding: 34px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--panel);
+      box-shadow: 0 24px 70px rgba(15, 23, 42, .10);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--soft);
+      color: var(--accent-strong);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 6px rgba(47, 124, 104, .12);
+    }
+
+    h1 {
+      margin: 18px 0 10px;
+      font-size: clamp(30px, 5vw, 46px);
+      line-height: 1.08;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    .account {
+      display: grid;
+      gap: 8px;
+      margin-top: 20px;
+      padding: 14px;
+      border: 1px solid #c8ddd6;
+      border-radius: 14px;
+      background: #f8fbfa;
+      color: var(--ink);
+      line-height: 1.7;
+    }
+
+    .account strong {
+      color: var(--accent-strong);
+    }
+
+    code {
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: #edf3f1;
+      color: #173f36;
+      font-family: Consolas, "Microsoft YaHei", monospace;
+      font-size: .95em;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 26px;
+    }
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 9px 15px;
+      border-radius: 12px;
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: white;
+      text-decoration: none;
+      font-weight: 700;
+      transition: transform .16s ease, background .16s ease, border-color .16s ease;
+    }
+
+    a:hover {
+      background: var(--accent-strong);
+      border-color: var(--accent-strong);
+    }
+
+    a:active { transform: translateY(1px); }
+
+    a.secondary {
+      background: white;
+      color: var(--accent-strong);
+      border-color: #b8d2ca;
+    }
+  </style>
+  <script>
+    window.location.replace('http://159.75.213.93/system-builder/teacher');
+  </script>
+</head>
+<body>
+  <main>
+    <span class="eyebrow"><span class="dot"></span>画布教师后台</span>
+    <h1>正在进入画布教师后台</h1>
+    <p>本页会自动跳转到信息系统搭建模拟器的教师工作台，用于查看学生画布提交、自动评分、提交批次和学生作答情况。若浏览器没有自动跳转，请点击下方按钮。</p>
+
+    <div class="account">
+      <div><strong>教师账号：</strong><code>teacher</code></div>
+      <div><strong>教师密码：</strong><code>teacher@123</code></div>
+    </div>
+
+    <div class="actions">
+      <a href="http://159.75.213.93/system-builder/teacher">立即进入画布教师后台</a>
+      <a class="secondary" href="http://159.75.213.93/system-builder/teacher-demo-blank">教师空白演示画布</a>
+      <a class="secondary" href="http://159.75.213.93/system-builder/openclass">学生半成品画布</a>
+      <a class="secondary" href="教师后台入口.html">活动提交后台</a>
+      <a class="secondary" href="课堂链接导航.html">返回课堂链接导航</a>
+    </div>
+  </main>
+</body>
+</html>
